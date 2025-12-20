@@ -1,29 +1,123 @@
+'use client';
+
 import Link from 'next/link';
+import Image from 'next/image';
+import { useState } from 'react';
 
 export function Header() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <header className="bg-white shadow-sm">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold">
-          Accent Productions
-        </Link>
-        <div className="flex gap-6">
-          <Link href="/services" className="hover:text-gray-600">
-            Services
+    <header className="bg-white shadow-sm sticky top-0 z-50">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src="/images/logo.png"
+              alt="Accent Productions"
+              width={50}
+              height={50}
+              className="rounded-lg"
+            />
+            <span className="text-xl font-bold text-gray-900">
+              Accent Productions
+            </span>
           </Link>
-          <Link href="/about" className="hover:text-gray-600">
-            About
-          </Link>
-          <Link href="/contact" className="hover:text-gray-600">
-            Contact
-          </Link>
-          <Link
-            href="/inquiry"
-            className="bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800"
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-8">
+            <Link
+              href="/services"
+              className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+            >
+              Services
+            </Link>
+            <Link
+              href="/about"
+              className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+            >
+              About
+            </Link>
+            <Link
+              href="/contact"
+              className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+            >
+              Contact
+            </Link>
+            <Link
+              href="/inquiry"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-2.5 rounded-full font-semibold hover:from-amber-600 hover:to-orange-600 transition-all shadow-md hover:shadow-lg"
+            >
+              Get a Quote
+            </Link>
+          </div>
+
+          {/* Mobile menu button */}
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            Get a Quote
-          </Link>
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              {mobileMenuOpen ? (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              ) : (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              )}
+            </svg>
+          </button>
         </div>
+
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="md:hidden py-4 border-t">
+            <div className="flex flex-col gap-4">
+              <Link
+                href="/services"
+                className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Services
+              </Link>
+              <Link
+                href="/about"
+                className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                About
+              </Link>
+              <Link
+                href="/contact"
+                className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Contact
+              </Link>
+              <Link
+                href="/inquiry"
+                className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-3 rounded-full font-semibold text-center"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Get a Quote
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
     </header>
   );
