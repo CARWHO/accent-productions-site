@@ -28,15 +28,14 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="lg:col-span-1">
-            <Link href="/" className="flex items-center gap-3 mb-6">
+            <Link href="/" className="inline-block mb-6">
               <Image
                 src="/images/logo.png"
                 alt="Accent Productions"
-                width={40}
-                height={40}
-                className="rounded-lg"
+                width={160}
+                height={45}
+                className="h-11 w-auto brightness-0 invert"
               />
-              <span className="text-xl font-bold">Accent Productions</span>
             </Link>
             <p className="text-gray-400 mb-6">
               Professional sound equipment rental for events of all sizes. Making your events sound amazing since 2014.

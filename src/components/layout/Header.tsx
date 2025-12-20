@@ -12,17 +12,14 @@ export function Header() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/">
             <Image
               src="/images/logo.png"
               alt="Accent Productions"
-              width={50}
+              width={180}
               height={50}
-              className="rounded-lg"
+              className="h-12 w-auto"
             />
-            <span className="text-xl font-bold text-gray-900">
-              Accent Productions
-            </span>
           </Link>
 
           {/* Desktop Navigation */}
