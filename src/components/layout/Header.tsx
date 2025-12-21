@@ -37,14 +37,8 @@ export function Header() {
               About
             </Link>
             <Link
-              href="/contact"
-              className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
-            >
-              Contact
-            </Link>
-            <Link
               href="/inquiry"
-              className="bg-amber-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
+              className="bg-[#F47B20] text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-[#D96B10] transition-colors"
             >
               Get a Quote
             </Link>
@@ -99,15 +93,8 @@ export function Header() {
                 About
               </Link>
               <Link
-                href="/contact"
-                className="text-gray-600 hover:text-gray-900 font-medium py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Contact
-              </Link>
-              <Link
                 href="/inquiry"
-                className="bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold text-center hover:bg-amber-600 transition-colors"
+                className="bg-[#F47B20] text-white px-6 py-3 rounded-lg font-semibold text-center hover:bg-[#D96B10] transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Get a Quote

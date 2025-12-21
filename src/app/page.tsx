@@ -32,7 +32,7 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative h-[80vh] min-h-[500px] flex items-center">
+      <section className="relative h-screen flex items-center">
         <div className="absolute inset-0 z-0">
           <Image
             src="/images/image7.jpg"
@@ -55,34 +55,34 @@ export default function Home() {
             <div className="flex flex-wrap gap-4">
               <Link
                 href="/inquiry"
-                className="bg-amber-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
+                className="bg-[#F47B20] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#D96B10] transition-colors"
               >
                 Get a Quote
               </Link>
-              <Link
-                href="/services"
-                className="bg-white text-gray-900 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+              <a
+                href="#services"
+                className="bg-white/20 backdrop-blur-sm text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/30 transition-colors border border-white/30"
               >
                 View Services
-              </Link>
+              </a>
             </div>
           </div>
         </div>
       </section>
 
       {/* Services Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-12">Our Services</h2>
+      <section id="services" className="h-screen py-12 bg-white flex flex-col justify-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">Our Services</h2>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             {services.map((service) => (
               <Link
                 key={service.title}
                 href={service.href}
                 className="group block"
               >
-                <div className="aspect-[4/3] relative rounded-lg overflow-hidden mb-4">
+                <div className="aspect-[2/1] relative rounded-lg overflow-hidden mb-3">
                   <Image
                     src={service.image}
                     alt={service.title}
@@ -90,7 +90,7 @@ export default function Home() {
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-600 transition-colors">
+                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-[#F47B20] transition-colors">
                   {service.title}
                 </h3>
                 <p className="text-gray-600 text-sm mt-1">{service.description}</p>
@@ -116,7 +116,7 @@ export default function Home() {
               </p>
               <Link
                 href="/about"
-                className="text-amber-600 font-medium hover:text-amber-700"
+                className="text-[#F47B20] font-medium hover:text-[#D96B10]"
               >
                 Learn more about us →
               </Link>
@@ -133,23 +133,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to get started?
-          </h2>
-          <p className="text-gray-400 mb-8 max-w-xl mx-auto">
-            Tell us about your event and we&apos;ll put together a custom quote.
-          </p>
-          <Link
-            href="/inquiry"
-            className="inline-block bg-amber-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
-          >
-            Request a Quote
-          </Link>
-        </div>
-      </section>
     </main>
   );
 }

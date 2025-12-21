@@ -5,10 +5,10 @@ export default function AboutPage() {
   return (
     <main className="min-h-screen">
       {/* Header */}
-      <section className="py-16 bg-gray-900">
+      <section className="pt-24 pb-12 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-bold text-white mb-4">About Us</h1>
-          <p className="text-xl text-gray-400 max-w-2xl">
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">About Us</h1>
+          <p className="text-xl text-gray-600 max-w-2xl">
             Professional sound equipment rental in Auckland since 2014.
           </p>
         </div>
@@ -43,44 +43,6 @@ export default function AboutPage() {
               />
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Stats */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-gray-900 mb-2">500+</div>
-              <div className="text-gray-600">Events completed</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-gray-900 mb-2">10+</div>
-              <div className="text-gray-600">Years in business</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-gray-900 mb-2">Auckland</div>
-              <div className="text-gray-600">Based and operated</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-16 bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">
-            Have an event coming up?
-          </h2>
-          <p className="text-gray-400 mb-6">
-            Get in touch for a free quote.
-          </p>
-          <Link
-            href="/inquiry"
-            className="inline-block bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-amber-600 transition-colors"
-          >
-            Request a Quote
-          </Link>
         </div>
       </section>
     </main>

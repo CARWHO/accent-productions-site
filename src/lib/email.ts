@@ -3,9 +3,18 @@
 
 export async function sendInquiryNotification(data: {
   eventType: string;
-  attendance: number;
+  organization: string;
+  eventName: string;
   eventDate: string;
+  eventTime: string;
+  setupTime: string;
+  attendance: number;
   location: string;
+  venueContact: string;
+  content: string;
+  indoorOutdoor: string;
+  powerAccess: string;
+  stageProvider: string;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
