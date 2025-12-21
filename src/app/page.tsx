@@ -32,7 +32,7 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center">
+      <section className="relative h-dvh min-h-[600px] flex items-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <Image
             src="/images/image7.jpg"
@@ -40,11 +40,12 @@ export default function Home() {
             fill
             className="object-cover"
             priority
+            sizes="100vw"
           />
           <div className="absolute inset-0 bg-black/60" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="container relative z-10 mx-auto px-4">
           <div className="max-w-2xl">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
               Professional Sound Equipment Rental
@@ -71,7 +72,7 @@ export default function Home() {
       </section>
 
       {/* Services Section */}
-      <section id="services" className="h-screen py-12 bg-white flex flex-col justify-center">
+      <section id="services" className="relative min-h-screen py-16 md:py-24 bg-white flex flex-col justify-center">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Our Services</h2>
 
