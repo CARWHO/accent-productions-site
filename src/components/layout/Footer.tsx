@@ -9,7 +9,7 @@ export function Footer() {
           <div className="flex items-center gap-8">
             <Link href="/">
               <Image
-                src="/images/logowhite.png"
+                src="/images/logowhitefooter.png"
                 alt="Accent Productions"
                 width={120}
                 height={35}

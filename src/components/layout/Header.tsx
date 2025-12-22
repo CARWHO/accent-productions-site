@@ -14,7 +14,7 @@ export function Header() {
           {/* Logo */}
           <Link href="/">
             <Image
-              src="/images/logowhite.png"
+              src="/images/logowhiteheader.png"
               alt="Accent Productions"
               width={180}
               height={50}
