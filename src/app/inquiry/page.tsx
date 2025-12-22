@@ -115,12 +115,18 @@ function InquiryForm() {
 
   const updateField = (field: keyof PackageFormData, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear validation when user updates a field
+    if (showValidation) {
+      setShowValidation(false);
+    }
   };
 
   const goToStep = (newStep: number) => {
     if (isTransitioning) return;
     setIsTransitioning(true);
     setIsVisible(false);
+    // Clear validation when changing steps
+    setShowValidation(false);
 
     setTimeout(() => {
       setStep(newStep);
@@ -173,7 +179,14 @@ function InquiryForm() {
   const totalSteps = formData.package === 'extra_large' ? 1 : 4;
 
   return (
-    <div className="w-full min-h-[720px] flex flex-col">
+    <div className="w-full min-h-0 lg:min-h-[720px] flex flex-col">
+      {/* Error Summary */}
+      {showValidation && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+          <p className="text-sm text-red-800 font-semibold">Please fill in all required fields</p>
+        </div>
+      )}
+
       {/* Progress - only show after package selection */}
       {step > 1 && (
         <div className="flex gap-2 mb-4">
@@ -235,9 +248,12 @@ function InquiryForm() {
                 type="text"
                 value={formData.contactName || ''}
                 onChange={(e) => updateField('contactName', e.target.value)}
-                className={inputStyles}
+                className={`${inputStyles} ${showValidation && !formData.contactName ? 'border-red-500' : ''}`}
                 placeholder="John Smith"
               />
+              {showValidation && !formData.contactName && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
             </div>
             <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
               <div>
@@ -246,9 +262,12 @@ function InquiryForm() {
                   type="email"
                   value={formData.contactEmail || ''}
                   onChange={(e) => updateField('contactEmail', e.target.value)}
-                  className={inputStyles}
+                  className={`${inputStyles} ${showValidation && !formData.contactEmail ? 'border-red-500' : ''}`}
                   placeholder="john@example.com"
                 />
+                {showValidation && !formData.contactEmail && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
@@ -256,9 +275,12 @@ function InquiryForm() {
                   type="tel"
                   value={formData.contactPhone || ''}
                   onChange={(e) => updateField('contactPhone', e.target.value)}
-                  className={inputStyles}
+                  className={`${inputStyles} ${showValidation && !formData.contactPhone ? 'border-red-500' : ''}`}
                   placeholder="+64 21 123 4567"
                 />
+                {showValidation && !formData.contactPhone && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
               </div>
             </div>
             <div>
@@ -277,8 +299,15 @@ function InquiryForm() {
           <div className="flex gap-4 mt-auto pt-5">
             <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !formData.contactName || !formData.contactEmail || !formData.contactPhone}
+              onClick={() => {
+                if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
+                  setShowValidation(true);
+                } else {
+                  setShowValidation(false);
+                  handleSubmit();
+                }
+              }}
+              disabled={isSubmitting}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000] disabled:opacity-50"
             >
               {isSubmitting ? 'Sending...' : 'Submit Request'}
@@ -298,13 +327,16 @@ function InquiryForm() {
               <select
                 value={formData.eventType || ''}
                 onChange={(e) => updateField('eventType', e.target.value)}
-                className={inputStyles}
+                className={`${inputStyles} ${showValidation && !formData.eventType ? 'border-red-500' : ''}`}
               >
                 <option value="">Select event type...</option>
                 {eventTypes.map((type) => (
                   <option key={type.value} value={type.value}>{type.label}</option>
                 ))}
               </select>
+              {showValidation && !formData.eventType && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
             </div>
 
             <div>
@@ -313,9 +345,12 @@ function InquiryForm() {
                 type="text"
                 value={formData.eventName || ''}
                 onChange={(e) => updateField('eventName', e.target.value)}
-                className={inputStyles}
+                className={`${inputStyles} ${showValidation && !formData.eventName ? 'border-red-500' : ''}`}
                 placeholder="e.g., Annual Awards Night"
               />
+              {showValidation && !formData.eventName && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
             </div>
 
             <div>
@@ -336,8 +371,11 @@ function InquiryForm() {
                   type="date"
                   value={formData.eventDate || ''}
                   onChange={(e) => updateField('eventDate', e.target.value)}
-                  className={inputStyles}
+                  className={`${inputStyles} ${showValidation && !formData.eventDate ? 'border-red-500' : ''}`}
                 />
+                {showValidation && !formData.eventDate && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Event Time *</label>
@@ -346,8 +384,11 @@ function InquiryForm() {
                   placeholder="e.g., 6pm - 11pm"
                   value={formData.eventTime || ''}
                   onChange={(e) => updateField('eventTime', e.target.value)}
-                  className={inputStyles}
+                  className={`${inputStyles} ${showValidation && !formData.eventTime ? 'border-red-500' : ''}`}
                 />
+                {showValidation && !formData.eventTime && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
               </div>
             </div>
 
@@ -358,8 +399,11 @@ function InquiryForm() {
                 placeholder="e.g., 2pm setup / 12am packout"
                 value={formData.setupTime || ''}
                 onChange={(e) => updateField('setupTime', e.target.value)}
-                className={inputStyles}
+                className={`${inputStyles} ${showValidation && !formData.setupTime ? 'border-red-500' : ''}`}
               />
+              {showValidation && !formData.setupTime && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
             </div>
           </div>
           </div>
@@ -567,8 +611,11 @@ function InquiryForm() {
                 placeholder="Full venue address"
                 value={formData.location || ''}
                 onChange={(e) => updateField('location', e.target.value)}
-                className={inputStyles}
+                className={`${inputStyles} ${showValidation && !formData.location ? 'border-red-500' : ''}`}
               />
+              {showValidation && !formData.location && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
             </div>
 
             <div>
@@ -598,6 +645,8 @@ function InquiryForm() {
                     <div className={`py-2.5 text-center rounded-md border-2 transition-all font-bold ${
                       formData.indoorOutdoor === opt
                         ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
+                        : showValidation && !formData.indoorOutdoor
+                        ? 'border-red-500 text-gray-600 hover:border-red-600'
                         : 'border-gray-200 text-gray-600 hover:border-gray-300'
                     }`}>
                       {opt}
@@ -605,6 +654,9 @@ function InquiryForm() {
                   </label>
                 ))}
               </div>
+              {showValidation && !formData.indoorOutdoor && (
+                <p className="text-xs text-red-600 mt-1 font-medium">Please select an environment</p>
+              )}
             </div>
 
             {formData.indoorOutdoor === 'Outdoor' && (
@@ -616,8 +668,11 @@ function InquiryForm() {
                     placeholder="e.g., 2 standard outlets, 3-phase power available"
                     value={formData.powerAccess || ''}
                     onChange={(e) => updateField('powerAccess', e.target.value)}
-                    className={inputStyles}
+                    className={`${inputStyles} ${showValidation && !formData.powerAccess ? 'border-red-500' : ''}`}
                   />
+                  {showValidation && !formData.powerAccess && (
+                    <p className="text-xs text-red-600 mt-1 font-medium">This field is required for outdoor events</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Wet Weather Plan</label>
@@ -704,9 +759,12 @@ function InquiryForm() {
                 type="text"
                 value={formData.contactName || ''}
                 onChange={(e) => updateField('contactName', e.target.value)}
-                className={inputStyles}
+                className={`${inputStyles} ${showValidation && !formData.contactName ? 'border-red-500' : ''}`}
                 placeholder="John Smith"
               />
+              {showValidation && !formData.contactName && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
@@ -716,9 +774,12 @@ function InquiryForm() {
                   type="email"
                   value={formData.contactEmail || ''}
                   onChange={(e) => updateField('contactEmail', e.target.value)}
-                  className={inputStyles}
+                  className={`${inputStyles} ${showValidation && !formData.contactEmail ? 'border-red-500' : ''}`}
                   placeholder="john@example.com"
                 />
+                {showValidation && !formData.contactEmail && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
@@ -726,9 +787,12 @@ function InquiryForm() {
                   type="tel"
                   value={formData.contactPhone || ''}
                   onChange={(e) => updateField('contactPhone', e.target.value)}
-                  className={inputStyles}
+                  className={`${inputStyles} ${showValidation && !formData.contactPhone ? 'border-red-500' : ''}`}
                   placeholder="+64 21 123 4567"
                 />
+                {showValidation && !formData.contactPhone && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
               </div>
             </div>
 
@@ -753,8 +817,15 @@ function InquiryForm() {
               Back
             </button>
             <button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !formData.contactName || !formData.contactEmail || !formData.contactPhone}
+              onClick={() => {
+                if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
+                  setShowValidation(true);
+                } else {
+                  setShowValidation(false);
+                  handleSubmit();
+                }
+              }}
+              disabled={isSubmitting}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000] disabled:opacity-50"
             >
               {isSubmitting ? 'Sending...' : 'Get Quote'}
@@ -768,9 +839,9 @@ function InquiryForm() {
 
 export default function InquiryPage() {
   return (
-    <main className="bg-stone-50 min-h-screen pt-24 lg:pt-5 pb-8 lg:pb-12 px-4 sm:px-6 lg:px-8">
+    <main className="bg-stone-50 min-h-screen pt-5 lg:pt-5 pb-8 lg:pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-md border border-stone-200 p-6 lg:p-8 min-h-[775px]">
+        <div className="bg-white rounded-md border border-stone-200 p-6 lg:p-8 min-h-[400px] lg:min-h-[775px]">
           <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded-md" />}>
             <InquiryForm />
           </Suspense>
