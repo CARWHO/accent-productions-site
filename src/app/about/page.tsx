@@ -9,7 +9,7 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">About Us</h1>
           <p className="text-xl text-gray-600 max-w-2xl">
-            Professional sound equipment rental in Auckland since 2014.
+            Professional sound equipment rental in Wellington since 2014.
           </p>
         </div>
       </section>
@@ -24,7 +24,7 @@ export default function AboutPage() {
               </h2>
               <div className="space-y-4 text-gray-600">
                 <p>
-                  Accent Productions started in 2014 with a simple goal: provide reliable, professional sound equipment for events in Auckland.
+                  Accent Productions started in 2014 with a simple goal: provide reliable, professional sound equipment for events in Wellington.
                 </p>
                 <p>
                   What began as helping friends with their weddings and parties has grown into a full-service audio rental company. We&apos;ve now provided sound for over 500 events - from backyard celebrations to corporate conferences.

@@ -9,7 +9,7 @@ const services = [
     id: 'weddings',
     title: 'Weddings',
     description: 'Audio systems for ceremonies and receptions. Wireless microphones for vows, speaker systems for music, and everything in between.',
-    image: '/images/image1.jpg',
+    image: '/images/image9.webp',
     includes: [
       'Wireless microphones for ceremony',
       'Speaker systems for reception',

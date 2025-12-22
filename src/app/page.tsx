@@ -5,7 +5,7 @@ const services = [
   {
     title: 'Weddings',
     description: 'Ceremony and reception audio systems.',
-    image: '/images/image1.jpg',
+    image: '/images/image9.webp',
     href: '/services#weddings',
   },
   {
@@ -51,7 +51,7 @@ export default function Home() {
               Professional Sound Equipment Rental
             </h1>
             <p className="text-xl text-gray-200 mb-8">
-              Auckland-based audio solutions for weddings, corporate events, festivals, and private parties.
+              Wellington-based audio solutions for weddings, corporate events, festivals, and private parties.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
@@ -110,7 +110,7 @@ export default function Home() {
                 10+ Years of Experience
               </h2>
               <p className="text-gray-600 mb-4">
-                Since 2014, we&apos;ve provided professional audio equipment and technical support for over 500 events across Auckland.
+                Since 2014, we&apos;ve provided professional audio equipment and technical support for over 500 events across the Wellington region.
               </p>
               <p className="text-gray-600 mb-6">
                 We handle setup, operation, and breakdown - you focus on your event.
