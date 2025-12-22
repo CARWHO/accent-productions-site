@@ -372,14 +372,14 @@ function InquiryForm() {
 
 export default function InquiryPage() {
   return (
-    <main className="bg-stone-50 min-h-screen pt-24 lg:pt-24 pb-6 lg:pb-8 px-4 sm:px-6 lg:px-8">
+    <main className="bg-stone-50 min-h-screen pt-6 lg:pt-28 pb-8 lg:pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        <div className="mb-4 lg:mb-5 text-center">
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Request a Quote</h1>
-          <p className="text-gray-700 text-sm lg:text-base font-medium">Tell us about your event and we'll be in touch within 24 hours.</p>
+        <div className="mb-5 lg:mb-6 text-center">
+          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-3">Request a Quote</h1>
+          <p className="text-gray-700 text-base lg:text-lg font-medium">Tell us about your event and we'll be in touch within 24 hours.</p>
         </div>
 
-        <div className="bg-white rounded-md border border-stone-200 p-5 lg:p-6">
+        <div className="bg-white rounded-md border border-stone-200 p-6 lg:p-8">
           <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded-md" />}>
             <InquiryForm />
           </Suspense>
