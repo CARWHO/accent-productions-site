@@ -85,7 +85,7 @@ export default function ServicesPage() {
       <section className="pt-24 pb-8 md:pb-12 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">Services</h1>
-          <p className="text-xl text-gray-600 max-w-2xl">
+          <p className="text-xl text-gray-700 max-w-2xl font-medium">
             Sound equipment rental for events of all sizes.
           </p>
         </div>
@@ -101,17 +101,17 @@ export default function ServicesPage() {
                 id={service.id}
                 className="min-h-[calc(100vh-12rem)] md:min-h-[calc(100vh-14rem)] py-8 md:py-12 flex items-center"
               >
-                <div className="w-full grid lg:grid-cols-2 gap-6 md:gap-8 lg:gap-12 items-center">
+                <div className="w-full grid lg:grid-cols-2 gap-6 md:gap-8 lg:gap-16 items-center">
                   <div className={index % 2 === 1 ? 'lg:order-2' : ''}>
-                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">
+                    <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 md:mb-6">
                       {service.title}
                     </h2>
-                    <p className="text-gray-600 mb-4 md:mb-6 text-sm md:text-base">{service.description}</p>
-                    <ul className="space-y-2 md:space-y-3 mb-6 md:mb-8">
+                    <p className="text-gray-700 mb-6 md:mb-8 text-base md:text-lg font-medium">{service.description}</p>
+                    <ul className="space-y-3 md:space-y-4 mb-8 md:mb-10">
                       {service.includes.map((item) => (
-                        <li key={item} className="flex items-start gap-2 md:gap-3">
+                        <li key={item} className="flex items-start gap-3 md:gap-4">
                           <svg
-                            className="w-4 h-4 md:w-5 md:h-5 text-[#F47B20] mt-0.5 flex-shrink-0"
+                            className="w-5 h-5 md:w-6 md:h-6 text-[#000000] mt-0.5 flex-shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -123,18 +123,18 @@ export default function ServicesPage() {
                               d="M5 13l4 4L19 7"
                             />
                           </svg>
-                          <span className="text-gray-700 text-sm md:text-base">{item}</span>
+                          <span className="text-gray-700 text-base md:text-lg font-medium">{item}</span>
                         </li>
                       ))}
                     </ul>
                     <Link
                       href={`/inquiry?type=${service.id === 'parties' ? 'private_party' : service.id === 'weddings' ? 'wedding' : service.id}`}
-                      className="inline-block bg-[#F47B20] text-white px-5 py-2.5 md:px-6 md:py-3 rounded-lg font-semibold hover:bg-[#D96B10] transition-colors text-sm md:text-base"
+                      className="inline-block bg-[#000000] text-white px-6 py-3 md:px-8 md:py-3.5 rounded-md font-bold hover:bg-[#152d47] transition-colors text-base md:text-base border border-[#000000]"
                     >
                       Get a Quote
                     </Link>
                   </div>
-                  <div className={`aspect-[4/3] relative rounded-lg overflow-hidden ${index % 2 === 1 ? 'lg:order-1' : ''}`}>
+                  <div className={`aspect-[4/3] relative rounded-md overflow-hidden ${index % 2 === 1 ? 'lg:order-1' : ''}`}>
                     <Image
                       src={service.image}
                       alt={service.title}

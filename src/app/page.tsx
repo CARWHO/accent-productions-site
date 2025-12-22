@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -29,6 +31,21 @@ const services = [
 ];
 
 export default function Home() {
+  const handleScrollToServices = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const servicesSection = document.getElementById('services');
+    if (servicesSection) {
+      const headerOffset = 80; // Height of sticky header (h-20)
+      const elementPosition = servicesSection.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
@@ -50,19 +67,20 @@ export default function Home() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
               Professional Sound Equipment Rental
             </h1>
-            <p className="text-xl text-gray-200 mb-8">
+            <p className="text-xl text-gray-200 mb-8 font-medium">
               Wellington-based audio solutions for weddings, corporate events, festivals, and private parties.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
                 href="/inquiry"
-                className="bg-[#F47B20] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#D96B10] transition-colors"
+                className="bg-[#FFFFFF] text-black px-8 py-3 rounded-md font-bold hover:bg-[#152d47] transition-colors border border-[#000000]"
               >
                 Get a Quote
               </Link>
               <a
                 href="#services"
-                className="bg-white/20 backdrop-blur-sm text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/30 transition-colors border border-white/30"
+                onClick={handleScrollToServices}
+                className="bg-white/10 backdrop-blur-sm text-white px-8 py-3 rounded-md font-bold hover:bg-white/20 transition-colors border border-white/40 cursor-pointer"
               >
                 View Services
               </a>
@@ -72,18 +90,18 @@ export default function Home() {
       </section>
 
       {/* Services Section */}
-      <section id="services" className="relative min-h-screen py-16 md:py-24 bg-white flex flex-col justify-center">
+      <section id="services" className="relative min-h-screen py-16 md:py-24 bg-white flex flex-col justify-center scroll-mt-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">Our Services</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-12">Our Services</h2>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-8">
             {services.map((service) => (
               <Link
                 key={service.title}
                 href={service.href}
                 className="group block"
               >
-                <div className="aspect-[2/1] relative rounded-lg overflow-hidden mb-3">
+                <div className="aspect-[2/1] relative rounded-md overflow-hidden mb-4">
                   <Image
                     src={service.image}
                     alt={service.title}
@@ -91,10 +109,10 @@ export default function Home() {
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-[#F47B20] transition-colors">
+                <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#000000] transition-colors">
                   {service.title}
                 </h3>
-                <p className="text-gray-600 text-sm mt-1">{service.description}</p>
+                <p className="text-gray-600 text-sm mt-2 font-medium">{service.description}</p>
               </Link>
             ))}
           </div>
@@ -102,27 +120,27 @@ export default function Home() {
       </section>
 
       {/* About Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">
+              <h2 className="text-4xl font-bold text-gray-900 mb-6">
                 10+ Years of Experience
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-700 mb-4 font-medium text-lg">
                 Since 2014, we&apos;ve provided professional audio equipment and technical support for over 500 events across the Wellington region.
               </p>
-              <p className="text-gray-600 mb-6">
+              <p className="text-gray-700 mb-8 font-medium text-lg">
                 We handle setup, operation, and breakdown - you focus on your event.
               </p>
               <Link
                 href="/about"
-                className="text-[#F47B20] font-medium hover:text-[#D96B10]"
+                className="text-[#000000] font-bold hover:text-[#152d47] text-base underline underline-offset-4"
               >
                 Learn more about us →
               </Link>
             </div>
-            <div className="aspect-[4/3] relative rounded-lg overflow-hidden">
+            <div className="aspect-[4/3] relative rounded-md overflow-hidden">
               <Image
                 src="/images/image8.webp"
                 alt="Sound equipment setup"

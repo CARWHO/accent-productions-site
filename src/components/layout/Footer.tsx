@@ -16,7 +16,7 @@ export function Footer() {
                 className="h-8 w-auto"
               />
             </Link>
-            <nav className="flex gap-6 text-sm text-gray-600">
+            <nav className="flex gap-6 text-sm text-gray-700 font-semibold">
               <Link href="/services" className="hover:text-gray-900">Services</Link>
               <Link href="/about" className="hover:text-gray-900">About</Link>
             </nav>

@@ -8,21 +8,21 @@ export default function AboutPage() {
       <section className="pt-24 pb-12 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">About Us</h1>
-          <p className="text-xl text-gray-600 max-w-2xl">
+          <p className="text-xl text-gray-700 max-w-2xl font-medium">
             Professional sound equipment rental in Wellington since 2014.
           </p>
         </div>
       </section>
 
       {/* Story */}
-      <section className="py-16 bg-white">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">
+              <h2 className="text-4xl font-bold text-gray-900 mb-8">
                 Our Story
               </h2>
-              <div className="space-y-4 text-gray-600">
+              <div className="space-y-5 text-gray-700 text-lg font-medium">
                 <p>
                   Accent Productions started in 2014 with a simple goal: provide reliable, professional sound equipment for events in Wellington.
                 </p>
@@ -34,7 +34,7 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
-            <div className="aspect-[4/3] relative rounded-lg overflow-hidden">
+            <div className="aspect-[4/3] relative rounded-md overflow-hidden">
               <Image
                 src="/images/image8.webp"
                 alt="Sound equipment"

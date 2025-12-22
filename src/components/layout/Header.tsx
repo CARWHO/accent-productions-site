@@ -26,19 +26,19 @@ export function Header() {
           <div className="hidden md:flex items-center gap-8">
             <Link
               href="/services"
-              className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+              className="text-gray-700 hover:text-gray-900 font-semibold transition-colors"
             >
               Services
             </Link>
             <Link
               href="/about"
-              className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+              className="text-gray-700 hover:text-gray-900 font-semibold transition-colors"
             >
               About
             </Link>
             <Link
               href="/inquiry"
-              className="bg-[#F47B20] text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-[#D96B10] transition-colors"
+              className="bg-[#000000] text-white px-6 py-2.5 rounded-md font-bold hover:bg-[#152d47] transition-colors border border-[#000000]"
             >
               Get a Quote
             </Link>
@@ -46,11 +46,11 @@ export function Header() {
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            className="md:hidden p-2 rounded-md hover:bg-gray-100 transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             <svg
-              className="w-6 h-6"
+              className={`w-6 h-6 transition-transform duration-200 ${mobileMenuOpen ? 'rotate-90' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -75,33 +75,37 @@ export function Header() {
         </div>
 
         {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t">
+        <div
+          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+            mobileMenuOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="py-4 border-t">
             <div className="flex flex-col gap-4">
               <Link
                 href="/services"
-                className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                className="text-gray-700 hover:text-gray-900 font-semibold py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Services
               </Link>
               <Link
                 href="/about"
-                className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                className="text-gray-700 hover:text-gray-900 font-semibold py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 About
               </Link>
               <Link
                 href="/inquiry"
-                className="bg-[#F47B20] text-white px-6 py-3 rounded-lg font-semibold text-center hover:bg-[#D96B10] transition-colors"
+                className="bg-[#000000] text-white px-6 py-3 rounded-md font-bold text-center hover:bg-[#152d47] transition-colors border border-[#000000]"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Get a Quote
               </Link>
             </div>
           </div>
-        )}
+        </div>
       </nav>
     </header>
   );

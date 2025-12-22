@@ -73,27 +73,27 @@ function InquiryForm() {
   if (submitted) {
     return (
       <div className={`flex flex-col items-center justify-center py-20 transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="w-20 h-20 bg-[#F47B20] rounded-full flex items-center justify-center mb-8">
+        <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-8">
           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <h2 className="text-3xl font-bold text-gray-900 mb-3">Thank you</h2>
-        <p className="text-gray-600 text-lg">We&apos;ll be in touch within 24 hours.</p>
+        <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
       </div>
     );
   }
 
-  const inputStyles = "w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:border-[#F47B20] transition-colors bg-white";
+  const inputStyles = "w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
 
   return (
     <div className="w-full">
       {/* Progress */}
-      <div className="flex gap-2 mb-8">
+      <div className="flex gap-2 mb-6">
         {[1, 2, 3, 4].map((s) => (
           <div
             key={s}
-            className={`h-1.5 flex-1 rounded-full transition-colors duration-200 ${s <= step ? 'bg-[#F47B20]' : 'bg-gray-200'}`}
+            className={`h-2 flex-1 transition-colors duration-200 ${s <= step ? 'bg-[#000000]' : 'bg-gray-200'}`}
           />
         ))}
       </div>
@@ -101,8 +101,8 @@ function InquiryForm() {
       {/* Step 1: Event Type */}
       {step === 1 && (
         <div className={`transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">What type of event?</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-5">What type of event?</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 lg:gap-4">
             {eventTypes.map((type) => (
               <button
                 key={type.value}
@@ -111,17 +111,17 @@ function InquiryForm() {
                   updateField('eventType', type.value);
                   goToStep(2);
                 }}
-                className={`group relative border-2 rounded-xl overflow-hidden transition-all text-left ${formData.eventType === type.value
-                  ? 'border-[#F47B20] ring-2 ring-[#F47B20]'
-                  : 'border-gray-100 bg-white hover:border-gray-200'
+                className={`group relative border-2 rounded-md overflow-hidden transition-all text-left ${formData.eventType === type.value
+                  ? 'border-[#000000] ring-2 ring-[#000000]'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
               >
-                <div className="aspect-[4/3] relative w-full">
+                <div className="aspect-[3/2] lg:aspect-[4/3] relative w-full">
                   <Image src={type.image} alt={type.label} fill className="object-cover" />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
                 </div>
-                <div className="p-4">
-                  <span className={`font-semibold block ${formData.eventType === type.value ? 'text-[#F47B20]' : 'text-gray-900'}`}>
+                <div className="p-3 lg:p-4">
+                  <span className={`font-bold block ${formData.eventType === type.value ? 'text-[#000000]' : 'text-gray-900'}`}>
                     {type.label}
                   </span>
                 </div>
@@ -134,8 +134,8 @@ function InquiryForm() {
       {/* Step 2: Event Basics */}
       {step === 2 && (
         <div className={`transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Event Basics</h2>
-          <div className="grid gap-6">
+          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-6">Event Basics</h2>
+          <div className="grid gap-4 lg:gap-5">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Event Name *</label>
               <input
@@ -156,7 +156,7 @@ function InquiryForm() {
                 placeholder="Company or Group Name"
               />
             </div>
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 gap-4 lg:gap-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
                 <input
@@ -177,7 +177,7 @@ function InquiryForm() {
                 />
               </div>
             </div>
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 gap-4 lg:gap-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Event Time *</label>
                 <input
@@ -201,8 +201,8 @@ function InquiryForm() {
             </div>
           </div>
 
-          <div className="flex gap-4 mt-8">
-            <button onClick={() => goToStep(1)} className="px-6 py-3 text-gray-600 font-semibold hover:text-gray-900 transition-colors">Back</button>
+          <div className="flex gap-4 mt-6 lg:mt-7">
+            <button onClick={() => goToStep(1)} className="px-6 py-3 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => {
                 if (!formData.eventName || !formData.eventDate || !formData.attendance || !formData.eventTime || !formData.setupTime) {
@@ -212,7 +212,7 @@ function InquiryForm() {
                   goToStep(3);
                 }
               }}
-              className="flex-1 bg-[#F47B20] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#D96B10] transition-all hover:-translate-y-0.5"
+              className="flex-1 bg-[#000000] text-white py-4 rounded-md font-bold text-lg hover:bg-[#152d47] transition-colors border border-[#000000]"
             >
               Continue
             </button>
@@ -223,8 +223,8 @@ function InquiryForm() {
       {/* Step 3: Logistics */}
       {step === 3 && (
         <div className={`transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Logistics & Content</h2>
-          <div className="grid gap-6">
+          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-6">Logistics & Content</h2>
+          <div className="grid gap-4 lg:gap-5">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Venue Location *</label>
               <input
@@ -245,7 +245,7 @@ function InquiryForm() {
                 className={inputStyles}
               />
             </div>
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 gap-4 lg:gap-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Environment *</label>
                 <div className="flex gap-4 p-1">
@@ -259,7 +259,7 @@ function InquiryForm() {
                         onChange={(e) => updateField('indoorOutdoor', e.target.value)}
                         className="sr-only"
                       />
-                      <div className={`py-3 text-center rounded-lg border-2 transition-all font-medium ${formData.indoorOutdoor === opt ? 'border-[#F47B20] bg-orange-50 text-[#F47B20]' : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                      <div className={`py-3 text-center rounded-md border-2 transition-all font-bold ${formData.indoorOutdoor === opt ? 'border-[#000000] bg-[#000000]/5 text-[#000000]' : 'border-gray-200 text-gray-600 hover:border-gray-300'
                         }`}>
                         {opt}
                       </div>
@@ -290,8 +290,8 @@ function InquiryForm() {
             </div>
           </div>
 
-          <div className="flex gap-4 mt-8">
-            <button onClick={() => goToStep(2)} className="px-6 py-3 text-gray-600 font-semibold hover:text-gray-900 transition-colors">Back</button>
+          <div className="flex gap-4 mt-6 lg:mt-7">
+            <button onClick={() => goToStep(2)} className="px-6 py-3 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => {
                 if (!formData.location || !formData.indoorOutdoor || !formData.powerAccess || !formData.content) {
@@ -301,7 +301,7 @@ function InquiryForm() {
                   goToStep(4);
                 }
               }}
-              className="flex-1 bg-[#F47B20] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#D96B10] transition-all hover:-translate-y-0.5"
+              className="flex-1 bg-[#000000] text-white py-4 rounded-md font-bold text-lg hover:bg-[#152d47] transition-colors border border-[#000000]"
             >
               Continue
             </button>
@@ -312,8 +312,8 @@ function InquiryForm() {
       {/* Step 4: Contact */}
       {step === 4 && (
         <div className={`transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Info</h2>
-          <div className="grid gap-6">
+          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-6">Contact Info</h2>
+          <div className="grid gap-4 lg:gap-5">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name</label>
               <input
@@ -323,7 +323,7 @@ function InquiryForm() {
                 className={inputStyles}
               />
             </div>
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 gap-4 lg:gap-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
                 <input
@@ -354,12 +354,12 @@ function InquiryForm() {
             </div>
           </div>
 
-          <div className="flex gap-4 mt-8">
-            <button onClick={() => goToStep(3)} className="px-6 py-3 text-gray-600 font-semibold hover:text-gray-900 transition-colors">Back</button>
+          <div className="flex gap-4 mt-6 lg:mt-7">
+            <button onClick={() => goToStep(3)} className="px-6 py-3 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={handleSubmit}
               disabled={isSubmitting || !formData.contactName || !formData.contactEmail || !formData.contactPhone}
-              className="flex-1 bg-[#F47B20] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#D96B10] transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0"
+              className="flex-1 bg-[#000000] text-white py-4 rounded-md font-bold text-lg hover:bg-[#152d47] transition-colors border border-[#000000] disabled:opacity-50"
             >
               {isSubmitting ? 'Sending...' : 'Get Quote'}
             </button>
@@ -372,15 +372,15 @@ function InquiryForm() {
 
 export default function InquiryPage() {
   return (
-    <main className="bg-stone-50 min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+    <main className="bg-stone-50 min-h-screen pt-24 lg:pt-24 pb-6 lg:pb-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        <div className="mb-12 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Request a Quote</h1>
-          <p className="text-gray-600 text-lg">Tell us about your event and we'll be in touch within 24 hours.</p>
+        <div className="mb-4 lg:mb-5 text-center">
+          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Request a Quote</h1>
+          <p className="text-gray-700 text-sm lg:text-base font-medium">Tell us about your event and we'll be in touch within 24 hours.</p>
         </div>
 
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 md:p-10">
-          <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded-xl" />}>
+        <div className="bg-white rounded-md border border-stone-200 p-5 lg:p-6">
+          <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded-md" />}>
             <InquiryForm />
           </Suspense>
         </div>
