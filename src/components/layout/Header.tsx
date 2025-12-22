@@ -37,6 +37,12 @@ export function Header() {
               About
             </Link>
             <Link
+              href="/contact"
+              className="text-gray-700 hover:text-gray-900 font-semibold transition-colors"
+            >
+              Contact
+            </Link>
+            <Link
               href="/inquiry"
               className="bg-[#000000] text-white px-6 py-2.5 rounded-md font-bold hover:bg-[#152d47] transition-colors border border-[#000000]"
             >
@@ -77,7 +83,7 @@ export function Header() {
         {/* Mobile Navigation */}
         <div
           className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-            mobileMenuOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0'
+            mobileMenuOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
           <div className="py-4 border-t">
@@ -95,6 +101,13 @@ export function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 About
+              </Link>
+              <Link
+                href="/contact"
+                className="text-gray-700 hover:text-gray-900 font-semibold py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Contact
               </Link>
               <Link
                 href="/inquiry"

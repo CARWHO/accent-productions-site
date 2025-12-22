@@ -19,6 +19,7 @@ export function Footer() {
             <nav className="flex gap-6 text-sm text-gray-700 font-semibold">
               <Link href="/services" className="hover:text-gray-900">Services</Link>
               <Link href="/about" className="hover:text-gray-900">About</Link>
+              <Link href="/contact" className="hover:text-gray-900">Contact</Link>
             </nav>
           </div>
           <div className="text-sm text-gray-500">
