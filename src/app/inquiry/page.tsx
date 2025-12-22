@@ -598,8 +598,8 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 4: Venue & Logistics */}
-      {step === 4 && formData.package !== 'extra_large' && (
+      {/* Step 4: Venue & Logistics (only for medium/large) */}
+      {step === 4 && (formData.package === 'medium' || formData.package === 'large') && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Venue & Logistics</h2>
