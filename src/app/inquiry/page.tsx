@@ -163,7 +163,7 @@ function InquiryForm() {
 
   if (submitted) {
     return (
-      <div className={`flex flex-col items-center justify-center min-h-0 lg:min-h-[610px] py-16 lg:py-0 transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`flex flex-col items-center justify-center min-h-[610px] transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -201,9 +201,9 @@ function InquiryForm() {
 
       {/* Step 1: Package Selection */}
       {step === 1 && (
-        <div className={`transition-opacity duration-100 lg:flex-grow lg:flex lg:flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
             {packages.map((pkg) => (
               <div
                 key={pkg.value}
@@ -235,8 +235,8 @@ function InquiryForm() {
 
       {/* Step 2: Extra-Large Contact (or Event Basics for others) */}
       {step === 2 && formData.package === 'extra_large' && (
-        <div className={`transition-opacity duration-100 lg:flex-grow lg:flex lg:flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="lg:flex-grow">
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
             <p className="text-gray-600 mb-4 font-medium">
               For events with 1000+ people, we'll need to discuss your requirements in detail. Please provide your contact information and we'll be in touch within 24 hours.
@@ -296,7 +296,7 @@ function InquiryForm() {
           </div>
           </div>
 
-          <div className="flex gap-4 mt-5 lg:mt-auto lg:pt-5">
+          <div className="flex gap-4 mt-auto pt-5">
             <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => {
@@ -318,8 +318,8 @@ function InquiryForm() {
 
       {/* Step 2: Event Basics (for small/medium/large) */}
       {step === 2 && formData.package !== 'extra_large' && (
-        <div className={`transition-opacity duration-100 lg:flex-grow lg:flex lg:flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="lg:flex-grow">
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Basics</h2>
             <div className="grid gap-3 lg:gap-4">
             <div>
@@ -408,7 +408,7 @@ function InquiryForm() {
           </div>
           </div>
 
-          <div className="flex gap-4 mt-5 lg:mt-auto lg:pt-5">
+          <div className="flex gap-4 mt-auto pt-5">
             <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => {
@@ -429,8 +429,8 @@ function InquiryForm() {
 
       {/* Step 3: Small Event Specifics */}
       {step === 3 && formData.package === 'small' && (
-        <div className={`transition-opacity duration-100 lg:flex-grow lg:flex lg:flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="lg:flex-grow">
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Details</h2>
             <div className="grid gap-3">
             <div className="border border-gray-200 rounded-md p-3">
@@ -506,7 +506,7 @@ function InquiryForm() {
           </div>
           </div>
 
-          <div className="flex gap-4 mt-5 lg:mt-auto lg:pt-5">
+          <div className="flex gap-4 mt-auto pt-5">
             <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => goToStep(4)}
@@ -520,8 +520,8 @@ function InquiryForm() {
 
       {/* Step 3: Medium/Large Event Configuration */}
       {step === 3 && (formData.package === 'medium' || formData.package === 'large') && (
-        <div className={`transition-opacity duration-100 lg:flex-grow lg:flex lg:flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="lg:flex-grow">
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Content & Setup</h2>
             <div className="grid gap-3">
 
@@ -586,7 +586,7 @@ function InquiryForm() {
           </div>
           </div>
 
-          <div className="flex gap-4 mt-5 lg:mt-auto lg:pt-5">
+          <div className="flex gap-4 mt-auto pt-5">
             <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => goToStep(4)}
@@ -600,8 +600,8 @@ function InquiryForm() {
 
       {/* Step 4: Venue & Logistics */}
       {step === 4 && formData.package !== 'extra_large' && (
-        <div className={`transition-opacity duration-100 lg:flex-grow lg:flex lg:flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="lg:flex-grow">
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Venue & Logistics</h2>
             <div className="grid gap-3 lg:gap-4">
             <div>
@@ -727,7 +727,7 @@ function InquiryForm() {
           </div>
           </div>
 
-          <div className="flex gap-4 mt-5 lg:mt-auto lg:pt-5">
+          <div className="flex gap-4 mt-auto pt-5">
             <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => {
@@ -749,8 +749,8 @@ function InquiryForm() {
 
       {/* Step 5: Contact Information (Small) or Step 4 (Medium/Large) */}
       {((step === 4 && formData.package === 'small') || (step === 5 && (formData.package === 'medium' || formData.package === 'large'))) && (
-        <div className={`transition-opacity duration-100 lg:flex-grow lg:flex lg:flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="lg:flex-grow">
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
             <div className="grid gap-3 lg:gap-4">
             <div>
@@ -809,7 +809,7 @@ function InquiryForm() {
           </div>
           </div>
 
-          <div className="flex gap-4 mt-5 lg:mt-auto lg:pt-5">
+          <div className="flex gap-4 mt-auto pt-5">
             <button
               onClick={() => goToStep(formData.package === 'small' ? 3 : 4)}
               className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors"
