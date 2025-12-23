@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Accent Productions | Wellington Sound Hire',
   description:
-    'Professional sound equipment rental in Wellington for weddings, corporate events, festivals, and private parties.',
+    'Professional sound equipment rental in Wellington for Corporate events, public events festivals, and private parties.',
 };
 
 export default function RootLayout({

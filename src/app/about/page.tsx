@@ -36,11 +36,14 @@ export default function AboutPage() {
             </div>
             <div className="aspect-[4/3] relative rounded-md overflow-hidden">
               <Image
-                src="/images/image8.webp"
+                src="/images/image12.png"
                 alt="Sound equipment"
                 fill
                 className="object-cover"
               />
+              <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded">
+                <p className="text-white text-xs font-medium">Wellington CBD, New Zealand</p>
+              </div>
             </div>
           </div>
         </div>

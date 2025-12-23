@@ -202,8 +202,8 @@ export default function ContactPage() {
                 </svg>
                 <div>
                   <p className="font-semibold">Email</p>
-                  <a href="mailto:info@accentproductions.co.nz" className="text-blue-600 hover:underline">
-                    info@accentproductions.co.nz
+                  <a href="mailto:hello@accentproductions.co.nz" className="text-blue-600 hover:underline">
+                    hello@accentproductions.co.nz
                   </a>
                 </div>
               </div>
@@ -213,8 +213,8 @@ export default function ContactPage() {
                 </svg>
                 <div>
                   <p className="font-semibold">Phone</p>
-                  <a href="tel:+6421234567" className="text-blue-600 hover:underline">
-                    021 123 4567
+                  <a href="tel:+64 27 702 3869" className="text-blue-600 hover:underline">
+                    027 702 3869
                   </a>
                 </div>
               </div>

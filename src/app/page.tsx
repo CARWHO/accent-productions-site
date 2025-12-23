@@ -2,33 +2,131 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
 
 const services = [
   {
-    title: 'Weddings',
+    title: 'Public Events',
     description: 'Ceremony and reception audio systems.',
-    image: '/images/image9.webp',
-    href: '/services#weddings',
+    images: [
+      { src: '/images/image1-public-parilament.png', location: 'Parliament, Wellington' },
+      { src: '/images/image1-public-waitangipark.png', location: 'Waitangi Park, Wellington' },
+      { src: '/images/image3-public-waitangipark.webp', location: 'Waitangi Park, Wellington' },
+    ],
+    href: '/services#public',
   },
   {
     title: 'Corporate Events',
     description: 'Conferences, presentations, and company events.',
-    image: '/images/image2.jpg',
+    images: [
+      { src: '/images/image1-corporate.png', location: 'Wellington CBD, New Zealand' },
+      { src: '/images/image2-corporate.jpg', location: 'Wellington CBD, New Zealand' },
+    ],
     href: '/services#corporate',
   },
   {
     title: 'Festivals',
     description: 'Large-scale outdoor sound systems.',
-    image: '/images/image3.jpg',
+    images: [
+      { src: '/images/image1-festival-bontanic-gardens.jpg', location: 'Botanic Gardens, Wellington' },
+      { src: '/images/image2-festival-bontanic-gardens.jpg', location: 'Botanic Gardens, Wellington' },
+      { src: '/images/image1-festival-cuba-st.png', location: 'Cuba Street, Wellington' },
+      { src: '/images/image3-festival-waterfront.jpg', location: 'Waterfront, Wellington' },
+      { src: '/images/image3-festival-newtown-festival.jpg', location: 'Newtown Festival, Wellington' },
+    ],
     href: '/services#festivals',
   },
   {
-    title: 'Private Parties',
+    title: 'Private Events',
     description: 'Sound equipment for any celebration.',
-    image: '/images/image6.jpg',
+    images: [
+      { src: '/images/image1-private.png', location: 'Wellington CBD, New Zealand' },
+      { src: '/images/image2-private.png', location: 'Wellington CBD, New Zealand' },
+      { src: '/images/image3-private.png', location: 'Wellington CBD, New Zealand' },
+    ],
     href: '/services#parties',
   },
 ];
+
+function ServiceCard({ service }: { service: typeof services[0] }) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [direction, setDirection] = useState<'left' | 'right'>('right');
+  const hasCarousel = 'images' in service;
+
+  useEffect(() => {
+    if (hasCarousel && service.images) {
+      // Random initial delay (0-6 seconds) so carousels don't sync
+      const initialDelay = Math.random() * 6000;
+
+      const startInterval = () => {
+        return setInterval(() => {
+          setDirection('right');
+          setCurrentImageIndex((prev) => {
+            const nextIndex = prev + 1;
+            return nextIndex >= service.images!.length ? 0 : nextIndex;
+          });
+        }, 12000);
+      };
+
+      const timeout = setTimeout(() => {
+        intervalRef = startInterval();
+      }, initialDelay);
+
+      let intervalRef: NodeJS.Timeout;
+
+      return () => {
+        clearTimeout(timeout);
+        if (intervalRef) clearInterval(intervalRef);
+      };
+    }
+  }, [hasCarousel, service.images]);
+
+  const allImages = hasCarousel && service.images ? service.images : [{ src: service.image, location: service.location }];
+
+  return (
+    <Link href={service.href} className="group block">
+      <div className="aspect-[2/1] relative rounded-md overflow-hidden mb-4">
+        {/* Image carousel container */}
+        <div
+          className="flex h-full transition-transform duration-700 ease-in-out"
+          style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
+        >
+          {allImages.map((img, index) => (
+            <div key={index} className="min-w-full h-full relative">
+              <Image
+                src={img.src}
+                alt={service.title}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded">
+                <p className="text-white text-xs font-medium">{img.location}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Carousel Dots */}
+        {hasCarousel && service.images && (
+          <div className="absolute bottom-3 left-3 flex gap-1.5">
+            {service.images.map((_, index) => (
+              <div
+                key={index}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  index === currentImageIndex ? 'bg-white' : 'bg-white/40'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+      <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#000000] transition-colors">
+        {service.title}
+      </h3>
+      <p className="text-gray-600 text-sm mt-2 font-medium">{service.description}</p>
+    </Link>
+  );
+}
 
 export default function Home() {
   const handleScrollToServices = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -49,10 +147,10 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative h-dvh min-h-[600px] flex items-center overflow-hidden">
+      <section className="relative h-[calc(100dvh-5rem)] flex items-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <Image
-            src="/images/image7.jpg"
+            src="/images/image7-newtown-festival.jpg"
             alt="Professional sound equipment"
             fill
             className="object-cover"
@@ -60,6 +158,9 @@ export default function Home() {
             sizes="100vw"
           />
           <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute bottom-4 right-4 px-4 py-2 rounded">
+            <p className="text-white text-sm font-medium">Newtown Festival, Wellington</p>
+          </div>
         </div>
 
         <div className="container relative z-10 mx-auto px-4">
@@ -68,7 +169,7 @@ export default function Home() {
               Professional Sound Equipment Rental
             </h1>
             <p className="text-xl text-gray-200 mb-8 font-medium">
-              Wellington-based audio solutions for weddings, corporate events, festivals, and private parties.
+              Wellington-based audio solutions for Corporate events, public events, festivals, and private parties.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
@@ -96,24 +197,7 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 gap-8">
             {services.map((service) => (
-              <Link
-                key={service.title}
-                href={service.href}
-                className="group block"
-              >
-                <div className="aspect-[2/1] relative rounded-md overflow-hidden mb-4">
-                  <Image
-                    src={service.image}
-                    alt={service.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#000000] transition-colors">
-                  {service.title}
-                </h3>
-                <p className="text-gray-600 text-sm mt-2 font-medium">{service.description}</p>
-              </Link>
+              <ServiceCard key={service.title} service={service} />
             ))}
           </div>
         </div>
@@ -142,11 +226,14 @@ export default function Home() {
             </div>
             <div className="aspect-[4/3] relative rounded-md overflow-hidden">
               <Image
-                src="/images/image8.webp"
+                src="/images/image11-waitangipark.png"
                 alt="Sound equipment setup"
                 fill
                 className="object-cover"
               />
+              <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded">
+                <p className="text-white text-xs font-medium">Waitangi Park, Wellington</p>
+              </div>
             </div>
           </div>
         </div>

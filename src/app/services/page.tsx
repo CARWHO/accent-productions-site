@@ -6,10 +6,11 @@ import { useEffect } from 'react';
 
 const services = [
   {
-    id: 'weddings',
-    title: 'Weddings',
+    id: 'public',
+    title: 'Public Events',
     description: 'Audio systems for ceremonies and receptions. Wireless microphones for vows, speaker systems for music, and everything in between.',
-    image: '/images/image9.webp',
+    image: '/images/image9.png',
+    location: 'Wellington CBD, New Zealand',
     includes: [
       'Wireless microphones for ceremony',
       'Speaker systems for reception',
@@ -21,7 +22,8 @@ const services = [
     id: 'corporate',
     title: 'Corporate Events',
     description: 'Professional audio for conferences, presentations, and company events. Clear speech reinforcement for any venue size.',
-    image: '/images/image2.jpg',
+    image: '/images/image10-parliament.png',
+    location: 'Parliament, Wellington',
     includes: [
       'Lectern and lapel microphones',
       'PA systems',
@@ -33,7 +35,8 @@ const services = [
     id: 'festivals',
     title: 'Festivals',
     description: 'Large-scale sound systems for outdoor events. Line arrays, stage monitors, and full front-of-house setups.',
-    image: '/images/image3.jpg',
+    image: '/images/image3-bontanic-gardens.jpg',
+    location: 'Botanic Gardens, Wellington',
     includes: [
       'Line array speaker systems',
       'Stage monitors',
@@ -43,9 +46,10 @@ const services = [
   },
   {
     id: 'parties',
-    title: 'Private Parties',
+    title: 'Private Events',
     description: 'Sound equipment for birthdays, anniversaries, and celebrations. We deliver, set up, and pick up.',
-    image: '/images/image6.jpg',
+    image: '/images/image2.jpg',
+    location: 'CBD, Wellington',
     includes: [
       'Speaker and subwoofer packages',
       'DJ equipment',
@@ -141,6 +145,9 @@ export default function ServicesPage() {
                       fill
                       className="object-cover"
                     />
+                    <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded">
+                      <p className="text-white text-xs font-medium">{service.location}</p>
+                    </div>
                   </div>
                 </div>
               </div>
