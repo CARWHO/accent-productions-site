@@ -50,38 +50,35 @@ const services = [
 
 function ServiceCard({ service }: { service: typeof services[0] }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [direction, setDirection] = useState<'left' | 'right'>('right');
-  const hasCarousel = 'images' in service;
 
   useEffect(() => {
-    if (hasCarousel && service.images) {
-      // Random initial delay (0-6 seconds) so carousels don't sync
-      const initialDelay = Math.random() * 6000;
+    if (service.images.length <= 1) return;
 
-      const startInterval = () => {
-        return setInterval(() => {
-          setDirection('right');
-          setCurrentImageIndex((prev) => {
-            const nextIndex = prev + 1;
-            return nextIndex >= service.images!.length ? 0 : nextIndex;
-          });
-        }, 12000);
-      };
+    // Random initial delay (0-6 seconds) so carousels don't sync
+    const initialDelay = Math.random() * 6000;
 
-      const timeout = setTimeout(() => {
-        intervalRef = startInterval();
-      }, initialDelay);
+    const startInterval = () => {
+      return setInterval(() => {
+        setCurrentImageIndex((prev) => {
+          const nextIndex = prev + 1;
+          return nextIndex >= service.images.length ? 0 : nextIndex;
+        });
+      }, 12000);
+    };
 
-      let intervalRef: NodeJS.Timeout;
+    const timeout = setTimeout(() => {
+      intervalRef = startInterval();
+    }, initialDelay);
 
-      return () => {
-        clearTimeout(timeout);
-        if (intervalRef) clearInterval(intervalRef);
-      };
-    }
-  }, [hasCarousel, service.images]);
+    let intervalRef: NodeJS.Timeout;
 
-  const allImages = hasCarousel && service.images ? service.images : [{ src: service.image, location: service.location }];
+    return () => {
+      clearTimeout(timeout);
+      if (intervalRef) clearInterval(intervalRef);
+    };
+  }, [service.images.length]);
+
+  const allImages = service.images;
 
   return (
     <Link href={service.href} className="group block">
@@ -107,7 +104,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
         </div>
 
         {/* Carousel Dots */}
-        {hasCarousel && service.images && (
+        {service.images.length > 1 && (
           <div className="absolute bottom-3 left-3 flex gap-1.5">
             {service.images.map((_, index) => (
               <div
