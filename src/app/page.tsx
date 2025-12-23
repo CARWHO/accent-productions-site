@@ -55,7 +55,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
     if (service.images.length <= 1) return;
 
     // Random initial delay (0-6 seconds) so carousels don't sync
-    const initialDelay = Math.random() * 6000;
+    const initialDelay = Math.random() * 4000;
 
     const startInterval = () => {
       return setInterval(() => {
@@ -63,7 +63,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
           const nextIndex = prev + 1;
           return nextIndex >= service.images.length ? 0 : nextIndex;
         });
-      }, 12000);
+      }, 6000);
     };
 
     const timeout = setTimeout(() => {

@@ -86,7 +86,7 @@ export default function ServicesPage() {
   return (
     <main className="min-h-screen">
       {/* Header */}
-      <section className="pt-24 pb-8 md:pb-12 bg-white border-b border-gray-200">
+      <section className="pt-24 pb-12 md:pb-12 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">Services</h1>
           <p className="text-xl text-gray-700 max-w-2xl font-medium">
@@ -103,7 +103,7 @@ export default function ServicesPage() {
               <div
                 key={service.id}
                 id={service.id}
-                className="min-h-[calc(100vh-12rem)] md:min-h-[calc(100vh-14rem)] py-8 md:py-12 flex items-center"
+                className="min-h-[calc(100vh-12rem)] md:min-h-[calc(100vh-14rem)] py-8 md:py-12 flex items-start"
               >
                 <div className="w-full grid lg:grid-cols-2 gap-6 md:gap-8 lg:gap-16 items-center">
                   <div className={index % 2 === 1 ? 'lg:order-2' : ''}>
