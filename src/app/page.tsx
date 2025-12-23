@@ -147,7 +147,7 @@ export default function Home() {
       <section className="relative h-[calc(100dvh-5rem)] flex items-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <Image
-            src="/images/image7-newtown-festival.jpg"
+            src="/images/image3-festival-newtown-festival.jpg"
             alt="Professional sound equipment"
             fill
             className="object-cover"
@@ -223,7 +223,7 @@ export default function Home() {
             </div>
             <div className="aspect-[4/3] relative rounded-md overflow-hidden">
               <Image
-                src="/images/image11-waitangipark.png"
+                src="/images/image1-public-waitangipark.png"
                 alt="Sound equipment setup"
                 fill
                 className="object-cover"

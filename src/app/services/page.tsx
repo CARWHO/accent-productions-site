@@ -9,7 +9,7 @@ const services = [
     id: 'public',
     title: 'Public Events',
     description: 'Audio systems for ceremonies and receptions. Wireless microphones for vows, speaker systems for music, and everything in between.',
-    image: '/images/image9.png',
+    image: '/images/image1-public-waitangipark.png',
     location: 'Wellington CBD, New Zealand',
     includes: [
       'Wireless microphones for ceremony',
@@ -22,7 +22,7 @@ const services = [
     id: 'corporate',
     title: 'Corporate Events',
     description: 'Professional audio for conferences, presentations, and company events. Clear speech reinforcement for any venue size.',
-    image: '/images/image10-parliament.png',
+    image: '/images/image1-public-parilament.png',
     location: 'Parliament, Wellington',
     includes: [
       'Lectern and lapel microphones',
@@ -35,7 +35,7 @@ const services = [
     id: 'festivals',
     title: 'Festivals',
     description: 'Large-scale sound systems for outdoor events. Line arrays, stage monitors, and full front-of-house setups.',
-    image: '/images/image3-bontanic-gardens.jpg',
+    image: '/images/image2-festival-bontanic-gardens.jpg',
     location: 'Botanic Gardens, Wellington',
     includes: [
       'Line array speaker systems',
@@ -48,7 +48,7 @@ const services = [
     id: 'parties',
     title: 'Private Events',
     description: 'Sound equipment for birthdays, anniversaries, and celebrations. We deliver, set up, and pick up.',
-    image: '/images/image2.jpg',
+    image: '/images/image2-corporate.jpg',
     location: 'CBD, Wellington',
     includes: [
       'Speaker and subwoofer packages',
