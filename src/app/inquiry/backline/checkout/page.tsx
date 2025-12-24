@@ -13,6 +13,7 @@ interface CheckoutFormData {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  techRider: File | null;
 }
 
 export default function CheckoutPage() {
@@ -33,6 +34,7 @@ export default function CheckoutPage() {
     contactName: '',
     contactEmail: '',
     contactPhone: '',
+    techRider: null,
   });
 
   const updateField = <K extends keyof CheckoutFormData>(field: K, value: CheckoutFormData[K]) => {
@@ -66,21 +68,26 @@ export default function CheckoutPage() {
         quantity: item.quantity,
       }));
 
+      // Use FormData to support file upload
+      const formDataToSend = new FormData();
+      formDataToSend.append('equipment', JSON.stringify(equipment));
+      formDataToSend.append('otherEquipment', otherEquipment);
+      formDataToSend.append('startDate', formData.startDate);
+      formDataToSend.append('endDate', formData.endDate);
+      formDataToSend.append('deliveryMethod', formData.deliveryMethod);
+      formDataToSend.append('deliveryAddress', formData.deliveryAddress);
+      formDataToSend.append('additionalNotes', formData.additionalNotes);
+      formDataToSend.append('contactName', formData.contactName);
+      formDataToSend.append('contactEmail', formData.contactEmail);
+      formDataToSend.append('contactPhone', formData.contactPhone);
+
+      if (formData.techRider) {
+        formDataToSend.append('techRider', formData.techRider);
+      }
+
       const response = await fetch('/api/inquiry/backline', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          equipment,
-          otherEquipment,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          deliveryMethod: formData.deliveryMethod,
-          deliveryAddress: formData.deliveryAddress,
-          additionalNotes: formData.additionalNotes,
-          contactName: formData.contactName,
-          contactEmail: formData.contactEmail,
-          contactPhone: formData.contactPhone,
-        }),
+        body: formDataToSend,
       });
       if (response.ok) {
         clearCart();
@@ -322,6 +329,45 @@ export default function CheckoutPage() {
                         className={`${inputStyles} resize-none`}
                         placeholder="Any special requirements or notes..."
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Tech Rider (optional)</label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            updateField('techRider', file);
+                          }}
+                          className="hidden"
+                          id="techRider"
+                        />
+                        <label
+                          htmlFor="techRider"
+                          className={`${inputStyles} cursor-pointer flex items-center gap-3 text-gray-500`}
+                        >
+                          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <span className="truncate">
+                            {formData.techRider ? formData.techRider.name : 'Upload PDF tech rider / stage plot'}
+                          </span>
+                        </label>
+                        {formData.techRider && (
+                          <button
+                            type="button"
+                            onClick={() => updateField('techRider', null)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Upload a tech rider or stage plot if available</p>
                     </div>
                   </div>
                 </div>

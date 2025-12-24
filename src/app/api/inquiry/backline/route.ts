@@ -13,19 +13,21 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const {
-      equipment,
-      otherEquipment,
-      startDate,
-      endDate,
-      deliveryMethod,
-      deliveryAddress,
-      additionalNotes,
-      contactName,
-      contactEmail,
-      contactPhone
-    } = body;
+    const formData = await request.formData();
+
+    // Parse form fields
+    const equipmentRaw = formData.get('equipment') as string;
+    const equipment = equipmentRaw ? JSON.parse(equipmentRaw) : [];
+    const otherEquipment = formData.get('otherEquipment') as string || '';
+    const startDate = formData.get('startDate') as string;
+    const endDate = formData.get('endDate') as string;
+    const deliveryMethod = formData.get('deliveryMethod') as 'pickup' | 'delivery';
+    const deliveryAddress = formData.get('deliveryAddress') as string || '';
+    const additionalNotes = formData.get('additionalNotes') as string || '';
+    const contactName = formData.get('contactName') as string;
+    const contactEmail = formData.get('contactEmail') as string;
+    const contactPhone = formData.get('contactPhone') as string;
+    const techRiderFile = formData.get('techRider') as File | null;
 
     // Format equipment list for email
     const equipmentList = equipment
@@ -162,6 +164,7 @@ export async function POST(request: Request) {
           <p><strong>Phone:</strong> ${contactPhone}</p>
 
           ${pdfBuffer ? '<p><em>Quote PDF attached</em></p>' : '<p><em>Quote PDF generation failed - please create manually</em></p>'}
+          ${techRiderFile ? '<p><em>Tech rider attached</em></p>' : ''}
 
           ${approvalToken ? `
           <hr />
@@ -178,14 +181,27 @@ export async function POST(request: Request) {
         `,
       };
 
-      // Add PDF attachment if generated successfully
+      // Add attachments
+      const attachments: { filename: string; content: Buffer }[] = [];
+
       if (pdfBuffer) {
-        emailOptions.attachments = [
-          {
-            filename: `Quote-${quoteNumber}.pdf`,
-            content: pdfBuffer
-          }
-        ];
+        attachments.push({
+          filename: `Quote-${quoteNumber}.pdf`,
+          content: pdfBuffer
+        });
+      }
+
+      // Add tech rider if uploaded
+      if (techRiderFile && techRiderFile.size > 0) {
+        const techRiderBuffer = Buffer.from(await techRiderFile.arrayBuffer());
+        attachments.push({
+          filename: techRiderFile.name || 'tech-rider.pdf',
+          content: techRiderBuffer
+        });
+      }
+
+      if (attachments.length > 0) {
+        emailOptions.attachments = attachments;
       }
 
       await resend.emails.send(emailOptions);
