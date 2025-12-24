@@ -15,15 +15,16 @@ interface HireItem {
 }
 
 const slugToCategory: Record<string, string> = {
-  'consoles': 'Consoles',
-  'digital-stage-boxes': 'Digital Stage Boxes',
-  'powered-compact-mixers': 'Powered Compact Mixers',
-  'powered-speakers': 'Powered Speakers',
-  'passive-speakers': 'Passive Speakers',
-  'battery-pa-speakers': 'Battery PA Speakers',
-  'pa-amps': 'PA Amps',
-  'rack-gear': 'Rack Gear',
-  'iem': 'IEM',
+  'drum-kits': 'Drum Kits',
+  'cymbals': 'Cymbals',
+  'percussion': 'Percussion',
+  'guitar-amps': 'Guitar Amps',
+  'bass-heads': 'Bass Heads',
+  'bass-cabinets': 'Bass Cabinets',
+  'keyboards': 'Keyboards',
+  'guitars': 'Guitars',
+  'bass-guitars': 'Bass Guitars',
+  'accessories': 'Accessories',
 };
 
 export default function CategoryPage() {

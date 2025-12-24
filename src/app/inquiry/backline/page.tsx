@@ -12,27 +12,29 @@ interface CategoryInfo {
 }
 
 const categoryConfig: Record<string, { slug: string; image: string }> = {
-  'Consoles': { slug: 'consoles', image: '/images/categories/consoles.jpg' },
-  'Digital Stage Boxes': { slug: 'digital-stage-boxes', image: '/images/categories/stage-boxes.jpg' },
-  'Powered Compact Mixers': { slug: 'powered-compact-mixers', image: '/images/categories/mixers.jpg' },
-  'Powered Speakers': { slug: 'powered-speakers', image: '/images/categories/powered-speakers.jpg' },
-  'Passive Speakers': { slug: 'passive-speakers', image: '/images/categories/passive-speakers.jpg' },
-  'Battery PA Speakers': { slug: 'battery-pa-speakers', image: '/images/categories/battery-speakers.jpg' },
-  'PA Amps': { slug: 'pa-amps', image: '/images/categories/amps.jpg' },
-  'Rack Gear': { slug: 'rack-gear', image: '/images/categories/rack-gear.jpg' },
-  'IEM': { slug: 'iem', image: '/images/categories/iem.jpg' },
+  'Drum Kits': { slug: 'drum-kits', image: '/images/categories/drum-kits.jpg' },
+  'Cymbals': { slug: 'cymbals', image: '/images/categories/cymbals.jpg' },
+  'Percussion': { slug: 'percussion', image: '/images/categories/percussion.jpg' },
+  'Guitar Amps': { slug: 'guitar-amps', image: '/images/categories/guitar-amps.jpg' },
+  'Bass Heads': { slug: 'bass-heads', image: '/images/categories/bass-heads.jpg' },
+  'Bass Cabinets': { slug: 'bass-cabinets', image: '/images/categories/bass-cabinets.jpg' },
+  'Keyboards': { slug: 'keyboards', image: '/images/categories/keyboards.jpg' },
+  'Guitars': { slug: 'guitars', image: '/images/categories/guitars.jpg' },
+  'Bass Guitars': { slug: 'bass-guitars', image: '/images/categories/bass-guitars.jpg' },
+  'Accessories': { slug: 'accessories', image: '/images/categories/accessories.jpg' },
 };
 
 const categoryOrder = [
-  'Consoles',
-  'Digital Stage Boxes',
-  'Powered Compact Mixers',
-  'Powered Speakers',
-  'Passive Speakers',
-  'Battery PA Speakers',
-  'PA Amps',
-  'Rack Gear',
-  'IEM',
+  'Drum Kits',
+  'Cymbals',
+  'Percussion',
+  'Guitar Amps',
+  'Bass Heads',
+  'Bass Cabinets',
+  'Keyboards',
+  'Guitars',
+  'Bass Guitars',
+  'Accessories',
 ];
 
 export default function BacklinePage() {

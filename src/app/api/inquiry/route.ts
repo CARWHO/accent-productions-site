@@ -3,10 +3,13 @@ import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { generateSoundQuote, SoundQuoteInput } from '@/lib/gemini-sound-quote';
 import { generateSoundQuotePDF } from '@/lib/pdf-sound-quote';
+import { uploadQuoteToDrive } from '@/lib/google-drive';
+import { randomUUID } from 'crypto';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
 const businessEmail = baseEmail.replace('@', '+fullevent@');
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
 
 export async function POST(request: Request) {
   try {
@@ -14,8 +17,10 @@ export async function POST(request: Request) {
 
     // 1. Save to Supabase
     const supabaseAdmin = getSupabaseAdmin();
+    let inquiryId: string | null = null;
+
     if (supabaseAdmin) {
-      const { error } = await supabaseAdmin
+      const { data: inquiryData, error } = await supabaseAdmin
         .from('inquiries')
         .insert({
           event_type: body.eventType,
@@ -36,10 +41,14 @@ export async function POST(request: Request) {
           contact_email: body.contactEmail,
           contact_phone: body.contactPhone,
           status: 'new'
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) {
         console.error('Supabase error:', error);
+      } else {
+        inquiryId = inquiryData?.id || null;
       }
     } else {
       console.warn('Supabase admin client not initialized');
@@ -105,9 +114,42 @@ export async function POST(request: Request) {
         );
 
         console.log(`Sound quote ${quoteNumber} generated successfully`);
+
+        // Upload to Google Drive
+        if (pdfBuffer) {
+          await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'fullsystem');
+        }
       } catch (quoteError) {
         console.error('Error generating sound quote:', quoteError);
         // Continue without quote - email will still be sent
+      }
+    }
+
+    // 2b. Create booking record for contractor scheduling
+    let approvalToken: string | null = null;
+    if (supabaseAdmin && quoteNumber) {
+      approvalToken = randomUUID();
+      const { error: bookingError } = await supabaseAdmin
+        .from('bookings')
+        .insert({
+          inquiry_id: inquiryId,
+          quote_number: quoteNumber,
+          booking_type: 'fullsystem',
+          status: 'pending',
+          event_date: body.eventDate || null,
+          event_time: body.eventTime || null,
+          location: body.location || null,
+          event_name: body.eventName || null,
+          job_description: body.details || null,
+          client_name: body.contactName,
+          client_email: body.contactEmail,
+          client_phone: body.contactPhone,
+          approval_token: approvalToken,
+        });
+
+      if (bookingError) {
+        console.error('Error creating booking:', bookingError);
+        approvalToken = null; // Don't show button if booking failed
       }
     }
 
@@ -187,6 +229,19 @@ export async function POST(request: Request) {
           ${body.details ? `<p><strong>Additional Details:</strong> ${body.details}</p>` : ''}
 
           ${pdfBuffer ? '<p><em>Quote PDF attached</em></p>' : '<p><em>Quote PDF not generated (extra-large package or generation failed)</em></p>'}
+
+          ${approvalToken ? `
+          <hr />
+          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7; text-align: center;">
+            <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
+              Ready to book this job? Click below to approve and notify contractors:
+            </p>
+            <a href="${baseUrl}/api/approve-quote?token=${approvalToken}"
+               style="display: inline-block; background: #16a34a; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+              ✓ Approve Quote & Notify Contractors
+            </a>
+          </div>
+          ` : ''}
         `,
       };
 

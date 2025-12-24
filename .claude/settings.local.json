@@ -13,7 +13,14 @@
       "mcp__supabase__get_publishable_keys",
       "Bash(npm run build:*)",
       "Bash(npm install:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node scripts/update-backline.js:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "github-server",
+    "supabase",
+    "vercel"
+  ]
 }

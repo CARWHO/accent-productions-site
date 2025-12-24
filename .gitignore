@@ -42,3 +42,7 @@ next-env.d.ts
 .agent/
 .mcp.json
 
+# Google OAuth credentials
+client_secret*.json
+.env
+

@@ -4,6 +4,32 @@ const genAI = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
 
+// Retry helper with exponential backoff for transient API errors
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      lastError = error as Error;
+      const errorMessage = lastError?.message || '';
+      // Only retry on 503 (overloaded) or network errors
+      if (errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('ECONNRESET')) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`Gemini API retry ${attempt + 1}/${maxRetries} after ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error; // Don't retry other errors
+      }
+    }
+  }
+  throw lastError;
+}
+
 export interface EquipmentItem {
   name: string;
   quantity: number;

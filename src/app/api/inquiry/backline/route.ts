@@ -3,10 +3,13 @@ import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { generateQuote, QuoteInput, EquipmentItem } from '@/lib/gemini-quote';
 import { generateQuotePDF } from '@/lib/pdf-quote';
+import { uploadQuoteToDrive } from '@/lib/google-drive';
+import { randomUUID } from 'crypto';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
 const businessEmail = baseEmail.replace('@', '+dryhire@');
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
 
 export async function POST(request: Request) {
   try {
@@ -84,9 +87,41 @@ export async function POST(request: Request) {
       );
 
       console.log(`Quote ${quoteNumber} generated successfully`);
+
+      // Upload to Google Drive
+      if (pdfBuffer) {
+        await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'backline');
+      }
     } catch (quoteError) {
       console.error('Error generating quote:', quoteError);
       // Continue without quote - email will still be sent
+    }
+
+    // Create booking record for contractor scheduling
+    let approvalToken: string | null = null;
+    if (supabase && quoteNumber) {
+      approvalToken = randomUUID();
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          quote_number: quoteNumber,
+          booking_type: 'backline',
+          status: 'pending',
+          event_date: startDate || null,
+          event_time: null,
+          location: deliveryMethod === 'delivery' ? deliveryAddress : 'Pickup',
+          event_name: `Backline Hire - ${contactName}`,
+          job_description: additionalNotes || null,
+          client_name: contactName,
+          client_email: contactEmail,
+          client_phone: contactPhone,
+          approval_token: approvalToken,
+        });
+
+      if (bookingError) {
+        console.error('Error creating booking:', bookingError);
+        approvalToken = null; // Don't show button if booking failed
+      }
     }
 
     // Send email notification
@@ -127,6 +162,19 @@ export async function POST(request: Request) {
           <p><strong>Phone:</strong> ${contactPhone}</p>
 
           ${pdfBuffer ? '<p><em>Quote PDF attached</em></p>' : '<p><em>Quote PDF generation failed - please create manually</em></p>'}
+
+          ${approvalToken ? `
+          <hr />
+          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7; text-align: center;">
+            <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
+              Ready to book this job? Click below to approve and notify contractors:
+            </p>
+            <a href="${baseUrl}/api/approve-quote?token=${approvalToken}"
+               style="display: inline-block; background: #16a34a; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+              ✓ Approve Quote & Notify Contractors
+            </a>
+          </div>
+          ` : ''}
         `,
       };
 
