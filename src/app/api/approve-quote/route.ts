@@ -142,8 +142,11 @@ export async function GET(request: Request) {
         .eq('id', booking.id);
     }
 
-    // Redirect to success page
-    return NextResponse.redirect(`${baseUrl}/approve-quote?success=true&quote=${booking.quote_number}&contractors=${contractors?.length || 0}`);
+    // Redirect to success page with calendar link
+    const calendarUrl = calendarEventId
+      ? `https://calendar.google.com/calendar/event?eid=${Buffer.from(`${calendarEventId} ${process.env.GOOGLE_CALENDAR_ID || 'primary'}`).toString('base64').replace(/=/g, '')}`
+      : '';
+    return NextResponse.redirect(`${baseUrl}/approve-quote?success=true&quote=${booking.quote_number}&contractors=${contractors?.length || 0}${calendarUrl ? `&calendar=${encodeURIComponent(calendarUrl)}` : ''}`);
   } catch (error) {
     console.error('Error processing approval:', error);
     return NextResponse.redirect(`${baseUrl}/approve-quote?error=server_error`);
