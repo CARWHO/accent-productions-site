@@ -88,6 +88,32 @@ export async function GET(request: Request) {
       });
     };
 
+    const formatTime = (timeStr: string | null) => {
+      if (!timeStr) return null;
+      // Handle various time formats
+      const cleanTime = timeStr.trim().toLowerCase();
+      // If already formatted nicely (e.g., "6pm", "6:00 PM"), return as-is but capitalized
+      if (/^\d{1,2}(:\d{2})?\s*(am|pm)$/i.test(cleanTime)) {
+        return timeStr.trim();
+      }
+      // If 24-hour format like "18:00", convert to 12-hour
+      const match24 = cleanTime.match(/^(\d{1,2}):(\d{2})$/);
+      if (match24) {
+        let hours = parseInt(match24[1], 10);
+        const mins = match24[2];
+        const period = hours >= 12 ? 'pm' : 'am';
+        if (hours > 12) hours -= 12;
+        if (hours === 0) hours = 12;
+        return mins === '00' ? `${hours}${period}` : `${hours}:${mins}${period}`;
+      }
+      return timeStr;
+    };
+
+    // Build calendar link
+    const calendarUrl = booking.calendar_event_id
+      ? `https://calendar.google.com/calendar/event?eid=${Buffer.from(`${booking.calendar_event_id} ${process.env.GOOGLE_CALENDAR_ID || 'primary'}`).toString('base64').replace(/=/g, '')}`
+      : null;
+
     // Notify business owner
     if (resend) {
       await resend.emails.send({
@@ -107,8 +133,7 @@ export async function GET(request: Request) {
           <h3>Job Details</h3>
           <p><strong>Event:</strong> ${booking.event_name || 'Event'}</p>
           <p><strong>Quote:</strong> #${booking.quote_number}</p>
-          <p><strong>Date:</strong> ${formatDate(booking.event_date)}</p>
-          <p><strong>Time:</strong> ${booking.event_time || 'TBC'}</p>
+          <p><strong>Date:</strong> ${formatDate(booking.event_date)}${formatTime(booking.event_time) ? ` at ${formatTime(booking.event_time)}` : ''}</p>
           <p><strong>Location:</strong> ${booking.location || 'TBC'}</p>
 
           <h3>Client</h3>
@@ -137,6 +162,9 @@ export async function GET(request: Request) {
               to: [other.email],
               subject: `Job Filled: ${booking.event_name || 'Event'} - ${formatDate(booking.event_date)}`,
               html: `
+                <div style="text-align: center; margin-bottom: 24px;">
+                  <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 60px; width: auto;" />
+                </div>
                 <p>Hi ${other.name},</p>
                 <p>The following job has been filled by another contractor:</p>
                 <p><strong>${booking.event_name || 'Event'}</strong> on ${formatDate(booking.event_date)}</p>
@@ -155,16 +183,27 @@ export async function GET(request: Request) {
         to: [contractor.email],
         subject: `Confirmed: You're booked for ${booking.event_name || 'Event'}`,
         html: `
+          <div style="text-align: center; margin-bottom: 24px;">
+            <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 60px; width: auto;" />
+          </div>
           <h1>You're Booked!</h1>
           <p>Hi ${contractor.name},</p>
           <p>You've successfully accepted this job:</p>
 
           <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h2 style="margin-top: 0;">${booking.event_name || 'Event'}</h2>
-            <p><strong>Date:</strong> ${formatDate(booking.event_date)}</p>
-            <p><strong>Time:</strong> ${booking.event_time || 'TBC'}</p>
+            <p><strong>Date:</strong> ${formatDate(booking.event_date)}${formatTime(booking.event_time) ? ` at ${formatTime(booking.event_time)}` : ''}</p>
             <p><strong>Location:</strong> ${booking.location || 'TBC'}</p>
           </div>
+
+          ${calendarUrl ? `
+          <p style="margin: 20px 0;">
+            <a href="${calendarUrl}"
+               style="display: inline-block; background: #4285f4; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+              View Calendar Event
+            </a>
+          </p>
+          ` : ''}
 
           <h3>Client Contact</h3>
           <p><strong>Name:</strong> ${booking.client_name}</p>

@@ -103,6 +103,24 @@ export async function POST(request: Request) {
     let approvalToken: string | null = null;
     if (supabase && quoteNumber) {
       approvalToken = randomUUID();
+
+      // Build rich details for contractor emails
+      const detailsJson = {
+        type: 'backline',
+        equipment: equipment.map((item: { name: string; quantity: number }) => ({
+          name: item.name,
+          quantity: item.quantity,
+        })),
+        otherEquipment: otherEquipment || null,
+        rentalPeriod: {
+          start: startDate,
+          end: endDate,
+        },
+        deliveryMethod,
+        deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : null,
+        additionalNotes: additionalNotes || null,
+      };
+
       const { error: bookingError } = await supabase
         .from('bookings')
         .insert({
@@ -118,6 +136,7 @@ export async function POST(request: Request) {
           client_email: contactEmail,
           client_phone: contactPhone,
           approval_token: approvalToken,
+          details_json: detailsJson,
         });
 
       if (bookingError) {

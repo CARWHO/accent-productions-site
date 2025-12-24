@@ -91,6 +91,109 @@ export async function GET(request: Request) {
         });
       };
 
+      const formatTime = (timeStr: string | null) => {
+        if (!timeStr) return null;
+        const cleanTime = timeStr.trim().toLowerCase();
+        if (/^\d{1,2}(:\d{2})?\s*(am|pm)$/i.test(cleanTime)) {
+          return timeStr.trim();
+        }
+        const match24 = cleanTime.match(/^(\d{1,2}):(\d{2})$/);
+        if (match24) {
+          let hours = parseInt(match24[1], 10);
+          const mins = match24[2];
+          const period = hours >= 12 ? 'pm' : 'am';
+          if (hours > 12) hours -= 12;
+          if (hours === 0) hours = 12;
+          return mins === '00' ? `${hours}${period}` : `${hours}:${mins}${period}`;
+        }
+        return timeStr;
+      };
+
+      // Generate rich details HTML based on booking type
+      const generateDetailsHtml = () => {
+        const details = booking.details_json as Record<string, unknown> | null;
+        if (!details) return '';
+
+        if (details.type === 'backline') {
+          const equipment = details.equipment as Array<{ name: string; quantity: number }> | null;
+          const equipmentHtml = equipment && equipment.length > 0
+            ? `<p><strong>Equipment:</strong></p>
+               <ul style="margin: 8px 0; padding-left: 20px;">
+                 ${equipment.map(e => `<li>${e.quantity}x ${e.name}</li>`).join('')}
+               </ul>`
+            : '';
+
+          const period = details.rentalPeriod as { start: string; end: string } | null;
+          const periodHtml = period
+            ? `<p><strong>Rental Period:</strong> ${formatDate(period.start)} → ${formatDate(period.end)}</p>`
+            : '';
+
+          const deliveryHtml = details.deliveryMethod === 'delivery'
+            ? `<p><strong>Delivery to:</strong> ${details.deliveryAddress || 'TBC'}</p>`
+            : `<p><strong>Collection:</strong> Customer pickup</p>`;
+
+          const otherHtml = details.otherEquipment
+            ? `<p><strong>Other requests:</strong> ${details.otherEquipment}</p>`
+            : '';
+
+          const notesHtml = details.additionalNotes
+            ? `<p><strong>Notes:</strong> ${details.additionalNotes}</p>`
+            : '';
+
+          return `${equipmentHtml}${periodHtml}${deliveryHtml}${otherHtml}${notesHtml}`;
+        }
+
+        if (details.type === 'fullsystem') {
+          const packageLabels: Record<string, string> = {
+            small: 'Small (10-50 people)',
+            medium: 'Medium (50-200 people)',
+            large: 'Large (200-1000 people)',
+          };
+
+          const packageHtml = details.package
+            ? `<p><strong>Package:</strong> ${packageLabels[details.package as string] || details.package}</p>`
+            : '';
+
+          const eventTypeHtml = details.eventType
+            ? `<p><strong>Event Type:</strong> ${details.eventType}</p>`
+            : '';
+
+          const attendanceHtml = details.attendance
+            ? `<p><strong>Attendance:</strong> ${details.attendance}</p>`
+            : '';
+
+          const setupHtml = details.setupTime
+            ? `<p><strong>Setup/Packout:</strong> ${details.setupTime}</p>`
+            : '';
+
+          const contentReqs = details.contentRequirements as string[] | null;
+          const contentHtml = contentReqs && contentReqs.length > 0
+            ? `<p><strong>Requirements:</strong> ${contentReqs.join(', ')}</p>`
+            : '';
+
+          const bandHtml = details.bandNames
+            ? `<p><strong>Band(s):</strong> ${details.bandNames}</p>`
+            : '';
+
+          const venue = details.venue as Record<string, unknown> | null;
+          const venueHtml = venue ? `
+            ${venue.indoorOutdoor ? `<p><strong>Setting:</strong> ${venue.indoorOutdoor}</p>` : ''}
+            ${venue.hasStage ? `<p><strong>Stage:</strong> Yes${venue.stageDetails ? ` - ${venue.stageDetails}` : ''}</p>` : ''}
+            ${venue.powerAccess ? `<p><strong>Power:</strong> ${venue.powerAccess}</p>` : ''}
+          ` : '';
+
+          const notesHtml = details.additionalInfo || details.details
+            ? `<p><strong>Notes:</strong> ${details.additionalInfo || details.details}</p>`
+            : '';
+
+          return `${packageHtml}${eventTypeHtml}${attendanceHtml}${setupHtml}${contentHtml}${bandHtml}${venueHtml}${notesHtml}`;
+        }
+
+        return '';
+      };
+
+      const detailsHtml = generateDetailsHtml();
+
       for (const contractor of contractors) {
         try {
           await resend.emails.send({
@@ -98,16 +201,23 @@ export async function GET(request: Request) {
             to: [contractor.email],
             subject: `Job Available: ${booking.event_name || 'Event'} - ${formatDate(booking.event_date)}`,
             html: `
+              <div style="text-align: center; margin-bottom: 24px;">
+                <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 60px; width: auto;" />
+              </div>
               <h1>New Job Available</h1>
               <p>Hi ${contractor.name},</p>
               <p>A new job is available and you're invited to accept it:</p>
 
               <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <h2 style="margin-top: 0;">${booking.event_name || 'Event'}</h2>
-                <p><strong>Date:</strong> ${formatDate(booking.event_date)}</p>
-                <p><strong>Time:</strong> ${booking.event_time || 'TBC'}</p>
+                <p><strong>Date:</strong> ${formatDate(booking.event_date)}${formatTime(booking.event_time) ? ` at ${formatTime(booking.event_time)}` : ''}</p>
                 <p><strong>Location:</strong> ${booking.location || 'TBC'}</p>
-                ${booking.job_description ? `<p><strong>Details:</strong> ${booking.job_description}</p>` : ''}
+                ${detailsHtml}
+              </div>
+
+              <div style="background: #e8f4fd; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
+                <p style="margin: 0;"><strong>Client:</strong> ${booking.client_name}</p>
+                <p style="margin: 8px 0 0 0;"><strong>Phone:</strong> ${booking.client_phone}</p>
               </div>
 
               <p style="background: #fff3cd; padding: 12px; border-radius: 4px; border-left: 4px solid #ffc107;">

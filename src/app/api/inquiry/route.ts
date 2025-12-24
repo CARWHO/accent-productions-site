@@ -129,6 +129,41 @@ export async function POST(request: Request) {
     let approvalToken: string | null = null;
     if (supabaseAdmin && quoteNumber) {
       approvalToken = randomUUID();
+
+      // Build content requirements list
+      const contentRequirements: string[] = [];
+      if (body.playbackFromDevice) contentRequirements.push('Playback from device');
+      if (body.hasLiveMusic) contentRequirements.push('Live music');
+      if (body.needsMic) contentRequirements.push('Microphone required');
+      if (body.hasDJ) contentRequirements.push('DJ');
+      if (body.hasBand) contentRequirements.push(`Live band(s)${body.bandCount ? ` (${body.bandCount})` : ''}`);
+      if (body.hasSpeeches) contentRequirements.push('Speeches/presentations');
+      if (body.needsWirelessMic) contentRequirements.push('Wireless mic');
+      if (body.needsLectern) contentRequirements.push('Lectern');
+
+      // Build rich details for contractor emails
+      const detailsJson = {
+        type: 'fullsystem',
+        package: body.package || null,
+        eventType: body.eventType || null,
+        organization: body.organization || null,
+        attendance: body.attendance || null,
+        setupTime: body.setupTime || null,
+        contentRequirements,
+        bandNames: body.bandNames || null,
+        bandSetup: body.bandSetup || null,
+        venue: {
+          location: body.location || null,
+          venueContact: body.venueContact || null,
+          indoorOutdoor: body.indoorOutdoor || null,
+          powerAccess: body.powerAccess || null,
+          hasStage: body.hasStage || false,
+          stageDetails: body.stageDetails || null,
+        },
+        additionalInfo: body.additionalInfo || null,
+        details: body.details || null,
+      };
+
       const { error: bookingError } = await supabaseAdmin
         .from('bookings')
         .insert({
@@ -145,6 +180,7 @@ export async function POST(request: Request) {
           client_email: body.contactEmail,
           client_phone: body.contactPhone,
           approval_token: approvalToken,
+          details_json: detailsJson,
         });
 
       if (bookingError) {
