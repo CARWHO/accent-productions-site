@@ -60,3 +60,36 @@ export async function uploadQuoteToDrive(
     return null;
   }
 }
+
+/**
+ * Share a file so anyone with the link can view it
+ * Returns the shareable link or null if failed
+ */
+export async function shareFileWithLink(fileId: string): Promise<string | null> {
+  try {
+    const oauth2Client = getOAuth2Client();
+    if (!oauth2Client) {
+      console.warn('Google Drive not configured');
+      return null;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    // Create a permission for anyone with the link to view
+    await drive.permissions.create({
+      fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+
+    // Return the shareable link
+    const link = `https://drive.google.com/file/d/${fileId}/view`;
+    console.log(`Shared file ${fileId}: ${link}`);
+    return link;
+  } catch (error) {
+    console.error('Error sharing file:', error);
+    return null;
+  }
+}

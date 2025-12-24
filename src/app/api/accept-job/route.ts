@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { updateCalendarEvent } from '@/lib/google-calendar';
+import { shareFileWithLink } from '@/lib/google-drive';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const businessEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
@@ -77,6 +78,12 @@ export async function GET(request: Request) {
         summary: `${booking.event_name || 'Event'} - ${contractor.name}`,
         description: `Quote: #${booking.quote_number}\nClient: ${booking.client_name}\nEmail: ${booking.client_email}\nPhone: ${booking.client_phone}\n\nContractor: ${contractor.name}\nPhone: ${contractor.phone || 'N/A'}\nEmail: ${contractor.email}`,
       });
+    }
+
+    // Share the quote PDF with the contractor if it exists
+    let quoteLink: string | null = null;
+    if (booking.quote_drive_file_id) {
+      quoteLink = await shareFileWithLink(booking.quote_drive_file_id);
     }
 
     const formatDate = (dateStr: string) => {
@@ -162,6 +169,10 @@ export async function GET(request: Request) {
       descriptionParts.push('---');
       descriptionParts.push(`Client: ${booking.client_name}`);
       descriptionParts.push(`Phone: ${booking.client_phone}`);
+      if (quoteLink) {
+        descriptionParts.push('');
+        descriptionParts.push(`📄 View Quote: ${quoteLink}`);
+      }
       descriptionParts.push('');
       descriptionParts.push('Booked via Accent Productions');
 
@@ -279,6 +290,7 @@ export async function GET(request: Request) {
             <h2 style="margin-top: 0;">${booking.event_name || 'Event'}</h2>
             <p><strong>Date:</strong> ${formatDate(booking.event_date)}${formatTime(booking.event_time) ? ` at ${formatTime(booking.event_time)}` : ''}</p>
             <p><strong>Location:</strong> ${booking.location || 'TBC'}</p>
+            ${quoteLink ? `<p><strong>Quote:</strong> <a href="${quoteLink}" style="color: #2563eb;">View PDF</a></p>` : ''}
           </div>
 
           ${addToCalendarUrl ? `

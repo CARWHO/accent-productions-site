@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     // 2. Generate quote and PDF (only for small, medium, large packages)
     let pdfBuffer: Buffer | null = null;
     let quoteNumber = '';
+    let driveFileId: string | null = null;
 
     // Check if this is a sound system inquiry with a valid package
     const validPackages = ['small', 'medium', 'large'];
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
 
         // Upload to Google Drive
         if (pdfBuffer) {
-          await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'fullsystem');
+          driveFileId = await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'fullsystem');
         }
       } catch (quoteError) {
         console.error('Error generating sound quote:', quoteError);
@@ -181,6 +182,7 @@ export async function POST(request: Request) {
           client_phone: body.contactPhone,
           approval_token: approvalToken,
           details_json: detailsJson,
+          quote_drive_file_id: driveFileId,
         });
 
       if (bookingError) {

@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     // Generate quote and PDF
     let pdfBuffer: Buffer | null = null;
     let quoteNumber = '';
+    let driveFileId: string | null = null;
 
     try {
       const quoteInput: QuoteInput = {
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
 
       // Upload to Google Drive
       if (pdfBuffer) {
-        await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'backline');
+        driveFileId = await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'backline');
       }
     } catch (quoteError) {
       console.error('Error generating quote:', quoteError);
@@ -137,6 +138,7 @@ export async function POST(request: Request) {
           client_phone: contactPhone,
           approval_token: approvalToken,
           details_json: detailsJson,
+          quote_drive_file_id: driveFileId,
         });
 
       if (bookingError) {
