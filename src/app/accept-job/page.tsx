@@ -12,7 +12,7 @@ function AcceptJobContent() {
 
   if (success) {
     return (
-      <div className="flex flex-col items-center text-center">
+      <div className="flex flex-col items-center text-center -mt-16">
         <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mb-6">
           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -29,7 +29,7 @@ function AcceptJobContent() {
 
   if (status === 'already_yours') {
     return (
-      <div className="flex flex-col items-center text-center">
+      <div className="flex flex-col items-center text-center -mt-16">
         <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6">
           <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -50,7 +50,7 @@ function AcceptJobContent() {
   };
 
   return (
-    <div className="flex flex-col items-center text-center">
+    <div className="flex flex-col items-center text-center -mt-16">
       <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mb-6">
         <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {error === 'already_taken' ? (

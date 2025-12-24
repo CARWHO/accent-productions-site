@@ -109,10 +109,47 @@ export async function GET(request: Request) {
       return timeStr;
     };
 
-    // Build calendar link
-    const calendarUrl = booking.calendar_event_id
-      ? `https://calendar.google.com/calendar/event?eid=${Buffer.from(`${booking.calendar_event_id} ${process.env.GOOGLE_CALENDAR_ID || 'primary'}`).toString('base64').replace(/=/g, '')}`
-      : null;
+    // Build "Add to Google Calendar" URL for contractor
+    const buildAddToCalendarUrl = () => {
+      if (!booking.event_date) return null;
+
+      const eventTitle = encodeURIComponent(`${booking.event_name || 'Event'} - Accent Productions`);
+      const location = encodeURIComponent(booking.location || '');
+      const details = encodeURIComponent(
+        `Client: ${booking.client_name}\nPhone: ${booking.client_phone}\n\nBooked via Accent Productions`
+      );
+
+      // Parse date and time
+      const startDate = new Date(booking.event_date);
+      if (booking.event_time) {
+        const timeMatch = booking.event_time.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1], 10);
+          const mins = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+          const meridiem = timeMatch[3]?.toLowerCase();
+          if (meridiem === 'pm' && hours < 12) hours += 12;
+          if (meridiem === 'am' && hours === 12) hours = 0;
+          startDate.setHours(hours, mins, 0, 0);
+        }
+      } else {
+        startDate.setHours(9, 0, 0, 0); // Default to 9am
+      }
+
+      // End time: 4 hours later
+      const endDate = new Date(startDate);
+      endDate.setHours(endDate.getHours() + 4);
+
+      // Format as YYYYMMDDTHHMMSS (local time)
+      const formatDateTime = (d: Date) => {
+        return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      };
+
+      const dates = `${formatDateTime(startDate)}/${formatDateTime(endDate)}`;
+
+      return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${dates}&details=${details}&location=${location}`;
+    };
+
+    const addToCalendarUrl = buildAddToCalendarUrl();
 
     // Notify business owner
     if (resend) {
@@ -196,11 +233,11 @@ export async function GET(request: Request) {
             <p><strong>Location:</strong> ${booking.location || 'TBC'}</p>
           </div>
 
-          ${calendarUrl ? `
+          ${addToCalendarUrl ? `
           <p style="margin: 20px 0;">
-            <a href="${calendarUrl}"
+            <a href="${addToCalendarUrl}"
                style="display: inline-block; background: #4285f4; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-              View Calendar Event
+              + Add to My Google Calendar
             </a>
           </p>
           ` : ''}
