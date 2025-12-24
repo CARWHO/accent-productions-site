@@ -54,6 +54,10 @@ export default function InquiryPage() {
               </Link>
             ))}
           </div>
+
+          <div className="flex gap-4 mt-auto pt-5">
+            <Link href="/" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</Link>
+          </div>
         </div>
       </div>
     </main>

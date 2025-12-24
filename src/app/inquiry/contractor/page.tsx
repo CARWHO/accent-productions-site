@@ -2,37 +2,16 @@
 
 import { useState } from 'react';
 
-type RoleType = 'sound_engineer' | 'audio_technician' | 'dj' | 'other';
-type EventType = 'wedding' | 'corporate' | 'festival' | 'party' | 'other';
-
 interface ContractorFormData {
-  roleType: RoleType | '';
-  otherRole: string;
   eventDate: string;
   startTime: string;
   endTime: string;
   location: string;
-  eventType: EventType | '';
-  specialRequirements: string;
+  eventDescription: string;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
 }
-
-const roleTypes: { value: RoleType; label: string; description: string }[] = [
-  { value: 'sound_engineer', label: 'Sound Engineer', description: 'Professional mixing and audio management' },
-  { value: 'audio_technician', label: 'Audio Technician', description: 'Equipment setup and operation' },
-  { value: 'dj', label: 'DJ', description: 'Music selection and entertainment' },
-  { value: 'other', label: 'Other', description: 'Specify your requirements' },
-];
-
-const eventTypes: { value: EventType; label: string }[] = [
-  { value: 'wedding', label: 'Wedding' },
-  { value: 'corporate', label: 'Corporate Event' },
-  { value: 'festival', label: 'Festival' },
-  { value: 'party', label: 'Private Party' },
-  { value: 'other', label: 'Other' },
-];
 
 export default function ContractorInquiryPage() {
   const [step, setStep] = useState(1);
@@ -43,14 +22,11 @@ export default function ContractorInquiryPage() {
   const [showValidation, setShowValidation] = useState(false);
 
   const [formData, setFormData] = useState<ContractorFormData>({
-    roleType: '',
-    otherRole: '',
     eventDate: '',
     startTime: '',
     endTime: '',
     location: '',
-    eventType: '',
-    specialRequirements: '',
+    eventDescription: '',
     contactName: '',
     contactEmail: '',
     contactPhone: '',
@@ -108,13 +84,15 @@ export default function ContractorInquiryPage() {
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-md border border-stone-200 p-6 lg:p-8 min-h-[400px] lg:min-h-[775px]">
             <div className={`flex flex-col items-center justify-center min-h-[610px] transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-              <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+              <div className="flex flex-col items-center mt-16">
+                <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
+                <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
-              <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
             </div>
           </div>
         </div>
@@ -123,7 +101,7 @@ export default function ContractorInquiryPage() {
   }
 
   const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
-  const totalSteps = 3;
+  const totalSteps = 2;
 
   return (
     <main className="bg-stone-50 min-h-screen pt-5 lg:pt-5 pb-8 lg:pb-12 px-4 sm:px-6 lg:px-8">
@@ -147,82 +125,12 @@ export default function ContractorInquiryPage() {
               ))}
             </div>
 
-            {/* Step 1: Role Selection */}
+            {/* Step 1: Event Details */}
             {step === 1 && (
               <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="flex-grow">
-                  <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Role Selection</h2>
-                  <p className="text-gray-600 mb-4 font-medium">What type of professional do you need?</p>
-
-                  <div className="grid gap-3">
-                    {roleTypes.map((role) => (
-                      <label
-                        key={role.value}
-                        className="cursor-pointer"
-                      >
-                        <input
-                          type="radio"
-                          name="roleType"
-                          value={role.value}
-                          checked={formData.roleType === role.value}
-                          onChange={(e) => updateField('roleType', e.target.value as RoleType)}
-                          className="sr-only"
-                        />
-                        <div className={`border-2 rounded-md p-4 transition-all ${
-                          formData.roleType === role.value
-                            ? 'border-[#000000] bg-[#000000]/5'
-                            : showValidation && !formData.roleType
-                            ? 'border-red-500'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}>
-                          <span className="font-bold text-gray-900 block">{role.label}</span>
-                          <span className="text-sm text-gray-600">{role.description}</span>
-                        </div>
-                      </label>
-                    ))}
-
-                    {formData.roleType === 'other' && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Please specify *</label>
-                        <input
-                          type="text"
-                          value={formData.otherRole}
-                          onChange={(e) => updateField('otherRole', e.target.value)}
-                          className={`${inputStyles} ${showValidation && formData.roleType === 'other' && !formData.otherRole ? 'border-red-500' : ''}`}
-                          placeholder="Describe the role you need..."
-                        />
-                        {showValidation && formData.roleType === 'other' && !formData.otherRole && (
-                          <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-4 mt-auto pt-5">
-                  <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</a>
-                  <button
-                    onClick={() => {
-                      const needsOtherRole = formData.roleType === 'other';
-                      if (!formData.roleType || (needsOtherRole && !formData.otherRole)) {
-                        setShowValidation(true);
-                      } else {
-                        goToStep(2);
-                      }
-                    }}
-                    className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000]"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Availability & Requirements */}
-            {step === 2 && (
-              <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="flex-grow">
-                  <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Availability & Requirements</h2>
+                  <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Sound Technician Request</h2>
+                  <p className="text-gray-600 mb-4 font-medium">Tell us about your event and we&apos;ll provide a professional sound tech.</p>
 
                   <div className="grid gap-3 lg:gap-4">
                     <div>
@@ -282,46 +190,33 @@ export default function ContractorInquiryPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Event Type *</label>
-                      <select
-                        value={formData.eventType}
-                        onChange={(e) => updateField('eventType', e.target.value as EventType)}
-                        className={`${inputStyles} ${showValidation && !formData.eventType ? 'border-red-500' : ''}`}
-                      >
-                        <option value="">Select event type...</option>
-                        {eventTypes.map((type) => (
-                          <option key={type.value} value={type.value}>{type.label}</option>
-                        ))}
-                      </select>
-                      {showValidation && !formData.eventType && (
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Describe Your Event *</label>
+                      <p className="text-sm text-gray-500 mb-2">Help us understand your event so we can match you with the right sound technician.</p>
+                      <textarea
+                        value={formData.eventDescription}
+                        onChange={(e) => updateField('eventDescription', e.target.value)}
+                        rows={5}
+                        className={`${inputStyles} resize-none ${showValidation && !formData.eventDescription ? 'border-red-500' : ''}`}
+                        placeholder="Tell us about your event - what type of event is it? (e.g., wedding, corporate function, live band, DJ night, conference). How many guests are expected? What kind of audio setup do you need? Any specific requirements or challenges we should know about?"
+                      />
+                      {showValidation && !formData.eventDescription && (
                         <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
                       )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Special Requirements</label>
-                      <textarea
-                        value={formData.specialRequirements}
-                        onChange={(e) => updateField('specialRequirements', e.target.value)}
-                        rows={3}
-                        className={`${inputStyles} resize-none`}
-                        placeholder="Any specific skills, equipment familiarity, or other requirements..."
-                      />
                     </div>
                   </div>
                 </div>
 
                 <div className="flex gap-4 mt-auto pt-5">
-                  <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+                  <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</a>
                   <button
                     onClick={() => {
-                      if (!formData.eventDate || !formData.startTime || !formData.endTime || !formData.location || !formData.eventType) {
+                      if (!formData.eventDate || !formData.startTime || !formData.endTime || !formData.location || !formData.eventDescription) {
                         setShowValidation(true);
                       } else {
-                        goToStep(3);
+                        goToStep(2);
                       }
                     }}
-                    className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000]"
+                    className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
                   >
                     Continue
                   </button>
@@ -329,8 +224,8 @@ export default function ContractorInquiryPage() {
               </div>
             )}
 
-            {/* Step 3: Contact Information */}
-            {step === 3 && (
+            {/* Step 2: Contact Information */}
+            {step === 2 && (
               <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="flex-grow">
                   <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
@@ -382,7 +277,7 @@ export default function ContractorInquiryPage() {
                 </div>
 
                 <div className="flex gap-4 mt-auto pt-5">
-                  <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+                  <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
                   <button
                     onClick={() => {
                       if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -393,7 +288,7 @@ export default function ContractorInquiryPage() {
                       }
                     }}
                     disabled={isSubmitting}
-                    className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000] disabled:opacity-50"
+                    className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
                   >
                     {isSubmitting ? 'Sending...' : 'Get Quote'}
                   </button>

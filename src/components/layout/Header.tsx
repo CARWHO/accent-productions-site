@@ -44,7 +44,7 @@ export function Header() {
             </Link>
             <Link
               href="/inquiry"
-              className="bg-[#000000] text-white px-6 py-2.5 rounded-md font-bold hover:bg-[#152d47] transition-colors border border-[#000000]"
+              className="bg-[#000000] text-white px-6 py-2.5 rounded-md font-bold hover:bg-[#FFFFF] transition-colors border border-[#000000]"
             >
               Get a Quote
             </Link>
@@ -110,7 +110,7 @@ export function Header() {
               </Link>
               <Link
                 href="/inquiry"
-                className="bg-[#000000] text-white px-6 py-3 rounded-md font-bold text-center hover:bg-[#152d47] transition-colors border border-[#000000]"
+                className="bg-[#000000] text-white px-6 py-3 rounded-md font-bold text-center hover:bg-[#FFFFF] transition-colors border border-[#000000]"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Get a Quote

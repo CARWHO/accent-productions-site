@@ -94,7 +94,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
                 src={img.src}
                 alt={service.title}
                 fill
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                className="object-cover"
               />
               <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded">
                 <p className="text-white text-xs font-medium">{img.location}</p>
@@ -171,14 +171,14 @@ export default function Home() {
             <div className="flex flex-wrap gap-4">
               <Link
                 href="/inquiry"
-                className="bg-[#FFFFFF] text-black px-8 py-3 rounded-md font-bold hover:bg-[#152d47] transition-colors border border-[#000000]"
+                className="bg-[#FFFFFF] text-black px-8 py-3 rounded-md font-bold hover:bg-[#FFFFF] transition-colors border border-[#000000]"
               >
                 Get a Quote
               </Link>
               <a
                 href="#services"
                 onClick={handleScrollToServices}
-                className="bg-white/10 backdrop-blur-sm text-white px-8 py-3 rounded-md font-bold hover:bg-white/20 transition-colors border border-white/40 cursor-pointer"
+                className="bg-white/10 backdrop-blur-sm text-white px-8 py-3 rounded-md font-bold transition-colors border border-white/40 cursor-pointer"
               >
                 View Services
               </a>

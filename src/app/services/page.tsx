@@ -133,7 +133,7 @@ export default function ServicesPage() {
                     </ul>
                     <Link
                       href={`/inquiry?type=${service.id === 'parties' ? 'private_party' : service.id === 'weddings' ? 'wedding' : service.id}`}
-                      className="inline-block bg-[#000000] text-white px-6 py-3 md:px-8 md:py-3.5 rounded-md font-bold hover:bg-[#152d47] transition-colors text-base md:text-base border border-[#000000]"
+                      className="inline-block bg-[#000000] text-white px-6 py-3 md:px-8 md:py-3.5 rounded-md font-bold transition-colors text-base md:text-base border border-[#000000]"
                     >
                       Get a Quote
                     </Link>

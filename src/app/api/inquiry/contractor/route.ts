@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const businessEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
+const baseEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
+const businessEmail = baseEmail.replace('@', '+contractor@');
 
 const roleLabels: Record<string, string> = {
   sound_engineer: 'Sound Engineer',

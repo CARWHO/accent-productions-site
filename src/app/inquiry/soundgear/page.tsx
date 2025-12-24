@@ -164,13 +164,15 @@ function InquiryForm() {
   if (submitted) {
     return (
       <div className={`flex flex-col items-center justify-center min-h-[610px] transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
-          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="flex flex-col items-center mt-16">
+          <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
+          <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
         </div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
-        <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
       </div>
     );
   }
@@ -202,33 +204,39 @@ function InquiryForm() {
       {/* Step 1: Package Selection */}
       {step === 1 && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.value}
-                onClick={() => {
-                  updateField('package', pkg.value);
-                  goToStep(2);
-                }}
-                className="cursor-pointer border-2 border-gray-200 rounded-md overflow-hidden transition-all hover:border-gray-300"
-              >
-                <div className="aspect-[5/4] relative w-full">
-                  <Image src={pkg.image} alt={pkg.label} fill className="object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-transparent" />
-                  <div className="absolute top-0 left-0 right-0 p-3">
-                    <div className="flex justify-between items-start text-white">
-                      <h3 className="text-lg font-bold leading-tight">{pkg.label}</h3>
-                      <span className="text-base font-bold leading-tight">{pkg.price}</span>
+          <div className="flex-grow">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.value}
+                  onClick={() => {
+                    updateField('package', pkg.value);
+                    goToStep(2);
+                  }}
+                  className="cursor-pointer border-2 border-gray-200 rounded-md overflow-hidden transition-all hover:border-gray-300"
+                >
+                  <div className="aspect-[5/4] relative w-full">
+                    <Image src={pkg.image} alt={pkg.label} fill className="object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-transparent" />
+                    <div className="absolute top-0 left-0 right-0 p-3">
+                      <div className="flex justify-between items-start text-white">
+                        <h3 className="text-lg font-bold leading-tight">{pkg.label}</h3>
+                        <span className="text-base font-bold leading-tight">{pkg.price}</span>
+                      </div>
+                      <p className="text-xs text-white/90 leading-tight mt-1">{pkg.size}</p>
                     </div>
-                    <p className="text-xs text-white/90 leading-tight mt-1">{pkg.size}</p>
+                  </div>
+                  <div className="px-3 py-2 bg-white">
+                    <p className="text-xs text-gray-600 font-medium leading-tight m-0">{pkg.description}</p>
                   </div>
                 </div>
-                <div className="px-3 py-2 bg-white">
-                  <p className="text-xs text-gray-600 font-medium leading-tight m-0">{pkg.description}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-4 mt-auto pt-5">
+            <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</a>
           </div>
         </div>
       )}
@@ -308,7 +316,7 @@ function InquiryForm() {
                 }
               }}
               disabled={isSubmitting}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000] disabled:opacity-50"
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
             >
               {isSubmitting ? 'Sending...' : 'Submit Request'}
             </button>
@@ -419,7 +427,7 @@ function InquiryForm() {
                   goToStep(3);
                 }
               }}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000]"
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
             >
               Continue
             </button>
@@ -510,7 +518,7 @@ function InquiryForm() {
             <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => goToStep(4)}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000]"
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
             >
               Continue
             </button>
@@ -590,7 +598,7 @@ function InquiryForm() {
             <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
             <button
               onClick={() => goToStep(4)}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000]"
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
             >
               Continue
             </button>
@@ -739,7 +747,7 @@ function InquiryForm() {
                   goToStep(5);
                 }
               }}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000]"
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
             >
               Continue
             </button>
@@ -826,7 +834,7 @@ function InquiryForm() {
                 }
               }}
               disabled={isSubmitting}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base hover:bg-[#152d47] transition-colors border border-[#000000] disabled:opacity-50"
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
             >
               {isSubmitting ? 'Sending...' : 'Get Quote'}
             </button>
