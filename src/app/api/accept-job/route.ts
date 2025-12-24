@@ -115,9 +115,57 @@ export async function GET(request: Request) {
 
       const eventTitle = encodeURIComponent(`${booking.event_name || 'Event'} - Accent Productions`);
       const location = encodeURIComponent(booking.location || '');
-      const details = encodeURIComponent(
-        `Client: ${booking.client_name}\nPhone: ${booking.client_phone}\n\nBooked via Accent Productions`
-      );
+
+      // Build detailed description from booking details
+      const descriptionParts: string[] = [];
+      const bookingDetails = booking.details_json as Record<string, unknown> | null;
+
+      if (bookingDetails) {
+        if (bookingDetails.type === 'backline') {
+          const equipment = bookingDetails.equipment as Array<{ name: string; quantity: number }> | null;
+          if (equipment && equipment.length > 0) {
+            descriptionParts.push('EQUIPMENT:');
+            equipment.forEach(e => descriptionParts.push(`• ${e.quantity}x ${e.name}`));
+            descriptionParts.push('');
+          }
+          if (bookingDetails.otherEquipment) {
+            descriptionParts.push(`Other: ${bookingDetails.otherEquipment}`);
+            descriptionParts.push('');
+          }
+          const period = bookingDetails.rentalPeriod as { start: string; end: string } | null;
+          if (period) {
+            descriptionParts.push(`Rental: ${period.start} to ${period.end}`);
+          }
+          if (bookingDetails.deliveryMethod === 'delivery' && bookingDetails.deliveryAddress) {
+            descriptionParts.push(`Delivery to: ${bookingDetails.deliveryAddress}`);
+          } else {
+            descriptionParts.push('Collection: Customer pickup');
+          }
+        } else if (bookingDetails.type === 'fullsystem') {
+          if (bookingDetails.eventType) descriptionParts.push(`Event: ${bookingDetails.eventType}`);
+          if (bookingDetails.attendance) descriptionParts.push(`Attendance: ${bookingDetails.attendance}`);
+          if (bookingDetails.setupTime) descriptionParts.push(`Setup: ${bookingDetails.setupTime}`);
+          const reqs = bookingDetails.contentRequirements as string[] | null;
+          if (reqs && reqs.length > 0) {
+            descriptionParts.push(`Requirements: ${reqs.join(', ')}`);
+          }
+          if (bookingDetails.bandNames) descriptionParts.push(`Band(s): ${bookingDetails.bandNames}`);
+        }
+
+        if (bookingDetails.additionalNotes || bookingDetails.details) {
+          descriptionParts.push('');
+          descriptionParts.push(`Notes: ${bookingDetails.additionalNotes || bookingDetails.details}`);
+        }
+      }
+
+      descriptionParts.push('');
+      descriptionParts.push('---');
+      descriptionParts.push(`Client: ${booking.client_name}`);
+      descriptionParts.push(`Phone: ${booking.client_phone}`);
+      descriptionParts.push('');
+      descriptionParts.push('Booked via Accent Productions');
+
+      const details = encodeURIComponent(descriptionParts.join('\n'));
 
       // Parse date and time
       const startDate = new Date(booking.event_date);
@@ -199,8 +247,8 @@ export async function GET(request: Request) {
               to: [other.email],
               subject: `Job Filled: ${booking.event_name || 'Event'} - ${formatDate(booking.event_date)}`,
               html: `
-                <div style="text-align: center; margin-bottom: 24px;">
-                  <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 60px; width: auto;" />
+                <div style="text-align: left; margin-bottom: 24px;">
+                  <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 120px; width: auto;" />
                 </div>
                 <p>Hi ${other.name},</p>
                 <p>The following job has been filled by another contractor:</p>
@@ -220,8 +268,8 @@ export async function GET(request: Request) {
         to: [contractor.email],
         subject: `Confirmed: You're booked for ${booking.event_name || 'Event'}`,
         html: `
-          <div style="text-align: center; margin-bottom: 24px;">
-            <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 60px; width: auto;" />
+          <div style="text-align: left; margin-bottom: 24px;">
+            <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 120px; width: auto;" />
           </div>
           <h1>You're Booked!</h1>
           <p>Hi ${contractor.name},</p>
@@ -237,7 +285,7 @@ export async function GET(request: Request) {
           <p style="margin: 20px 0;">
             <a href="${addToCalendarUrl}"
                style="display: inline-block; background: #4285f4; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-              + Add to My Google Calendar
+              Add to My Google Calendar
             </a>
           </p>
           ` : ''}

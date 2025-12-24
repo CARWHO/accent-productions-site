@@ -201,8 +201,8 @@ export async function GET(request: Request) {
             to: [contractor.email],
             subject: `Job Available: ${booking.event_name || 'Event'} - ${formatDate(booking.event_date)}`,
             html: `
-              <div style="text-align: center; margin-bottom: 24px;">
-                <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 60px; width: auto;" />
+              <div style="text-align: left; margin-bottom: 24px;">
+                <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 120px; width: auto;" />
               </div>
               <h1>New Job Available</h1>
               <p>Hi ${contractor.name},</p>
