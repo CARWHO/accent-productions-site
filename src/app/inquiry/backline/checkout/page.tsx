@@ -107,20 +107,16 @@ export default function CheckoutPage() {
 
   if (submitted) {
     return (
-      <main className="bg-stone-50 min-h-screen pt-5 lg:pt-5 pb-8 lg:pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto">
-          <div className="bg-white rounded-md border border-stone-200 p-6 lg:p-8 min-h-[400px] lg:min-h-[775px]">
-            <div className={`flex flex-col items-center justify-center min-h-[610px] transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-              <div className="flex flex-col items-center mt-16">
-                <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
-                <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
-              </div>
+      <main className="bg-stone-50 min-h-screen flex items-center justify-center px-4 pb-32">
+        <div className="bg-white rounded-lg border border-stone-200 p-8 max-w-md w-full aspect-square flex items-center justify-center">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-20 h-20 bg-black rounded-md flex items-center justify-center mb-6">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
             </div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
+            <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
           </div>
         </div>
       </main>

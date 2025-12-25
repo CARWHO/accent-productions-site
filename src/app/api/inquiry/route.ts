@@ -272,11 +272,11 @@ export async function POST(request: Request) {
           <hr />
           <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7; text-align: center;">
             <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
-              Ready to book this job? Click below to approve and notify contractors:
+              Review the quote and send to client for approval:
             </p>
-            <a href="${baseUrl}/api/approve-quote?token=${approvalToken}"
-               style="display: inline-block; background: #16a34a; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-              ✓ Approve Quote & Notify Contractors
+            <a href="${baseUrl}/review-quote?token=${approvalToken}"
+               style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+              Review Quote
             </a>
           </div>
           ` : ''}

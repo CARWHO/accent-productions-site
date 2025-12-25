@@ -3,6 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import PageCard from '@/components/ui/PageCard';
 
 type PackageType = 'small' | 'medium' | 'large' | 'extra_large';
 type EventType = 'wedding' | 'corporate' | 'festival' | 'private_party' | 'other';
@@ -203,39 +204,37 @@ function InquiryForm() {
 
       {/* Step 1: Package Selection */}
       {step === 1 && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="flex-grow">
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
-              {packages.map((pkg) => (
-                <div
-                  key={pkg.value}
-                  onClick={() => {
-                    updateField('package', pkg.value);
-                    goToStep(2);
-                  }}
-                  className="cursor-pointer border-2 border-gray-200 rounded-md overflow-hidden transition-all hover:border-gray-300"
-                >
-                  <div className="aspect-[5/4] relative w-full">
-                    <Image src={pkg.image} alt={pkg.label} fill className="object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-transparent" />
-                    <div className="absolute top-0 left-0 right-0 p-3">
-                      <div className="flex justify-between items-start text-white">
-                        <h3 className="text-lg font-bold leading-tight">{pkg.label}</h3>
-                        <span className="text-base font-bold leading-tight">{pkg.price}</span>
-                      </div>
-                      <p className="text-xs text-white/90 leading-tight mt-1">{pkg.size}</p>
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col min-h-0 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
+            {packages.map((pkg) => (
+              <div
+                key={pkg.value}
+                onClick={() => {
+                  updateField('package', pkg.value);
+                  goToStep(2);
+                }}
+                className="cursor-pointer border-2 border-gray-200 rounded-md overflow-hidden transition-all hover:border-gray-300 flex flex-col min-h-0"
+              >
+                <div className="flex-1 relative min-h-[120px]">
+                  <Image src={pkg.image} alt={pkg.label} fill className="object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-transparent" />
+                  <div className="absolute top-0 left-0 right-0 p-3">
+                    <div className="flex justify-between items-start text-white">
+                      <h3 className="text-lg font-bold leading-tight">{pkg.label}</h3>
+                      <span className="text-base font-bold leading-tight">{pkg.price}</span>
                     </div>
-                  </div>
-                  <div className="px-3 py-2 bg-white">
-                    <p className="text-xs text-gray-600 font-medium leading-tight m-0">{pkg.description}</p>
+                    <p className="text-xs text-white/90 leading-tight mt-1">{pkg.size}</p>
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="px-3 py-2 bg-white flex-shrink-0">
+                  <p className="text-xs text-gray-600 font-medium leading-tight m-0">{pkg.description}</p>
+                </div>
+              </div>
+            ))}
           </div>
 
-          <div className="flex gap-4 mt-auto pt-5">
+          <div className="flex gap-4 pt-5 flex-shrink-0">
             <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</a>
           </div>
         </div>
@@ -847,14 +846,10 @@ function InquiryForm() {
 
 export default function SoundgearInquiryPage() {
   return (
-    <main className="bg-stone-50 min-h-screen pt-5 lg:pt-5 pb-8 lg:pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-md border border-stone-200 p-6 lg:p-8 min-h-[400px] lg:min-h-[775px]">
-          <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded-md" />}>
-            <InquiryForm />
-          </Suspense>
-        </div>
-      </div>
-    </main>
+    <PageCard formMode>
+      <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded-md" />}>
+        <InquiryForm />
+      </Suspense>
+    </PageCard>
   );
 }

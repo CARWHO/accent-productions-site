@@ -78,7 +78,7 @@ function AcceptJobContent() {
 export default function AcceptJobPage() {
   return (
     <main className="bg-stone-50 min-h-screen flex items-center justify-center px-4 pb-32">
-      <div className="bg-white rounded-lg border border-stone-200 p-8 max-w-md w-full">
+      <div className="bg-white rounded-lg border border-stone-200 p-8 max-w-md w-full aspect-square flex items-center justify-center">
         <Suspense fallback={<div className="animate-pulse h-40 bg-stone-100 rounded" />}>
           <AcceptJobContent />
         </Suspense>

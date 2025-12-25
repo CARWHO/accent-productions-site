@@ -36,7 +36,7 @@ export default function AboutPage() {
             </div>
             <div className="aspect-[4/3] relative rounded-md overflow-hidden">
               <Image
-                src="/images/image12.png"
+                src="/images/image1-festival-cuba-st.png"
                 alt="Sound equipment"
                 fill
                 className="object-cover"
