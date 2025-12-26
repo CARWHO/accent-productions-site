@@ -15,6 +15,20 @@ const jobSheetFolderEnvKeys: Record<FolderType, string> = {
   soundtech: 'GOOGLE_DRIVE_SOUND_TECH_JOBSHEET_FOLDER_ID',
 };
 
+/**
+ * Extract folder ID from a Google Drive URL or return as-is if already an ID
+ * Handles URLs like: https://drive.google.com/drive/folders/ABC123?usp=sharing
+ */
+function extractFolderId(input: string): string {
+  // If it looks like a URL, extract the folder ID
+  if (input.includes('drive.google.com') || input.includes('/folders/')) {
+    const match = input.match(/folders\/([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+  }
+  // Remove any query params if present (e.g., ?usp=sharing)
+  return input.split('?')[0];
+}
+
 function getOAuth2Client() {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REFRESH_TOKEN) {
     return null;
@@ -38,7 +52,8 @@ export async function uploadQuoteToDrive(
   folderType: FolderType
 ): Promise<string | null> {
   try {
-    const folderId = process.env[quoteFolderEnvKeys[folderType]];
+    const rawFolderId = process.env[quoteFolderEnvKeys[folderType]];
+    const folderId = rawFolderId ? extractFolderId(rawFolderId) : null;
     const oauth2Client = getOAuth2Client();
 
     if (!folderId || !oauth2Client) {
@@ -135,7 +150,8 @@ export async function uploadJobSheetToDrive(
   folderType: FolderType
 ): Promise<string | null> {
   try {
-    const folderId = process.env[jobSheetFolderEnvKeys[folderType]];
+    const rawFolderId = process.env[jobSheetFolderEnvKeys[folderType]];
+    const folderId = rawFolderId ? extractFolderId(rawFolderId) : null;
     const oauth2Client = getOAuth2Client();
 
     if (!folderId || !oauth2Client) {
