@@ -166,7 +166,7 @@ export default function Home() {
               Professional Sound Equipment Rental
             </h1>
             <p className="text-xl text-gray-200 mb-8 font-medium">
-              Wellington-based audio solutions for Corporate events, public events, festivals, and private parties.
+              Wellington based audio solution for festivals, public events, and private functions & support to local & touring bands.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
@@ -206,14 +206,15 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <h2 className="text-4xl font-bold text-gray-900 mb-6">
-                10+ Years of Experience
+                Accent Productions
               </h2>
               <p className="text-gray-700 mb-4 font-medium text-lg">
-                Since 2014, we&apos;ve provided professional audio equipment and technical support for over 500 events across the Wellington region.
+                Starting in 2005, over 2000 events.
               </p>
-              <p className="text-gray-700 mb-8 font-medium text-lg">
-                We handle setup, operation, and breakdown - you focus on your event.
-              </p>
+              <div className="text-gray-700 mb-8 font-medium text-lg space-y-1">
+                <p>Newton Festival: 2005–2026</p>
+                <p>Cuba Dupa: 2022–2026</p>
+              </div>
               <Link
                 href="/about"
                 className="text-[#000000] font-bold hover:text-[#152d47] text-base underline underline-offset-4"

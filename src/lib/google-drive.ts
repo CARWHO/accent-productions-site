@@ -1,12 +1,18 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 
-export type QuoteFolderType = 'backline' | 'fullsystem' | 'soundtech';
+export type FolderType = 'backline' | 'fullsystem' | 'soundtech';
 
-const folderEnvKeys: Record<QuoteFolderType, string> = {
+const quoteFolderEnvKeys: Record<FolderType, string> = {
   backline: 'GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID',
   fullsystem: 'GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID',
   soundtech: 'GOOGLE_DRIVE_SOUND_TECH_QUOTES_FOLDER_ID',
+};
+
+const jobSheetFolderEnvKeys: Record<FolderType, string> = {
+  backline: 'GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID',
+  fullsystem: 'GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID',
+  soundtech: 'GOOGLE_DRIVE_SOUND_TECH_JOBSHEET_FOLDER_ID',
 };
 
 function getOAuth2Client() {
@@ -29,10 +35,10 @@ function getOAuth2Client() {
 export async function uploadQuoteToDrive(
   pdfBuffer: Buffer,
   filename: string,
-  folderType: QuoteFolderType
+  folderType: FolderType
 ): Promise<string | null> {
   try {
-    const folderId = process.env[folderEnvKeys[folderType]];
+    const folderId = process.env[quoteFolderEnvKeys[folderType]];
     const oauth2Client = getOAuth2Client();
 
     if (!folderId || !oauth2Client) {
@@ -93,3 +99,68 @@ export async function shareFileWithLink(fileId: string): Promise<string | null> 
     return null;
   }
 }
+
+/**
+ * Download a file from Google Drive by ID
+ * Returns the file as a Buffer or null if failed
+ */
+export async function downloadFileFromDrive(fileId: string): Promise<Buffer | null> {
+  try {
+    const oauth2Client = getOAuth2Client();
+    if (!oauth2Client) {
+      console.warn('Google Drive not configured');
+      return null;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    const response = await drive.files.get(
+      { fileId, alt: 'media' },
+      { responseType: 'arraybuffer' }
+    );
+
+    return Buffer.from(response.data as ArrayBuffer);
+  } catch (error) {
+    console.error('Error downloading file from Google Drive:', error);
+    return null;
+  }
+}
+
+/**
+ * Upload a Job Sheet PDF to the appropriate job sheets folder
+ */
+export async function uploadJobSheetToDrive(
+  pdfBuffer: Buffer,
+  filename: string,
+  folderType: FolderType
+): Promise<string | null> {
+  try {
+    const folderId = process.env[jobSheetFolderEnvKeys[folderType]];
+    const oauth2Client = getOAuth2Client();
+
+    if (!folderId || !oauth2Client) {
+      console.warn(`Google Drive not configured for ${folderType} job sheets, skipping upload`);
+      return null;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    const response = await drive.files.create({
+      requestBody: {
+        name: filename,
+        parents: [folderId],
+      },
+      media: {
+        mimeType: 'application/pdf',
+        body: Readable.from(pdfBuffer),
+      },
+    });
+
+    console.log(`Uploaded Job Sheet ${filename} to Google Drive ${folderType} folder (ID: ${response.data.id})`);
+    return response.data.id || null;
+  } catch (error) {
+    console.error('Error uploading Job Sheet to Google Drive:', error);
+    return null;
+  }
+}
+

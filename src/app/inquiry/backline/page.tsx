@@ -93,7 +93,7 @@ export default function BacklinePage() {
   }, [searchQuery, categories]);
 
   return (
-    <PageCard formMode>
+    <PageCard stretch>
       <div className="flex flex-col h-full">
         <div className="flex items-start justify-between mb-2">
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Backline Hire</h1>

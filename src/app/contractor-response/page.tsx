@@ -15,38 +15,35 @@ function ContractorResponseContent() {
 
   if (success && action === 'accepted') {
     return (
-      <div className="flex flex-col items-center text-center py-8">
+      <div className="flex flex-col items-center text-center">
         <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">You&apos;re Booked!</h1>
-        <p className="text-gray-600 mb-2">
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">You&apos;re Booked!</h2>
+        <p className="text-gray-700 text-lg font-medium">
           You&apos;ve been confirmed for <strong>{eventName || 'this event'}</strong>.
         </p>
         {pay && (
-          <p className="text-xl font-semibold text-green-600 mb-4">
-            Your pay: ${Number(pay).toFixed(2)}
+          <p className="text-gray-700 text-lg font-medium mt-1">
+            Your pay: <strong>${Number(pay).toFixed(2)}</strong>
           </p>
         )}
-        <p className="text-sm text-gray-500">
-          Check your email for confirmation and job details.
-        </p>
       </div>
     );
   }
 
   if (success && action === 'declined') {
     return (
-      <div className="flex flex-col items-center text-center py-8">
+      <div className="flex flex-col items-center text-center">
         <div className="w-20 h-20 bg-gray-400 rounded-md flex items-center justify-center mb-6">
           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">Response Recorded</h1>
-        <p className="text-gray-600 mb-4">
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Response Recorded</h2>
+        <p className="text-gray-700 text-lg font-medium">
           Thanks for letting us know. We&apos;ll notify you of future opportunities!
         </p>
       </div>
@@ -66,7 +63,7 @@ function ContractorResponseContent() {
   };
 
   return (
-    <div className="flex flex-col items-center text-center py-8">
+    <div className="flex flex-col items-center text-center">
       <div className="w-20 h-20 bg-amber-100 rounded-md flex items-center justify-center mb-6">
         <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {error === 'already_responded' ? (
@@ -76,10 +73,10 @@ function ContractorResponseContent() {
           )}
         </svg>
       </div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">
+      <h2 className="text-3xl font-bold text-gray-900 mb-2">
         {error === 'already_responded' ? 'Already Responded' : 'Error'}
-      </h1>
-      <p className="text-gray-600">
+      </h2>
+      <p className="text-gray-700 text-lg font-medium">
         {error ? errorMessages[error] || 'An unknown error occurred.' : 'Something went wrong.'}
       </p>
     </div>

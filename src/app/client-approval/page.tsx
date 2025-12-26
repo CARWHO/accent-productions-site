@@ -12,21 +12,18 @@ function ClientApprovalContent() {
 
   if (success) {
     return (
-      <div className="flex flex-col items-center text-center py-8">
+      <div className="flex flex-col items-center text-center">
         <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">Quote Approved!</h1>
-        <p className="text-gray-600 mb-2">
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Quote Approved!</h2>
+        <p className="text-gray-700 text-lg font-medium mb-1">
           Thank you for approving the quote for <strong>{eventName || 'your event'}</strong>.
         </p>
-        <p className="text-gray-600 mb-6">
-          We&apos;re now arranging your team and will be in touch soon with confirmation.
-        </p>
-        <p className="text-sm text-gray-500">
-          If you have any questions, please don&apos;t hesitate to contact us.
+        <p className="text-gray-700 text-lg font-medium">
+          We&apos;ll be in touch soon with confirmation.
         </p>
       </div>
     );
@@ -41,7 +38,7 @@ function ClientApprovalContent() {
   };
 
   return (
-    <div className="flex flex-col items-center text-center py-8">
+    <div className="flex flex-col items-center text-center">
       <div className="w-20 h-20 bg-red-100 rounded-md flex items-center justify-center mb-6">
         <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {error === 'already_approved' ? (
@@ -51,10 +48,10 @@ function ClientApprovalContent() {
           )}
         </svg>
       </div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">
+      <h2 className="text-3xl font-bold text-gray-900 mb-2">
         {error === 'already_approved' ? 'Already Approved' : 'Error'}
-      </h1>
-      <p className="text-gray-600">
+      </h2>
+      <p className="text-gray-700 text-lg font-medium">
         {error ? errorMessages[error] || 'An unknown error occurred.' : 'Something went wrong.'}
       </p>
     </div>

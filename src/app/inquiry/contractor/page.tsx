@@ -33,6 +33,21 @@ export default function ContractorInquiryPage() {
     contactPhone: '',
   });
 
+  const fillTestData = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 7);
+    setFormData({
+      eventDate: tomorrow.toISOString().split('T')[0],
+      startTime: '6:00 PM',
+      endTime: '11:00 PM',
+      location: '123 Test Venue, Wellington',
+      eventDescription: 'Test wedding with live band and DJ. Approximately 150 guests. Need full sound setup and operator for the evening.',
+      contactName: 'James Huddon',
+      contactEmail: 'relahunter@gmail.com',
+      contactPhone: '123467',
+    });
+  };
+
   const updateField = <K extends keyof ContractorFormData>(field: K, value: ContractorFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (showValidation) {
@@ -82,22 +97,25 @@ export default function ContractorInquiryPage() {
   const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
   const totalSteps = 2;
 
-  return (
-    <PageCard autoHeight>
-      {submitted ? (
-        <div className={`flex flex-col items-center justify-center min-h-[610px] transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="flex flex-col items-center mt-16">
-            <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
-            <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
+  if (submitted) {
+    return (
+      <PageCard centered>
+        <div className={`flex flex-col items-center text-center transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
+          <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
         </div>
-      ) : (
-        <div className="flex flex-col">
+      </PageCard>
+    );
+  }
+
+  return (
+    <PageCard>
+      <div className="flex flex-col">
           {/* Error Summary */}
           {showValidation && (
             <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
@@ -114,6 +132,17 @@ export default function ContractorInquiryPage() {
               />
             ))}
           </div>
+
+          {/* Dev Fill Button */}
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              type="button"
+              onClick={fillTestData}
+              className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300 hover:bg-yellow-200"
+            >
+              Fill Test Data
+            </button>
+          )}
 
           {/* Step 1: Event Details */}
           {step === 1 && (
@@ -284,8 +313,7 @@ export default function ContractorInquiryPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
+      </div>
     </PageCard>
   );
 }

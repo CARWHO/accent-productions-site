@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     // 2. Generate quote and PDF (only for small, medium, large packages)
     let pdfBuffer: Buffer | null = null;
     let quoteNumber = '';
+    let quoteTotal = 0;
     let driveFileId: string | null = null;
 
     // Check if this is a sound system inquiry with a valid package
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
 
         const quote = await generateSoundQuote(quoteInput);
         quoteNumber = quote.quoteNumber;
+        quoteTotal = quote.total;
 
         // Generate PDF
         pdfBuffer = await generateSoundQuotePDF(
@@ -183,6 +185,7 @@ export async function POST(request: Request) {
           approval_token: approvalToken,
           details_json: detailsJson,
           quote_drive_file_id: driveFileId,
+          quote_total: quoteTotal,
         });
 
       if (bookingError) {
@@ -270,7 +273,7 @@ export async function POST(request: Request) {
 
           ${approvalToken ? `
           <hr />
-          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7; text-align: center;">
+          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
             <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
               Review the quote and send to client for approval:
             </p>

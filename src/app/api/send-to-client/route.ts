@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
+import { generateInvoicePDF, InvoiceInput } from '@/lib/pdf-invoice';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -31,15 +32,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Booking not found' }, { status: 404 });
     }
 
+    // Generate invoice number (INV-YYYY-XXXX format)
+    const year = new Date().getFullYear();
+    const invoiceNumber = `INV-${year}-${booking.quote_number?.split('-')[1] || randomUUID().slice(0, 4).toUpperCase()}`;
+
     // Generate client approval token
     const clientApprovalToken = randomUUID();
+
+    // Calculate totals - adjustedAmount overrides the stored quote_total
+    const details = booking.details_json as Record<string, unknown> | null;
+    const finalAmount = adjustedAmount || booking.quote_total || 0;
+    const subtotal = finalAmount / 1.15; // Remove GST to get subtotal
+    const gst = finalAmount - subtotal;
+
+    // Build line items from details
+    const lineItems: Array<{ description: string; amount: number }> = [];
+    if (details?.equipment && Array.isArray(details.equipment)) {
+      for (const item of details.equipment as Array<{ name: string; quantity: number; price?: number }>) {
+        lineItems.push({
+          description: `${item.quantity}x ${item.name}`,
+          amount: (item.price || 0) * item.quantity,
+        });
+      }
+    }
+    // If no line items, add a generic one
+    if (lineItems.length === 0) {
+      lineItems.push({
+        description: booking.booking_type || 'Equipment Hire & Services',
+        amount: subtotal,
+      });
+    }
 
     // Create or update client_approvals record
     const { error: approvalError } = await supabase
       .from('client_approvals')
       .upsert({
         booking_id: bookingId,
-        adjusted_quote_total: adjustedAmount || null,
+        adjusted_quote_total: finalAmount,
         quote_notes: notes || null,
         client_approval_token: clientApprovalToken,
         sent_to_client_at: new Date().toISOString(),
@@ -53,10 +82,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Failed to create approval record' }, { status: 500 });
     }
 
-    // Update booking status
+    // Update booking with invoice number
     await supabase
       .from('bookings')
-      .update({ status: 'sent_to_client' })
+      .update({
+        status: 'sent_to_client',
+        invoice_number: invoiceNumber,
+      })
       .eq('id', bookingId);
 
     // Send email to client
@@ -70,61 +102,107 @@ export async function POST(request: Request) {
         });
       };
 
+      // Generate Invoice PDF with payment link
+      const stripePaymentUrl = `${baseUrl}/payment?invoice=${invoiceNumber}&amount=${finalAmount.toFixed(2)}`;
+
+      const invoiceInput: InvoiceInput = {
+        invoiceNumber,
+        quoteNumber: booking.quote_number || undefined,
+        clientName: booking.client_name,
+        clientEmail: booking.client_email,
+        clientPhone: booking.client_phone || '',
+        eventName: booking.event_name || 'Event',
+        eventDate: booking.event_date,
+        location: booking.location || undefined,
+        lineItems,
+        subtotal,
+        gst,
+        total: finalAmount,
+        notes: notes || undefined,
+        paymentUrl: stripePaymentUrl,
+      };
+
+      let invoicePdfBuffer: Buffer | null = null;
+      try {
+        invoicePdfBuffer = await generateInvoicePDF(invoiceInput);
+      } catch (pdfError) {
+        console.error('Error generating invoice PDF:', pdfError);
+      }
+
+      // Client approval URL
       const approveUrl = `${baseUrl}/api/client-approve?token=${clientApprovalToken}`;
 
       await resend.emails.send({
         from: 'Accent Productions <notifications@accent-productions.co.nz>',
         to: [booking.client_email],
-        subject: `Quote from Accent Productions - ${booking.event_name || 'Your Event'}`,
+        subject: `Invoice from Accent Productions - ${booking.event_name || 'Your Event'}`,
         html: `
-          <div style="text-align: left; margin-bottom: 24px;">
-            <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 120px; width: auto;" />
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; text-align: left;">
+            <div style="margin-bottom: 24px;">
+              <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 100px; width: auto;" />
+            </div>
+
+            <h1 style="color: #16a34a; margin-bottom: 10px; text-align: left;">Invoice Ready</h1>
+            <p style="color: #666; margin-top: 0; text-align: left;">Invoice #${invoiceNumber}</p>
+
+            <p style="text-align: left;">Hi ${booking.client_name.split(' ')[0]},</p>
+            <p style="text-align: left;">Thanks for booking with us! Please review and approve your invoice to confirm the booking.</p>
+
+            <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin: 25px 0; text-align: left;">
+              <div style="font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Amount Due</div>
+              <div style="font-size: 36px; font-weight: bold; color: #15803d; margin-bottom: 15px;">$${finalAmount.toFixed(2)}</div>
+              <div style="border-top: 1px solid #bbf7d0; padding-top: 15px;">
+                <div style="margin-bottom: 5px;"><strong>Event:</strong> ${booking.event_name || 'Your Event'}</div>
+                <div style="margin-bottom: 5px;"><strong>Date:</strong> ${formatDate(booking.event_date)}</div>
+                <div><strong>Location:</strong> ${booking.location || 'TBC'}</div>
+              </div>
+            </div>
+
+            ${notes ? `
+            <div style="background: #e8f4fd; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3; text-align: left;">
+              <p style="margin: 0;"><strong>Note:</strong></p>
+              <p style="margin: 8px 0 0 0;">${notes}</p>
+            </div>
+            ` : ''}
+
+            <p style="text-align: left; margin-top: 25px;">Please approve this quote to confirm your booking:</p>
+
+            <div style="margin: 25px 0; text-align: left;">
+              <a href="${approveUrl}"
+                 style="display: inline-block; background: #16a34a; color: #fff; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px;">
+                Approve Quote
+              </a>
+            </div>
+
+            <p style="color: #666; font-size: 14px; text-align: left; margin-top: 30px;">
+              Payment details are on the attached invoice.
+            </p>
+
+            <p style="color: #666; font-size: 14px; text-align: left;">
+              Questions? Reply to this email or call us on 027 602 3869.
+            </p>
+
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
+            <p style="color: #999; font-size: 12px; text-align: left;">
+              Accent Productions | Professional Sound & Lighting
+            </p>
           </div>
-
-          <h1>Your Quote is Ready</h1>
-          <p>Hi ${booking.client_name},</p>
-          <p>Thank you for your inquiry! Here are your event details:</p>
-
-          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="margin-top: 0;">${booking.event_name || 'Your Event'}</h2>
-            <p><strong>Date:</strong> ${formatDate(booking.event_date)}</p>
-            <p><strong>Location:</strong> ${booking.location || 'TBC'}</p>
-            ${adjustedAmount ? `<p style="font-size: 18px;"><strong>Quote Total:</strong> $${adjustedAmount.toFixed(2)}</p>` : ''}
-          </div>
-
-          ${notes ? `
-          <div style="background: #e8f4fd; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
-            <p style="margin: 0;"><strong>Note from Accent Productions:</strong></p>
-            <p style="margin: 8px 0 0 0;">${notes}</p>
-          </div>
-          ` : ''}
-
-          <p>Please review and approve this quote to confirm your booking:</p>
-
-          <p style="margin: 30px 0;">
-            <a href="${approveUrl}"
-               style="display: inline-block; background: #16a34a; color: #fff; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-              ✓ Approve Quote
-            </a>
-          </p>
-
-          <p style="color: #666; font-size: 14px;">
-            If you have any questions, please reply to this email or call us.
-          </p>
-
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
-          <p style="color: #999; font-size: 12px;">
-            Accent Productions | Professional Sound & Lighting
-          </p>
         `,
+        ...(invoicePdfBuffer ? {
+          attachments: [{
+            filename: `Invoice-${invoiceNumber}.pdf`,
+            content: invoicePdfBuffer,
+          }],
+        } : {}),
       });
 
-      console.log(`Sent quote to client: ${booking.client_email}`);
+      console.log(`Sent invoice to client: ${booking.client_email}`);
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Quote sent to client',
+      message: 'Invoice sent to client',
+      invoiceNumber,
       clientApprovalId: clientApprovalToken
     });
   } catch (error) {

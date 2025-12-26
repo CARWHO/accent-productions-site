@@ -94,121 +94,132 @@ function ReviewQuoteContent() {
     });
   };
 
+  const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
+
   if (loading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-stone-200 rounded w-3/4" />
-        <div className="h-4 bg-stone-200 rounded w-1/2" />
-        <div className="h-32 bg-stone-200 rounded" />
-      </div>
+      <PageCard>
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-3/4" />
+          <div className="h-4 bg-gray-200 rounded w-1/2" />
+          <div className="h-32 bg-gray-200 rounded" />
+        </div>
+      </PageCard>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+      <PageCard centered>
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Error</h2>
+          <p className="text-gray-700 text-lg font-medium">{error}</p>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Error</h2>
-        <p className="text-gray-600">{error}</p>
-      </div>
+      </PageCard>
     );
   }
 
   if (sent) {
     return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+      <PageCard centered>
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Quote Sent!</h2>
+          <p className="text-gray-700 text-lg font-medium">
+            The quote has been sent to {booking?.client_email}.
+          </p>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Quote Sent!</h2>
-        <p className="text-gray-600 mb-4">
-          The quote has been sent to {booking?.client_email}.
-        </p>
-        <p className="text-sm text-gray-500">
-          You&apos;ll receive an email when the client approves.
-        </p>
-      </div>
+      </PageCard>
     );
   }
 
   if (!booking) return null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Review Quote</h1>
-        <p className="text-gray-600">Quote #{booking.quote_number}</p>
-      </div>
+    <PageCard>
+      <div className="flex flex-col">
+      <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Review Quote</h1>
+      <p className="text-gray-600 mb-6 font-medium">Quote #{booking.quote_number}</p>
 
-      {/* Event Details */}
-      <div className="bg-stone-50 rounded-lg p-4 space-y-2">
-        <h2 className="font-semibold text-lg">{booking.event_name || 'Event'}</h2>
-        <p className="text-gray-600">
-          <strong>Date:</strong> {formatDate(booking.event_date)}
-          {booking.event_time && ` at ${booking.event_time}`}
-        </p>
-        <p className="text-gray-600">
-          <strong>Location:</strong> {booking.location || 'TBC'}
-        </p>
-        <p className="text-gray-600">
-          <strong>Type:</strong> {booking.booking_type === 'backline' ? 'Backline Hire' : 'Full System'}
-        </p>
-      </div>
+      <div className="grid gap-4">
+        {/* Event Details */}
+        <div className="border border-gray-200 rounded-md p-4">
+          <h2 className="font-bold text-lg text-gray-900 mb-3">{booking.event_name || 'Event'}</h2>
+          <div className="grid gap-2 text-sm">
+            <p className="text-gray-700">
+              <span className="font-semibold">Date:</span> {formatDate(booking.event_date)}
+              {booking.event_time && ` at ${booking.event_time}`}
+            </p>
+            <p className="text-gray-700">
+              <span className="font-semibold">Location:</span> {booking.location || 'TBC'}
+            </p>
+            <p className="text-gray-700">
+              <span className="font-semibold">Type:</span> {booking.booking_type === 'backline' ? 'Backline Hire' : 'Full System'}
+            </p>
+          </div>
+        </div>
 
-      {/* Client Info */}
-      <div className="bg-blue-50 rounded-lg p-4 space-y-1">
-        <h3 className="font-semibold">Client</h3>
-        <p className="text-gray-700">{booking.client_name}</p>
-        <p className="text-gray-600 text-sm">{booking.client_email}</p>
-        <p className="text-gray-600 text-sm">{booking.client_phone}</p>
-      </div>
+        {/* Client Info */}
+        <div className="border border-gray-200 rounded-md p-4">
+          <h3 className="font-bold text-gray-900 mb-2">Client</h3>
+          <p className="text-gray-900 font-medium">{booking.client_name}</p>
+          <p className="text-gray-600 text-sm">{booking.client_email}</p>
+          <p className="text-gray-600 text-sm">{booking.client_phone}</p>
+        </div>
 
-      {/* Notes */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Notes for Client (optional)
-        </label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add any notes or special conditions..."
-          rows={3}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-transparent resize-none"
-        />
+        {/* Notes */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Notes for Client (optional)
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add any notes or special conditions..."
+            rows={3}
+            className={`${inputStyles} resize-y`}
+          />
+        </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col gap-3 pt-4">
+      <div className="flex flex-col gap-3 pt-6">
         <button
           onClick={handleSendToClient}
           disabled={sending}
-          className="w-full bg-green-600 text-white py-3 px-4 rounded-md font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
         >
           {sending ? 'Sending...' : 'Send to Client for Approval'}
         </button>
         <a
           href={`/select-contractors?token=${token}`}
-          className="w-full bg-gray-800 text-white py-3 px-4 rounded-md font-semibold hover:bg-gray-900 transition-colors text-center"
+          className="w-full border-2 border-gray-300 text-gray-700 py-3 rounded-md font-bold text-base transition-colors hover:border-gray-400 text-center"
         >
           Skip → Select Contractors Directly
         </a>
       </div>
-    </div>
+      </div>
+    </PageCard>
   );
 }
 
 export default function ReviewQuotePage() {
   return (
-    <PageCard autoHeight>
-      <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded" />}>
-        <ReviewQuoteContent />
-      </Suspense>
-    </PageCard>
+    <Suspense fallback={
+      <PageCard>
+        <div className="animate-pulse h-96 bg-stone-100 rounded" />
+      </PageCard>
+    }>
+      <ReviewQuoteContent />
+    </Suspense>
   );
 }

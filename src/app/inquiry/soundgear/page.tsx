@@ -114,6 +114,35 @@ function InquiryForm() {
 
   const [formData, setFormData] = useState<Partial<PackageFormData>>({});
 
+  const fillTestData = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 7);
+    setFormData({
+      package: 'medium',
+      eventType: 'wedding',
+      eventName: 'Test Wedding Reception',
+      organization: 'Test Corp',
+      eventDate: tomorrow.toISOString().split('T')[0],
+      eventTime: '6pm - 11pm',
+      setupTime: '2pm setup / 12am packout',
+      attendance: 150,
+      hasBand: true,
+      hasDJ: true,
+      hasSpeeches: true,
+      additionalInfo: 'Test event notes',
+      location: '123 Test Venue, Wellington',
+      venueContact: 'Venue Manager 021 555 1234',
+      indoorOutdoor: 'Indoor',
+      hasStage: true,
+      stageDetails: '4m x 3m stage',
+      contactName: 'James Huddon',
+      contactEmail: 'relahunter@gmail.com',
+      contactPhone: '123467',
+      details: 'Test booking - please ignore',
+    });
+    setStep(2); // Go to step 2 after filling
+  };
+
   const updateField = (field: keyof PackageFormData, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear validation when user updates a field
@@ -164,8 +193,8 @@ function InquiryForm() {
 
   if (submitted) {
     return (
-      <div className={`flex flex-col items-center justify-center min-h-[610px] transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="flex flex-col items-center mt-16">
+      <PageCard centered>
+        <div className={`flex flex-col items-center text-center transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -174,7 +203,7 @@ function InquiryForm() {
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
           <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
         </div>
-      </div>
+      </PageCard>
     );
   }
 
@@ -182,9 +211,10 @@ function InquiryForm() {
   const totalSteps = formData.package === 'extra_large' ? 1 : 4;
 
   return (
-    <div className="w-full min-h-0 lg:min-h-[720px] flex flex-col">
-      {/* Error Summary */}
-      {showValidation && (
+    <PageCard>
+      <div className="h-full flex flex-col">
+        {/* Error Summary */}
+        {showValidation && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
           <p className="text-sm text-red-800 font-semibold">Please fill in all required fields</p>
         </div>
@@ -200,6 +230,17 @@ function InquiryForm() {
             />
           ))}
         </div>
+      )}
+
+      {/* Dev Fill Button */}
+      {process.env.NODE_ENV === 'development' && step === 1 && (
+        <button
+          type="button"
+          onClick={fillTestData}
+          className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300 hover:bg-yellow-200"
+        >
+          Fill Test Data (Medium Package)
+        </button>
       )}
 
       {/* Step 1: Package Selection */}
@@ -840,16 +881,19 @@ function InquiryForm() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </PageCard>
   );
 }
 
 export default function SoundgearInquiryPage() {
   return (
-    <PageCard formMode>
-      <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded-md" />}>
-        <InquiryForm />
-      </Suspense>
-    </PageCard>
+    <Suspense fallback={
+      <PageCard>
+        <div className="animate-pulse h-96 bg-stone-100 rounded-md" />
+      </PageCard>
+    }>
+      <InquiryForm />
+    </Suspense>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/lib/cart-context';
+import PageCard from '@/components/ui/PageCard';
 
 interface CheckoutFormData {
   startDate: string;
@@ -36,6 +37,24 @@ export default function CheckoutPage() {
     contactPhone: '',
     techRider: null,
   });
+
+  const fillTestData = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date();
+    dayAfter.setDate(dayAfter.getDate() + 2);
+    setFormData({
+      startDate: tomorrow.toISOString().split('T')[0],
+      endDate: dayAfter.toISOString().split('T')[0],
+      deliveryMethod: 'delivery',
+      deliveryAddress: '123 Daniel Street, Newtown',
+      additionalNotes: 'Test booking',
+      contactName: 'James Huddon',
+      contactEmail: 'relahunter@gmail.com',
+      contactPhone: '123467',
+      techRider: null,
+    });
+  };
 
   const updateField = <K extends keyof CheckoutFormData>(field: K, value: CheckoutFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -107,19 +126,17 @@ export default function CheckoutPage() {
 
   if (submitted) {
     return (
-      <main className="bg-stone-50 min-h-screen flex items-center justify-center px-4 pb-32">
-        <div className="bg-white rounded-lg border border-stone-200 p-8 max-w-md w-full aspect-square flex items-center justify-center">
-          <div className="flex flex-col items-center text-center">
-            <div className="w-20 h-20 bg-black rounded-md flex items-center justify-center mb-6">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
-            <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
+      <PageCard centered>
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
+          <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
         </div>
-      </main>
+      </PageCard>
     );
   }
 
@@ -128,10 +145,8 @@ export default function CheckoutPage() {
   const hasItems = items.length > 0 || otherEquipment.trim() !== '';
 
   return (
-    <main className="bg-stone-50 min-h-screen pt-5 lg:pt-5 pb-8 lg:pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-md border border-stone-200 p-6 lg:p-8 min-h-[400px] lg:min-h-[775px]">
-          <div className="w-full min-h-0 lg:min-h-[720px] flex flex-col">
+    <PageCard>
+      <div className="h-full flex flex-col">
             {/* Error Summary */}
             {showValidation && (
               <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
@@ -148,6 +163,17 @@ export default function CheckoutPage() {
                 />
               ))}
             </div>
+
+            {/* Dev Fill Button */}
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                type="button"
+                onClick={fillTestData}
+                className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300 hover:bg-yellow-200"
+              >
+                Fill Test Data
+              </button>
+            )}
 
             {/* Step 1: Review Cart */}
             {step === 1 && (
@@ -458,9 +484,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
       </div>
-    </main>
+    </PageCard>
   );
 }

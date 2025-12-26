@@ -199,44 +199,50 @@ function SelectContractorsContent() {
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-stone-200 rounded w-3/4" />
-        <div className="h-32 bg-stone-200 rounded" />
-        <div className="h-48 bg-stone-200 rounded" />
-      </div>
+      <PageCard>
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-stone-200 rounded w-3/4" />
+          <div className="h-32 bg-stone-200 rounded" />
+          <div className="h-48 bg-stone-200 rounded" />
+        </div>
+      </PageCard>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+      <PageCard centered>
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Error</h2>
+          <p className="text-gray-700 text-lg font-medium">{error}</p>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Error</h2>
-        <p className="text-gray-600">{error}</p>
-      </div>
+      </PageCard>
     );
   }
 
   if (notified) {
     return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+      <PageCard centered>
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Contractors Notified!</h2>
+          <p className="text-gray-700 text-lg font-medium">
+            {Object.keys(assignments).length} contractor{Object.keys(assignments).length !== 1 ? 's have' : ' has'} been notified.
+          </p>
+          <p className="text-gray-700 text-lg font-medium mt-1">
+            You&apos;ll receive an email when they respond.
+          </p>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Contractors Notified!</h2>
-        <p className="text-gray-600 mb-4">
-          {Object.keys(assignments).length} contractor{Object.keys(assignments).length !== 1 ? 's have' : ' has'} been notified.
-        </p>
-        <p className="text-sm text-gray-500">
-          You&apos;ll receive an email when they respond.
-        </p>
-      </div>
+      </PageCard>
     );
   }
 
@@ -250,9 +256,10 @@ function SelectContractorsContent() {
   }, 0);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="border-b border-stone-200 pb-4">
+    <PageCard stretch>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="border-b border-stone-200 pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Select Contractors</h1>
         <p className="text-gray-600">Quote #{booking.quote_number}</p>
       </div>
@@ -423,16 +430,19 @@ function SelectContractorsContent() {
           </p>
         )}
       </div>
-    </div>
+      </div>
+    </PageCard>
   );
 }
 
 export default function SelectContractorsPage() {
   return (
-    <PageCard autoHeight>
-      <Suspense fallback={<div className="animate-pulse h-96 bg-stone-100 rounded" />}>
-        <SelectContractorsContent />
-      </Suspense>
-    </PageCard>
+    <Suspense fallback={
+      <PageCard>
+        <div className="animate-pulse h-96 bg-stone-100 rounded" />
+      </PageCard>
+    }>
+      <SelectContractorsContent />
+    </Suspense>
   );
 }

@@ -2,9 +2,17 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
+import { generateJobSheetPDF, JobSheetInput } from '@/lib/pdf-job-sheet';
+import { uploadJobSheetToDrive, FolderType } from '@/lib/google-drive';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
+
+function getJobSheetFolderType(bookingType: string | null): FolderType {
+  if (bookingType === 'backline') return 'backline';
+  if (bookingType === 'soundgear' || bookingType === 'full_system') return 'fullsystem';
+  return 'soundtech'; // default for contractor bookings
+}
 
 export async function POST(request: Request) {
   try {
@@ -45,6 +53,23 @@ export async function POST(request: Request) {
 
     if (assignmentsError || !assignments || assignments.length === 0) {
       return NextResponse.json({ message: 'No assignments to notify' }, { status: 400 });
+    }
+
+    // Fetch equipment notes from hire_items for the Job Sheet PDF
+    const details = booking.details_json as Record<string, unknown> | null;
+    let equipmentWithNotes: Array<{ name: string; quantity: number; notes?: string | null }> = [];
+    if (details?.equipment && Array.isArray(details.equipment)) {
+      const equipmentNames = (details.equipment as Array<{ name: string }>).map(e => e.name);
+      const { data: hireItems } = await supabase
+        .from('hire_items')
+        .select('name, notes')
+        .in('name', equipmentNames);
+
+      equipmentWithNotes = (details.equipment as Array<{ name: string; quantity: number }>).map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        notes: hireItems?.find(h => h.name === item.name)?.notes || null,
+      }));
     }
 
     const formatDate = (dateStr: string) => {
@@ -109,8 +134,53 @@ export async function POST(request: Request) {
             ? `$${hourlyRate}/hr × ${hours} hrs = $${totalPay.toFixed(0)}`
             : `$${totalPay.toFixed(0)}`;
 
+          // Build content requirements array
+          const contentRequirements: string[] = [];
+          if (details?.contentRequirements && Array.isArray(details.contentRequirements)) {
+            contentRequirements.push(...(details.contentRequirements as string[]));
+          }
+
+          // Build venue info
+          const venue = details?.venue as Record<string, unknown> | undefined;
+
+          // Generate Job Sheet PDF
+          const jobSheetInput: JobSheetInput = {
+            eventName: booking.event_name || 'Event',
+            eventDate: booking.event_date,
+            eventTime: booking.event_time,
+            location: booking.location || 'TBC',
+            quoteNumber: booking.quote_number || '',
+            contractorName: contractor.name,
+            hourlyRate: hourlyRate || null,
+            estimatedHours: hours || null,
+            payAmount: totalPay,
+            tasksDescription: assignment.tasks_description || null,
+            equipment: equipmentWithNotes,
+            eventType: (details?.eventType as string) || null,
+            attendance: (details?.attendance as string) || null,
+            setupTime: (details?.setupTime as string) || null,
+            indoorOutdoor: (venue?.indoorOutdoor as string) || null,
+            contentRequirements,
+            additionalNotes: (details?.additionalNotes as string) || (details?.additionalInfo as string) || null,
+            clientName: booking.client_name,
+            clientPhone: booking.client_phone || '',
+            clientEmail: booking.client_email,
+          };
+
+          let jobSheetBuffer: Buffer | null = null;
+          const jobSheetFilename = `JobSheet-${booking.quote_number || 'Job'}-${contractor.name.split(' ')[0]}.pdf`;
+          try {
+            jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
+            // Upload to Google Drive
+            if (jobSheetBuffer) {
+              const folderType = getJobSheetFolderType(booking.booking_type);
+              await uploadJobSheetToDrive(jobSheetBuffer, jobSheetFilename, folderType);
+            }
+          } catch (pdfError) {
+            console.error('Error generating Job Sheet PDF:', pdfError);
+          }
+
           // Extract gear list from details_json if available
-          const details = booking.details_json as Record<string, unknown> | null;
           let gearListHtml = '';
           if (details?.equipment && Array.isArray(details.equipment)) {
             const gearItems = (details.equipment as Array<{ name: string; quantity: number }>)
@@ -133,7 +203,6 @@ export async function POST(request: Request) {
           if (details?.package) eventDetailItems.push(`Package: ${details.package}`);
           if (details?.attendance) eventDetailItems.push(`Attendance: ${details.attendance}`);
           if (details?.setupTime) eventDetailItems.push(`Setup: ${details.setupTime}`);
-          const venue = details?.venue as Record<string, unknown> | undefined;
           if (venue?.indoorOutdoor) eventDetailItems.push(`Venue: ${venue.indoorOutdoor}`);
           if (details?.contentRequirements && Array.isArray(details.contentRequirements) && details.contentRequirements.length > 0) {
             eventDetailItems.push(`Requirements: ${(details.contentRequirements as string[]).join(', ')}`);
@@ -154,16 +223,16 @@ export async function POST(request: Request) {
             to: [contractor.email],
             subject: `Job Offer: ${formatDate(booking.event_date)} - ${payBreakdown}`,
             html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto;">
-                <div style="text-align: left; margin-bottom: 20px;">
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; text-align: left;">
+                <div style="margin-bottom: 20px;">
                   <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 80px; width: auto;" />
                 </div>
 
                 <p style="color: #374151; margin-bottom: 20px;">Hi ${contractor.name.split(' ')[0]},</p>
 
                 <!-- Main Offer Box -->
-                <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin-bottom: 20px;">
-                  <div style="text-align: center; margin-bottom: 15px;">
+                <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin-bottom: 20px; text-align: left;">
+                  <div style="margin-bottom: 15px;">
                     <div style="font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px;">YOUR OFFER</div>
                     <div style="font-size: 32px; font-weight: bold; color: #15803d; margin: 8px 0;">${payBreakdown}</div>
                   </div>
@@ -199,7 +268,7 @@ export async function POST(request: Request) {
                 </div>
 
                 <!-- Action Buttons -->
-                <div style="text-align: center; margin: 30px 0;">
+                <div style="margin: 30px 0;">
                   <a href="${acceptUrl}"
                      style="display: inline-block; background: #16a34a; color: #fff; padding: 16px 50px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; margin-right: 12px;">
                     ACCEPT
@@ -210,11 +279,17 @@ export async function POST(request: Request) {
                   </a>
                 </div>
 
-                <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 30px;">
+                <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
                   Please respond ASAP so we can finalize the booking.
                 </p>
               </div>
             `,
+            ...(jobSheetBuffer ? {
+              attachments: [{
+                filename: jobSheetFilename,
+                content: jobSheetBuffer,
+              }],
+            } : {}),
           });
 
           console.log(`Sent job notification to ${contractor.email}`);
