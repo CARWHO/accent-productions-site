@@ -46,8 +46,8 @@ export async function POST(request: Request) {
       options
     );
 
-    // Return PDF as binary
-    return new Response(pdfBuffer, {
+    // Return PDF as binary (convert Buffer to Uint8Array for Response)
+    return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Quote-${quote.quoteNumber}.pdf"`,
