@@ -4,22 +4,31 @@ import mammoth from 'mammoth';
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 5000; // 5 seconds
 
-// Initialize Google GenAI with Vertex AI
+// Initialize Google GenAI with Vertex AI using Service Account
 function getGenAIClient(): GoogleGenAI | null {
-  const project = process.env.GOOGLE_CLOUD_PROJECT;
-  const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
+  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
-  // GOOGLE_API_KEY is read automatically by the SDK from env
-  if (!process.env.GOOGLE_API_KEY || !project) {
-    console.warn('[TechRider] GenAI not configured - missing GOOGLE_API_KEY or GOOGLE_CLOUD_PROJECT');
+  if (!serviceAccountJson) {
+    console.warn('[TechRider] GenAI not configured - missing GOOGLE_SERVICE_ACCOUNT_JSON');
     return null;
   }
 
-  return new GoogleGenAI({
-    vertexai: true,
-    project,
-    location,
-  });
+  try {
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+
+    return new GoogleGenAI({
+      vertexai: true,
+      project: serviceAccount.project_id,
+      location,
+      googleAuthOptions: {
+        credentials: serviceAccount,
+      },
+    });
+  } catch (error) {
+    console.error('[TechRider] Failed to parse service account JSON:', error);
+    return null;
+  }
 }
 
 /**
