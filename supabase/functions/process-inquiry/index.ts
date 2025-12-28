@@ -114,9 +114,18 @@ interface QuoteOutput {
   gst: number;
   total: number;
   rentalDays?: number;
-  executionNotes?: string;
-  suggestedGear?: string[];
+  executionNotes?: string[];
+  suggestedGear?: { item: string; quantity: number; notes?: string; matchedInInventory?: boolean }[];
+  unavailableGear?: string[];
 }
+
+// Package labels for display
+const PACKAGE_LABELS: Record<string, string> = {
+  small: "Small Event (10-50 people)",
+  medium: "Medium Event (50-200 people)",
+  large: "Large Event (200-1000 people)",
+  "extra-large": "Extra-Large Event (1000+ people)",
+};
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -434,17 +443,20 @@ Package: ${formData.package}
 Content Requirements:
 - Playback from device: ${formData.playbackFromDevice ? "Yes" : "No"}
 - Live music: ${formData.hasLiveMusic ? "Yes" : "No"}
-- Live band: ${formData.hasBand ? "Yes" : "No"}
-- DJ: ${formData.hasDJ ? "Yes" : "No"}
-- Speeches: ${formData.hasSpeeches ? "Yes" : "No"}
+- Live band: ${formData.hasBand ? "Yes" : "No"}${formData.hasBand && formData.bandCount ? ` (${formData.bandCount} band${formData.bandCount > 1 ? "s" : ""})` : ""}
+- DJ: ${formData.hasDJ ? "Yes" : "No"}${formData.hasDJ && formData.needsDJTable ? " (needs DJ table)" : ""}${formData.hasDJ && formData.needsCDJs ? ` (needs CDJs - ${formData.cdjType || "standard"})` : ""}
+- Speeches: ${formData.hasSpeeches ? "Yes" : "No"}${formData.hasSpeeches && formData.needsWirelessMic ? " (wireless mic)" : ""}${formData.hasSpeeches && formData.needsLectern ? " (lectern)" : ""}
 
 Venue:
 - Indoor/Outdoor: ${formData.indoorOutdoor || "Not specified"}
-- Stage: ${formData.hasStage ? "Yes" : "No"}
+- Stage: ${formData.hasStage ? "Yes" : "No"}${formData.hasStage && formData.stageDetails ? ` - ${formData.stageDetails}` : ""}
+- Power access: ${formData.powerAccess || "Not specified"}
+- Generator needed: ${formData.needsGenerator ? "Yes" : "No"}
+- Wet weather plan: ${formData.wetWeatherPlan || "None"}
 ${formData.additionalInfo ? `Additional Info: ${formData.additionalInfo}` : ""}
 `.trim();
 
-  const quotePrompt = `You are a professional audio equipment hire company. Generate a quote for this event:
+  const quotePrompt = `You are a professional audio equipment hire company in New Zealand. Generate a quote for this event:
 
 ${eventSummary}
 
@@ -455,14 +467,24 @@ Return a JSON object with:
   "lineItems": [
     {"description": "Item description with quantity", "amount": 123.00}
   ],
-  "executionNotes": "Brief notes for the sound engineer about setup requirements",
-  "suggestedGear": ["List", "of", "suggested", "equipment"]
+  "executionNotes": [
+    "Step-by-step notes for the sound engineer about setup",
+    "Each note should be a separate string in the array",
+    "Include timing, setup order, and key considerations"
+  ],
+  "suggestedGear": [
+    {"item": "Equipment name", "quantity": 2, "notes": "Optional notes about this item"}
+  ],
+  "unavailableGear": ["Items that might need to be hired externally or may not be available"]
 }
 
-Base pricing guidelines:
+Base pricing guidelines (NZD):
 - Small package (10-50 people): $500-800
 - Medium package (50-200 people): $1200-2000
 - Large package (200-1000 people): $3000-5000
+
+For suggestedGear, include realistic quantities based on the event size and requirements.
+For unavailableGear, list any items that are specialized, rarely available, or might need external hire (e.g., specific backline, specialty mics, large PA for outdoor events).
 
 Only return the JSON object, no other text.`;
 
@@ -480,6 +502,25 @@ Only return the JSON object, no other text.`;
   );
   const gst = Math.round(subtotal * 0.15 * 100) / 100;
 
+  // Parse execution notes - handle both string and array formats
+  let executionNotes: string[] = [];
+  if (Array.isArray(parsed.executionNotes)) {
+    executionNotes = parsed.executionNotes;
+  } else if (typeof parsed.executionNotes === "string" && parsed.executionNotes) {
+    executionNotes = parsed.executionNotes.split("\n").filter((n: string) => n.trim());
+  }
+
+  // Parse suggested gear - handle both array of strings and array of objects
+  let suggestedGear: { item: string; quantity: number; notes?: string; matchedInInventory?: boolean }[] = [];
+  if (Array.isArray(parsed.suggestedGear)) {
+    suggestedGear = parsed.suggestedGear.map((g: string | { item: string; quantity?: number; notes?: string }) => {
+      if (typeof g === "string") {
+        return { item: g, quantity: 1 };
+      }
+      return { item: g.item, quantity: g.quantity || 1, notes: g.notes };
+    });
+  }
+
   return {
     quoteNumber,
     title: parsed.title || "Sound System Hire",
@@ -488,8 +529,9 @@ Only return the JSON object, no other text.`;
     subtotal,
     gst,
     total: subtotal + gst,
-    executionNotes: parsed.executionNotes || "",
-    suggestedGear: parsed.suggestedGear || [],
+    executionNotes,
+    suggestedGear,
+    unavailableGear: Array.isArray(parsed.unavailableGear) ? parsed.unavailableGear : [],
   };
 }
 
@@ -529,6 +571,60 @@ async function generatePDF(
     return new Uint8Array(buffer);
   } catch (error) {
     console.error("PDF generation error:", error);
+    return null;
+  }
+}
+
+// ============================================
+// JOB SHEET PDF GENERATION (via Next.js API)
+// ============================================
+
+interface JobSheetInput {
+  eventName: string;
+  eventDate: string;
+  eventTime: string | null;
+  location: string;
+  quoteNumber: string;
+  contractorName: string;
+  hourlyRate: number | null;
+  estimatedHours: number | null;
+  payAmount: number;
+  tasksDescription: string | null;
+  executionNotes?: string[];
+  equipment: { name: string; quantity: number; notes?: string | null }[];
+  suggestedGear?: { item: string; quantity: number; notes?: string; matchedInInventory?: boolean }[];
+  unavailableGear?: string[];
+  eventType: string | null;
+  attendance: string | null;
+  setupTime?: string | null;
+  indoorOutdoor: string | null;
+  contentRequirements: string[];
+  additionalNotes: string | null;
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+}
+
+async function generateJobSheetPDF(input: JobSheetInput): Promise<Uint8Array | null> {
+  try {
+    const response = await fetch(`${SITE_URL}/api/generate-job-sheet`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${EDGE_FUNCTION_SECRET}`,
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      console.error("Job Sheet PDF generation failed:", await response.text());
+      return null;
+    }
+
+    const buffer = await response.arrayBuffer();
+    return new Uint8Array(buffer);
+  } catch (error) {
+    console.error("Job Sheet PDF generation error:", error);
     return null;
   }
 }
@@ -662,7 +758,7 @@ serve(async (req) => {
 
     console.log(`Quote ${quote.quoteNumber} generated`);
 
-    // Generate PDF
+    // Generate Quote PDF
     const pdfBuffer = await generatePDF(
       quote,
       formData.contactName,
@@ -670,6 +766,59 @@ serve(async (req) => {
       formData.contactPhone,
       eventDate
     );
+
+    // Generate Job Sheet PDF (for full system inquiries only)
+    let jobSheetBuffer: Uint8Array | null = null;
+    if (!isBackline) {
+      // Build content requirements for job sheet
+      const contentReqs: string[] = [];
+      if (formData.playbackFromDevice) contentReqs.push("Playback from device");
+      if (formData.hasLiveMusic) contentReqs.push("Live music");
+      if (formData.needsMic) contentReqs.push("Microphone required");
+      if (formData.hasDJ) contentReqs.push("DJ");
+      if (formData.hasBand) contentReqs.push("Live band(s)");
+      if (formData.hasSpeeches) contentReqs.push("Speeches/presentations");
+
+      const jobSheetInput: JobSheetInput = {
+        eventName: formData.eventName || "Event",
+        eventDate: formData.eventDate || "TBC",
+        eventTime: formData.eventStartTime && formData.eventEndTime
+          ? `${formData.eventStartTime} - ${formData.eventEndTime}`
+          : null,
+        location: formData.location || "TBC",
+        quoteNumber: quote.quoteNumber,
+        // No contractor assigned yet
+        contractorName: "TBC",
+        hourlyRate: null,
+        estimatedHours: null,
+        payAmount: 0,
+        tasksDescription: null,
+        // AI-generated notes
+        executionNotes: quote.executionNotes || [],
+        equipment: [], // Empty for initial job sheet
+        suggestedGear: quote.suggestedGear || [],
+        unavailableGear: quote.unavailableGear || [],
+        // Event details
+        eventType: formData.eventType || null,
+        attendance: formData.attendance ? String(formData.attendance) : null,
+        setupTime: null,
+        indoorOutdoor: formData.indoorOutdoor || null,
+        contentRequirements: contentReqs,
+        additionalNotes: formData.additionalInfo || null,
+        // Client
+        clientName: formData.contactName,
+        clientPhone: formData.contactPhone,
+        clientEmail: formData.contactEmail,
+      };
+
+      console.log("Generating Job Sheet PDF...");
+      jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
+      if (jobSheetBuffer) {
+        console.log("Job Sheet PDF generated successfully");
+      } else {
+        console.warn("Job Sheet PDF generation failed");
+      }
+    }
 
     // Upload to Google Drive
     let driveFileId: string | null = null;
@@ -731,10 +880,13 @@ serve(async (req) => {
         type: "fullsystem",
         package: formData.package,
         eventType: formData.eventType,
+        attendance: formData.attendance || null,
+        indoorOutdoor: formData.indoorOutdoor || null,
         contentRequirements: contentReqs,
         lineItems: quote.lineItems,
         executionNotes: quote.executionNotes,
         suggestedGear: quote.suggestedGear,
+        unavailableGear: quote.unavailableGear,
       };
     }
 
@@ -798,67 +950,183 @@ serve(async (req) => {
         </div>
       `;
     } else {
+      // Build content requirements list
       const contentReqs: string[] = [];
       if (formData.playbackFromDevice) contentReqs.push("Playback from device");
       if (formData.hasLiveMusic) contentReqs.push("Live music");
       if (formData.needsMic) contentReqs.push("Microphone required");
-      if (formData.hasDJ) contentReqs.push("DJ");
-      if (formData.hasBand) contentReqs.push("Live band(s)");
-      if (formData.hasSpeeches) contentReqs.push("Speeches/presentations");
+      if (formData.hasDJ) {
+        let djText = "DJ";
+        if (formData.needsDJTable) djText += " (table needed)";
+        if (formData.needsCDJs) djText += ` (CDJs: ${formData.cdjType || "standard"})`;
+        contentReqs.push(djText);
+      }
+      if (formData.hasBand) {
+        let bandText = "Live band";
+        if (formData.bandCount && formData.bandCount > 1) bandText += `s (${formData.bandCount})`;
+        if (formData.bandNames) bandText += `: ${formData.bandNames}`;
+        contentReqs.push(bandText);
+      }
+      if (formData.hasSpeeches) {
+        let speechText = "Speeches/presentations";
+        if (formData.needsWirelessMic) speechText += " (wireless mic)";
+        if (formData.needsLectern) speechText += " (lectern)";
+        contentReqs.push(speechText);
+      }
+      if (formData.needsAmbientMusic) contentReqs.push("Ambient music");
+
+      // Get package label
+      const packageLabel = PACKAGE_LABELS[formData.package] || formData.package;
+
+      // Build unavailable gear warning HTML
+      const unavailableGearHtml = quote.unavailableGear && quote.unavailableGear.length > 0
+        ? `
+          <div style="background: #fef2f2; border: 2px solid #dc2626; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #dc2626; margin: 0 0 12px 0; font-size: 16px;">⚠ Gear Requiring Attention</h3>
+            <p style="color: #991b1b; font-size: 12px; margin: 0 0 10px 0;">These items may need to be hired externally or confirmed:</p>
+            <ul style="margin: 0; padding-left: 20px; color: #dc2626;">
+              ${quote.unavailableGear.map((item) => `<li>${item}</li>`).join("")}
+            </ul>
+          </div>
+        `
+        : "";
+
+      // Build suggested gear HTML with quantities
+      const suggestedGearHtml = quote.suggestedGear && quote.suggestedGear.length > 0
+        ? `
+          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Suggested Gear</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background: #f5f5f5;">
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #e5e5e5;">Qty</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #e5e5e5;">Item</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #e5e5e5;">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${quote.suggestedGear.map((item) => `
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${item.quantity}x</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${item.item}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; color: #666; font-size: 12px;">${item.notes || "-"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `
+        : "";
+
+      // Build execution notes HTML
+      const executionNotesHtml = quote.executionNotes && quote.executionNotes.length > 0
+        ? `
+          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Execution Notes</h2>
+          <div style="background: #fffbeb; border: 1px solid #fcd34d; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+            <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+              ${quote.executionNotes.map((note) => `<li style="margin-bottom: 6px;">${note}</li>`).join("")}
+            </ul>
+          </div>
+        `
+        : "";
 
       emailHtml = `
-        <h1>New Sound System Hire Inquiry</h1>
-        <p><strong>Quote Number:</strong> ${quote.quoteNumber}</p>
-        <p><strong>Total:</strong> $${quote.total.toFixed(2)} (incl. GST)</p>
-        <hr />
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="margin-bottom: 8px;">New Sound System Hire Inquiry</h1>
+          <p style="color: #666; margin-top: 0;"><strong>Package:</strong> ${packageLabel}</p>
 
-        <h2>Event Details</h2>
-        <p><strong>Event:</strong> ${formData.eventName || "N/A"}</p>
-        <p><strong>Type:</strong> ${formData.eventType || "N/A"}</p>
-        <p><strong>Date:</strong> ${formData.eventDate || "N/A"}</p>
-        <p><strong>Time:</strong> ${formData.eventStartTime || ""} - ${formData.eventEndTime || ""}</p>
-        <p><strong>Location:</strong> ${formData.location || "N/A"}</p>
-        <p><strong>Attendance:</strong> ${formData.attendance || "N/A"}</p>
+          <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
+            <p style="margin: 0;"><strong>Quote Number:</strong> ${quote.quoteNumber}</p>
+            <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold;">$${quote.total.toFixed(2)} <span style="font-size: 14px; font-weight: normal; color: #666;">(incl. GST)</span></p>
+          </div>
 
-        <h2>Content Requirements</h2>
-        <p>${contentReqs.length > 0 ? contentReqs.join(", ") : "None specified"}</p>
+          <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
 
-        <h2>Contact</h2>
-        <p><strong>Name:</strong> ${formData.contactName}</p>
-        <p><strong>Email:</strong> ${formData.contactEmail}</p>
-        <p><strong>Phone:</strong> ${formData.contactPhone}</p>
+          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Event Details</h2>
+          <table style="width: 100%; margin-bottom: 20px;">
+            <tr><td style="padding: 4px 0; color: #666; width: 120px;">Event:</td><td style="padding: 4px 0;"><strong>${formData.eventName || "N/A"}</strong></td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Type:</td><td style="padding: 4px 0;">${formData.eventType || "N/A"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Organization:</td><td style="padding: 4px 0;">${formData.organization || "N/A"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Date:</td><td style="padding: 4px 0;">${formData.eventDate || "N/A"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Time:</td><td style="padding: 4px 0;">${formData.eventStartTime || ""} - ${formData.eventEndTime || ""}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Location:</td><td style="padding: 4px 0;">${formData.location || "N/A"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Attendance:</td><td style="padding: 4px 0;">${formData.attendance || "N/A"}</td></tr>
+          </table>
 
-        <h2>AI-Generated Quote</h2>
-        <p><strong>${quote.title}</strong></p>
-        <p>${quote.description}</p>
-        <ul>
-          ${quote.lineItems.map((item) => `<li>${item.description}: $${item.amount.toFixed(2)}</li>`).join("")}
-        </ul>
-        <p><strong>Subtotal:</strong> $${quote.subtotal.toFixed(2)}</p>
-        <p><strong>GST:</strong> $${quote.gst.toFixed(2)}</p>
-        <p><strong>Total:</strong> $${quote.total.toFixed(2)}</p>
+          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Content Requirements</h2>
+          ${contentReqs.length > 0
+            ? `<ul style="margin: 0 0 20px 0; padding-left: 20px;">${contentReqs.map((req) => `<li style="margin-bottom: 4px;">${req}</li>`).join("")}</ul>`
+            : `<p style="color: #666;">None specified</p>`
+          }
 
-        <h2>Execution Notes</h2>
-        <p>${quote.executionNotes || "None"}</p>
+          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Venue Details</h2>
+          <table style="width: 100%; margin-bottom: 20px;">
+            <tr><td style="padding: 4px 0; color: #666; width: 120px;">Indoor/Outdoor:</td><td style="padding: 4px 0;">${formData.indoorOutdoor || "N/A"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Stage:</td><td style="padding: 4px 0;">${formData.hasStage ? `Yes${formData.stageDetails ? ` - ${formData.stageDetails}` : ""}` : "No"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Power Access:</td><td style="padding: 4px 0;">${formData.powerAccess || "N/A"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Generator:</td><td style="padding: 4px 0;">${formData.needsGenerator ? "Yes" : "No"}</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Wet Weather:</td><td style="padding: 4px 0;">${formData.wetWeatherPlan || "None"}</td></tr>
+            ${formData.venueContact ? `<tr><td style="padding: 4px 0; color: #666;">Venue Contact:</td><td style="padding: 4px 0;">${formData.venueContact}</td></tr>` : ""}
+          </table>
 
-        <h2>Suggested Gear</h2>
-        <ul>
-          ${(quote.suggestedGear || []).map((item) => `<li>${item}</li>`).join("")}
-        </ul>
+          ${unavailableGearHtml}
 
-        ${pdfBuffer ? "<p><em>Quote PDF attached</em></p>" : "<p><em>Quote PDF generation failed</em></p>"}
+          ${suggestedGearHtml}
 
-        <hr />
-        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <a href="${SITE_URL}/review-quote?token=${inquiry.approval_token}"
-             style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            Review Quote
-          </a>
+          ${executionNotesHtml}
+
+          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Quote Summary</h2>
+          <p><strong>${quote.title}</strong></p>
+          <p style="color: #666;">${quote.description}</p>
+          <table style="width: 100%; margin: 16px 0;">
+            ${quote.lineItems.map((item) => `
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">${item.description}</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0; text-align: right; width: 100px;">$${item.amount.toFixed(2)}</td>
+              </tr>
+            `).join("")}
+            <tr style="border-top: 2px solid #e5e5e5;">
+              <td style="padding: 8px 0; color: #666;">Subtotal:</td>
+              <td style="padding: 8px 0; text-align: right;">$${quote.subtotal.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #666;">GST (15%):</td>
+              <td style="padding: 8px 0; text-align: right;">$${quote.gst.toFixed(2)}</td>
+            </tr>
+            <tr style="font-weight: bold; font-size: 18px;">
+              <td style="padding: 12px 0;">Total:</td>
+              <td style="padding: 12px 0; text-align: right;">$${quote.total.toFixed(2)}</td>
+            </tr>
+          </table>
+
+          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Contact Information</h2>
+          <table style="width: 100%; margin-bottom: 20px;">
+            <tr><td style="padding: 4px 0; color: #666; width: 80px;">Name:</td><td style="padding: 4px 0;"><strong>${formData.contactName}</strong></td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Email:</td><td style="padding: 4px 0;"><a href="mailto:${formData.contactEmail}">${formData.contactEmail}</a></td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">Phone:</td><td style="padding: 4px 0;"><a href="tel:${formData.contactPhone}">${formData.contactPhone}</a></td></tr>
+          </table>
+
+          ${formData.additionalInfo ? `
+            <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Additional Information</h2>
+            <p style="background: #f5f5f5; padding: 12px; border-radius: 4px;">${formData.additionalInfo}</p>
+          ` : ""}
+
+          <p style="color: #666; font-size: 12px;">
+            Attachments: ${pdfBuffer ? "Quote PDF" : "Quote PDF failed"}${jobSheetBuffer ? ", Job Sheet PDF" : ""}
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
+
+          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; border-left: 4px solid #0284c7;">
+            <p style="margin: 0 0 16px 0; color: #666;">Review and approve this quote to proceed</p>
+            <a href="${SITE_URL}/review-quote?token=${inquiry.approval_token}"
+               style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+              Review Quote
+            </a>
+          </div>
         </div>
       `;
     }
 
-    // Send email with attachment if PDF was generated
+    // Send email with attachments
     const emailOptions: {
       to: string[];
       subject: string;
@@ -870,13 +1138,22 @@ serve(async (req) => {
       html: emailHtml,
     };
 
+    // Build attachments array
+    const attachments: { filename: string; content: string }[] = [];
     if (pdfBuffer) {
-      emailOptions.attachments = [
-        {
-          filename: `Quote-${quote.quoteNumber}.pdf`,
-          content: base64Standard(pdfBuffer),
-        },
-      ];
+      attachments.push({
+        filename: `Quote-${quote.quoteNumber}.pdf`,
+        content: base64Standard(pdfBuffer),
+      });
+    }
+    if (jobSheetBuffer) {
+      attachments.push({
+        filename: `JobSheet-${quote.quoteNumber}.pdf`,
+        content: base64Standard(jobSheetBuffer),
+      });
+    }
+    if (attachments.length > 0) {
+      emailOptions.attachments = attachments;
     }
 
     await sendEmail(emailOptions);
