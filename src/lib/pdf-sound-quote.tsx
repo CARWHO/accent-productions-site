@@ -62,10 +62,10 @@ const styles = StyleSheet.create({
     border: '1 solid #000',
     marginBottom: 20,
   },
-  tableHeader: {
+  tableHeaderRow: {
     flexDirection: 'row',
     borderBottom: '1 solid #000',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f5f5',
   },
   tableHeaderLeft: {
     flex: 4,
@@ -79,21 +79,15 @@ const styles = StyleSheet.create({
   },
   tableHeaderText: {
     fontWeight: 'bold',
-    fontStyle: 'italic',
   },
-  tableBody: {
+  titleRow: {
     flexDirection: 'row',
-    minHeight: 250,
+    borderBottom: '1 solid #ccc',
   },
-  tableBodyLeft: {
-    flex: 4,
-    padding: 10,
-    borderRight: '1 solid #000',
-  },
-  tableBodyRight: {
+  titleCell: {
     flex: 1,
     padding: 10,
-    textAlign: 'right',
+    paddingBottom: 8,
   },
   quoteTitle: {
     fontWeight: 'bold',
@@ -102,12 +96,40 @@ const styles = StyleSheet.create({
   },
   quoteSubtitle: {
     fontSize: 10,
-    marginBottom: 10,
     fontStyle: 'italic',
   },
-  equipmentLine: {
-    fontSize: 9,
-    marginBottom: 2,
+  lineItemRow: {
+    flexDirection: 'row',
+    borderBottom: '1 solid #eee',
+  },
+  lineItemDescription: {
+    flex: 4,
+    padding: 8,
+    paddingLeft: 20,
+    borderRight: '1 solid #000',
+  },
+  lineItemCost: {
+    flex: 1,
+    padding: 8,
+    textAlign: 'right',
+  },
+  subtotalRow: {
+    flexDirection: 'row',
+    borderTop: '1 solid #000',
+    backgroundColor: '#f9f9f9',
+  },
+  subtotalLabel: {
+    flex: 4,
+    padding: 8,
+    borderRight: '1 solid #000',
+    textAlign: 'right',
+    fontWeight: 'bold',
+  },
+  subtotalValue: {
+    flex: 1,
+    padding: 8,
+    textAlign: 'right',
+    fontWeight: 'bold',
   },
   totalsContainer: {
     alignItems: 'flex-end',
@@ -178,8 +200,31 @@ export async function generateSoundQuotePDF(
   const today = formatDate();
   const logoBase64 = getLogoBase64();
 
-  // Split equipment description into lines
-  const equipmentLines = quote.equipmentDescription.split('\n').filter(line => line.trim());
+  // Build line items array for rendering
+  const lineItems: { description: string; cost: number }[] = [];
+
+  if (quote.lineItems.foh > 0) {
+    lineItems.push({ description: 'FOH System', cost: quote.lineItems.foh });
+  }
+  if (quote.lineItems.monitors.cost > 0) {
+    const monitorLabel = quote.lineItems.monitors.count > 1
+      ? `Monitors (${quote.lineItems.monitors.count}x)`
+      : 'Monitor';
+    lineItems.push({ description: monitorLabel, cost: quote.lineItems.monitors.cost });
+  }
+  if (quote.lineItems.console > 0) {
+    lineItems.push({ description: 'Console', cost: quote.lineItems.console });
+  }
+  if (quote.lineItems.cables > 0) {
+    lineItems.push({ description: 'Cables & Accessories', cost: quote.lineItems.cables });
+  }
+  if (quote.lineItems.vehicle > 0) {
+    lineItems.push({ description: 'Vehicle', cost: quote.lineItems.vehicle });
+  }
+  if (quote.lineItems.techTime.cost > 0) {
+    const techLabel = `Tech Time (${quote.lineItems.techTime.hours} hrs @ $${quote.lineItems.techTime.rate}/hr)`;
+    lineItems.push({ description: techLabel, cost: quote.lineItems.techTime.cost });
+  }
 
   const pdfDocument = (
     <Document>
@@ -201,7 +246,7 @@ export async function generateSoundQuotePDF(
           <Text>23 Moxham Ave</Text>
           <Text>Hataitai Wellington 6021</Text>
           <Text>Tel 027 602 3869</Text>
-          <Text>Email hello@accent-productions.co.nz.com</Text>
+          <Text>Email hello@accent-productions.co.nz</Text>
         </View>
 
         {/* Quote Number and Date */}
@@ -223,28 +268,42 @@ export async function generateSoundQuotePDF(
         {/* Quote Table */}
         <View style={styles.tableContainer}>
           {/* Table Header */}
-          <View style={styles.tableHeader}>
+          <View style={styles.tableHeaderRow}>
             <View style={styles.tableHeaderLeft}>
-              <Text style={styles.tableHeaderText}></Text>
+              <Text style={styles.tableHeaderText}>Description</Text>
             </View>
             <View style={styles.tableHeaderRight}>
               <Text style={styles.tableHeaderText}>Cost</Text>
             </View>
           </View>
 
-          {/* Table Body */}
-          <View style={styles.tableBody}>
-            <View style={styles.tableBodyLeft}>
+          {/* Title Row */}
+          <View style={styles.titleRow}>
+            <View style={styles.titleCell}>
               <Text style={styles.quoteTitle}>{quote.title}</Text>
               <Text style={styles.quoteSubtitle}>{quote.subtitle}</Text>
-              {equipmentLines.map((line, index) => (
-                <Text key={index} style={styles.equipmentLine}>
-                  {line}
-                </Text>
-              ))}
             </View>
-            <View style={styles.tableBodyRight}>
-              <Text style={{ fontWeight: 'bold' }}>{formatCurrency(quote.subtotal)}</Text>
+          </View>
+
+          {/* Line Items */}
+          {lineItems.map((item, index) => (
+            <View key={index} style={styles.lineItemRow}>
+              <View style={styles.lineItemDescription}>
+                <Text>{item.description}</Text>
+              </View>
+              <View style={styles.lineItemCost}>
+                <Text>{formatCurrency(item.cost)}</Text>
+              </View>
+            </View>
+          ))}
+
+          {/* Subtotal Row */}
+          <View style={styles.subtotalRow}>
+            <View style={styles.subtotalLabel}>
+              <Text>Subtotal</Text>
+            </View>
+            <View style={styles.subtotalValue}>
+              <Text>{formatCurrency(quote.subtotal)}</Text>
             </View>
           </View>
         </View>
@@ -252,15 +311,11 @@ export async function generateSoundQuotePDF(
         {/* Totals */}
         <View style={styles.totalsContainer}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>GST</Text>
+            <Text style={styles.totalLabel}>GST (15%)</Text>
             <Text style={styles.totalValue}>{formatCurrency(quote.gst)}</Text>
           </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal</Text>
-            <Text style={styles.totalValue}>{formatCurrency(quote.total)}</Text>
-          </View>
           <View style={styles.balanceRow}>
-            <Text style={styles.totalLabel}>Balance</Text>
+            <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>{formatCurrency(quote.total)}</Text>
           </View>
         </View>

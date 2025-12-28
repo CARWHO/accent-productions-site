@@ -9,6 +9,7 @@ export interface InvoiceInput {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  organization?: string;
   eventName: string;
   eventDate: string;
   location?: string;
@@ -59,17 +60,10 @@ const styles = StyleSheet.create({
   },
   invoiceHeader: {
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
-    marginBottom: 5,
-    marginTop: 10,
-    color: '#16a34a',
-  },
-  invoiceSubheader: {
-    textAlign: 'center',
-    fontSize: 10,
     marginBottom: 15,
-    color: '#666',
+    marginTop: 10,
   },
   clientBlock: {
     marginBottom: 15,
@@ -80,13 +74,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#dc2626',
     marginBottom: 15,
-    fontWeight: 'bold',
   },
   tableContainer: {
     border: '1 solid #000',
     marginBottom: 20,
   },
-  tableHeader: {
+  tableHeaderRow: {
     flexDirection: 'row',
     borderBottom: '1 solid #000',
     backgroundColor: '#f5f5f5',
@@ -104,34 +97,56 @@ const styles = StyleSheet.create({
   tableHeaderText: {
     fontWeight: 'bold',
   },
-  tableBody: {
+  titleRow: {
     flexDirection: 'row',
-    minHeight: 200,
+    borderBottom: '1 solid #ccc',
   },
-  tableBodyLeft: {
-    flex: 4,
-    padding: 10,
-    borderRight: '1 solid #000',
-  },
-  tableBodyRight: {
+  titleCell: {
     flex: 1,
     padding: 10,
-    textAlign: 'right',
+    paddingBottom: 8,
   },
-  eventTitle: {
+  invoiceTitle: {
     fontWeight: 'bold',
     fontSize: 11,
     marginBottom: 3,
   },
-  eventSubtitle: {
+  invoiceSubtitle: {
     fontSize: 10,
-    marginBottom: 10,
     fontStyle: 'italic',
-    color: '#666',
   },
-  lineItem: {
-    fontSize: 9,
-    marginBottom: 2,
+  lineItemRow: {
+    flexDirection: 'row',
+    borderBottom: '1 solid #eee',
+  },
+  lineItemDescription: {
+    flex: 4,
+    padding: 8,
+    paddingLeft: 20,
+    borderRight: '1 solid #000',
+  },
+  lineItemCost: {
+    flex: 1,
+    padding: 8,
+    textAlign: 'right',
+  },
+  subtotalRow: {
+    flexDirection: 'row',
+    borderTop: '1 solid #000',
+    backgroundColor: '#f9f9f9',
+  },
+  subtotalLabel: {
+    flex: 4,
+    padding: 8,
+    borderRight: '1 solid #000',
+    textAlign: 'right',
+    fontWeight: 'bold',
+  },
+  subtotalValue: {
+    flex: 1,
+    padding: 8,
+    textAlign: 'right',
+    fontWeight: 'bold',
   },
   totalsContainer: {
     alignItems: 'flex-end',
@@ -156,72 +171,7 @@ const styles = StyleSheet.create({
     width: 180,
     marginTop: 8,
     paddingTop: 8,
-    borderTop: '2 solid #16a34a',
-  },
-  balanceLabel: {
-    flex: 1,
-    textAlign: 'right',
-    paddingRight: 15,
-    fontWeight: 'bold',
-    fontSize: 12,
-    color: '#16a34a',
-  },
-  balanceValue: {
-    width: 80,
-    textAlign: 'right',
-    fontWeight: 'bold',
-    fontSize: 12,
-    color: '#16a34a',
-  },
-  paymentBox: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 4,
-    border: '1 solid #16a34a',
-  },
-  paymentTitle: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#166534',
-  },
-  paymentText: {
-    fontSize: 9,
-    marginBottom: 3,
-    color: '#374151',
-  },
-  notesBox: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: '#fffbeb',
-    borderRadius: 4,
-  },
-  notesTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  notesText: {
-    fontSize: 9,
-    color: '#92400e',
-  },
-  paymentUrlBox: {
-    marginTop: 8,
-    padding: 10,
-    backgroundColor: '#dcfce7',
-    borderRadius: 4,
-  },
-  paymentUrlLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#166534',
-    marginBottom: 4,
-  },
-  paymentUrlText: {
-    fontSize: 8,
-    color: '#166534',
-    wordBreak: 'break-all',
+    borderTop: '1 solid #000',
   },
 });
 
@@ -268,6 +218,9 @@ export async function generateInvoicePDF(input: InvoiceInput): Promise<Buffer> {
   const today = formatDate();
   const logoBase64 = getLogoBase64();
 
+  // Build subtitle from event date and location
+  const subtitle = `${formatEventDate(input.eventDate)}${input.location ? ` | ${input.location}` : ''}`;
+
   const pdfDocument = (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -291,54 +244,61 @@ export async function generateInvoicePDF(input: InvoiceInput): Promise<Buffer> {
           <Text>Email hello@accent-productions.co.nz</Text>
         </View>
 
-        {/* Invoice Header */}
+        {/* Invoice Number and Date */}
         <Text style={styles.invoiceHeader}>
-          TAX INVOICE
-        </Text>
-        <Text style={styles.invoiceSubheader}>
-          Invoice #: {input.invoiceNumber}   |   Date: {today}
-          {input.quoteNumber ? `   |   Quote Ref: ${input.quoteNumber}` : ''}
+          Invoice Nº: {input.invoiceNumber}   Issued: {today}
         </Text>
 
         {/* Client Info */}
         <View style={styles.clientBlock}>
-          <Text style={{ fontWeight: 'bold', marginBottom: 3 }}>Bill To:</Text>
           <Text>{input.clientName}</Text>
+          {input.organization && <Text>{input.organization}</Text>}
           <Text>{input.clientEmail}</Text>
           <Text>{input.clientPhone}</Text>
         </View>
 
         {/* Due Note */}
-        <Text style={styles.dueNote}>Payment Due: Prior to event</Text>
+        <Text style={styles.dueNote}>Payment due prior to event</Text>
 
         {/* Invoice Table */}
         <View style={styles.tableContainer}>
           {/* Table Header */}
-          <View style={styles.tableHeader}>
+          <View style={styles.tableHeaderRow}>
             <View style={styles.tableHeaderLeft}>
               <Text style={styles.tableHeaderText}>Description</Text>
             </View>
             <View style={styles.tableHeaderRight}>
-              <Text style={styles.tableHeaderText}>Amount</Text>
+              <Text style={styles.tableHeaderText}>Cost</Text>
             </View>
           </View>
 
-          {/* Table Body */}
-          <View style={styles.tableBody}>
-            <View style={styles.tableBodyLeft}>
-              <Text style={styles.eventTitle}>{input.eventName}</Text>
-              <Text style={styles.eventSubtitle}>
-                {formatEventDate(input.eventDate)}
-                {input.location ? ` | ${input.location}` : ''}
-              </Text>
-              {input.lineItems.map((item, index) => (
-                <Text key={index} style={styles.lineItem}>
-                  • {item.description} - ${item.amount.toFixed(2)}
-                </Text>
-              ))}
+          {/* Title Row */}
+          <View style={styles.titleRow}>
+            <View style={styles.titleCell}>
+              <Text style={styles.invoiceTitle}>{input.eventName}</Text>
+              <Text style={styles.invoiceSubtitle}>{subtitle}</Text>
             </View>
-            <View style={styles.tableBodyRight}>
-              <Text style={{ fontWeight: 'bold' }}>{formatCurrency(input.subtotal)}</Text>
+          </View>
+
+          {/* Line Items */}
+          {input.lineItems.map((item, index) => (
+            <View key={index} style={styles.lineItemRow}>
+              <View style={styles.lineItemDescription}>
+                <Text>{item.description}</Text>
+              </View>
+              <View style={styles.lineItemCost}>
+                <Text>{formatCurrency(item.amount)}</Text>
+              </View>
+            </View>
+          ))}
+
+          {/* Subtotal Row */}
+          <View style={styles.subtotalRow}>
+            <View style={styles.subtotalLabel}>
+              <Text>Subtotal</Text>
+            </View>
+            <View style={styles.subtotalValue}>
+              <Text>{formatCurrency(input.subtotal)}</Text>
             </View>
           </View>
         </View>
@@ -346,44 +306,14 @@ export async function generateInvoicePDF(input: InvoiceInput): Promise<Buffer> {
         {/* Totals */}
         <View style={styles.totalsContainer}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal</Text>
-            <Text style={styles.totalValue}>{formatCurrency(input.subtotal)}</Text>
-          </View>
-          <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>GST (15%)</Text>
             <Text style={styles.totalValue}>{formatCurrency(input.gst)}</Text>
           </View>
           <View style={styles.balanceRow}>
-            <Text style={styles.balanceLabel}>TOTAL DUE</Text>
-            <Text style={styles.balanceValue}>{formatCurrency(input.total)}</Text>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>{formatCurrency(input.total)}</Text>
           </View>
         </View>
-
-        {/* Payment Info */}
-        <View style={styles.paymentBox}>
-          <Text style={styles.paymentTitle}>Payment Options</Text>
-
-          {input.paymentUrl && (
-            <View style={styles.paymentUrlBox}>
-              <Text style={styles.paymentUrlLabel}>Pay Online (Visa/Mastercard):</Text>
-              <Text style={styles.paymentUrlText}>{input.paymentUrl}</Text>
-            </View>
-          )}
-
-          <Text style={styles.paymentText}>Bank Transfer:</Text>
-          <Text style={styles.paymentText}>   Account: Accent Entertainment</Text>
-          <Text style={styles.paymentText}>   Bank: ANZ</Text>
-          <Text style={styles.paymentText}>   Account #: 01-0505-0123456-00</Text>
-          <Text style={styles.paymentText}>   Reference: {input.invoiceNumber}</Text>
-        </View>
-
-        {/* Notes */}
-        {input.notes && (
-          <View style={styles.notesBox}>
-            <Text style={styles.notesTitle}>Notes</Text>
-            <Text style={styles.notesText}>{input.notes}</Text>
-          </View>
-        )}
       </Page>
     </Document>
   );

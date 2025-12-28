@@ -113,6 +113,15 @@ function InquiryForm() {
   const [showValidation, setShowValidation] = useState(false);
 
   const [formData, setFormData] = useState<Partial<PackageFormData>>({});
+  const [techRiderFile, setTechRiderFile] = useState<File | null>(null);
+
+  // When tech rider is uploaded, automatically mark hasBand as true
+  const handleTechRiderUpload = (file: File | null) => {
+    setTechRiderFile(file);
+    if (file) {
+      updateField('hasBand', true);
+    }
+  };
 
   const fillTestData = () => {
     const tomorrow = new Date();
@@ -171,10 +180,23 @@ function InquiryForm() {
   async function handleSubmit() {
     setIsSubmitting(true);
     try {
+      const formDataObj = new FormData();
+
+      // Append all form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          formDataObj.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+        }
+      });
+
+      // Append tech rider if present
+      if (techRiderFile) {
+        formDataObj.append('techRider', techRiderFile);
+      }
+
       const response = await fetch('/api/inquiry', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: formDataObj,
       });
       if (response.ok) {
         setIsVisible(false);
@@ -210,8 +232,11 @@ function InquiryForm() {
   const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
   const totalSteps = formData.package === 'extra_large' ? 1 : 4;
 
+  // Stretch on step 2 for medium/large (has tech rider upload)
+  const shouldStretch = step === 2 && (formData.package === 'medium' || formData.package === 'large');
+
   return (
-    <PageCard>
+    <PageCard stretch={shouldStretch}>
       <div className="h-full flex flex-col">
         {/* Error Summary */}
         {showValidation && (
@@ -370,6 +395,51 @@ function InquiryForm() {
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Basics</h2>
             <div className="grid gap-3 lg:gap-4">
+
+            {/* Tech Rider Upload - shown first for medium/large packages */}
+            {(formData.package === 'medium' || formData.package === 'large') && (
+              <div className="border-2 border-dashed border-gray-300 rounded-md p-4 bg-gray-50">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-black rounded-md flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-grow">
+                    <label className="block text-sm font-bold text-gray-900 mb-1">Have a Tech Rider?</label>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Upload it and we&apos;ll extract the requirements automatically. This speeds up your quote!
+                    </p>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => handleTechRiderUpload(e.target.files?.[0] || null)}
+                      className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
+                    />
+                    {techRiderFile && (
+                      <div className="flex items-center justify-between mt-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                        <p className="text-sm text-green-700 font-medium flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {techRiderFile.name}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleTechRiderUpload(null)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Type of Event *</label>
               <select
@@ -570,68 +640,133 @@ function InquiryForm() {
       {step === 3 && (formData.package === 'medium' || formData.package === 'large') && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Content & Setup</h2>
-            <div className="grid gap-3">
-
-            {/* Band Section */}
-            <div className="border border-gray-200 rounded-md p-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.hasBand || false}
-                  onChange={(e) => updateField('hasBand', e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                />
-                <div>
-                  <span className="font-semibold text-gray-900 block">Live Band(s)</span>
-                  <span className="text-sm text-gray-600">Will there be live band(s) performing?</span>
+            {/* Show simplified version if tech rider uploaded */}
+            {techRiderFile ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-green-100 rounded-md flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">Tech Rider Uploaded</h2>
+                    <p className="text-sm text-gray-600">{techRiderFile.name}</p>
+                  </div>
                 </div>
-              </label>
-            </div>
+                <p className="text-gray-600 mb-4">
+                  We&apos;ll extract band requirements from your tech rider. Just a few more questions:
+                </p>
+                <div className="grid gap-3">
+                  {/* DJ Section - still relevant even with tech rider */}
+                  <div className="border border-gray-200 rounded-md p-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasDJ || false}
+                        onChange={(e) => updateField('hasDJ', e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 block">DJ Setup</span>
+                        <span className="text-sm text-gray-600">Will there also be a DJ at your event?</span>
+                      </div>
+                    </label>
+                  </div>
 
-            {/* DJ Section */}
-            <div className="border border-gray-200 rounded-md p-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.hasDJ || false}
-                  onChange={(e) => updateField('hasDJ', e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                />
-                <div>
-                  <span className="font-semibold text-gray-900 block">DJ Setup</span>
-                  <span className="text-sm text-gray-600">Will you have a DJ at your event?</span>
+                  {/* Speeches Section - still relevant even with tech rider */}
+                  <div className="border border-gray-200 rounded-md p-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasSpeeches || false}
+                        onChange={(e) => updateField('hasSpeeches', e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 block">Speeches/Presentations</span>
+                        <span className="text-sm text-gray-600">Will there be speeches or presentations?</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Anything else we should know?</label>
+                    <textarea
+                      value={formData.additionalInfo || ''}
+                      onChange={(e) => updateField('additionalInfo', e.target.value)}
+                      rows={2}
+                      className={`${inputStyles} resize-none`}
+                      placeholder="Multiple bands, special requirements, etc..."
+                    />
+                  </div>
                 </div>
-              </label>
-            </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Content & Setup</h2>
+                <div className="grid gap-3">
+                  {/* Band Section */}
+                  <div className="border border-gray-200 rounded-md p-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasBand || false}
+                        onChange={(e) => updateField('hasBand', e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 block">Live Band(s)</span>
+                        <span className="text-sm text-gray-600">Will there be live band(s) performing?</span>
+                      </div>
+                    </label>
+                  </div>
 
-            {/* Speeches Section */}
-            <div className="border border-gray-200 rounded-md p-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.hasSpeeches || false}
-                  onChange={(e) => updateField('hasSpeeches', e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                />
-                <div>
-                  <span className="font-semibold text-gray-900 block">Speeches/Presentations</span>
-                  <span className="text-sm text-gray-600">Will there be speeches or presentations?</span>
+                  {/* DJ Section */}
+                  <div className="border border-gray-200 rounded-md p-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasDJ || false}
+                        onChange={(e) => updateField('hasDJ', e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 block">DJ Setup</span>
+                        <span className="text-sm text-gray-600">Will you have a DJ at your event?</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Speeches Section */}
+                  <div className="border border-gray-200 rounded-md p-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasSpeeches || false}
+                        onChange={(e) => updateField('hasSpeeches', e.target.checked)}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 block">Speeches/Presentations</span>
+                        <span className="text-sm text-gray-600">Will there be speeches or presentations?</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Information</label>
+                    <textarea
+                      value={formData.additionalInfo || ''}
+                      onChange={(e) => updateField('additionalInfo', e.target.value)}
+                      rows={2}
+                      className={`${inputStyles} resize-none`}
+                      placeholder="Band names, number of performers, any other details..."
+                    />
+                  </div>
                 </div>
-              </label>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Information</label>
-              <textarea
-                value={formData.additionalInfo || ''}
-                onChange={(e) => updateField('additionalInfo', e.target.value)}
-                rows={2}
-                className={`${inputStyles} resize-none`}
-                placeholder="Any other details we should know..."
-              />
-            </div>
-          </div>
+              </>
+            )}
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">

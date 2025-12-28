@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { generateSoundQuote, SoundQuoteInput } from '@/lib/gemini-sound-quote';
+import { generateSoundQuote, SoundQuoteInput, SoundQuoteOutput } from '@/lib/gemini-sound-quote';
 import { generateSoundQuotePDF } from '@/lib/pdf-sound-quote';
-import { uploadQuoteToDrive } from '@/lib/google-drive';
+import { generateJobSheetPDF, JobSheetInput } from '@/lib/pdf-job-sheet';
+import { uploadQuoteToDrive, uploadJobSheetToDrive, uploadTechRiderToDrive } from '@/lib/google-drive';
+import { parseTechRider, TechRiderRequirements } from '@/lib/parse-tech-rider';
 import { randomUUID } from 'crypto';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -13,7 +15,79 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    // Parse FormData instead of JSON
+    const formData = await request.formData();
+
+    // Helper to get string fields
+    const getField = (name: string): string => formData.get(name)?.toString() || '';
+    const getBoolField = (name: string): boolean => getField(name) === 'true';
+    const getNumField = (name: string): number | undefined => {
+      const val = getField(name);
+      return val ? parseInt(val, 10) : undefined;
+    };
+
+    // Extract all form fields
+    const body = {
+      package: getField('package'),
+      eventType: getField('eventType'),
+      eventName: getField('eventName'),
+      organization: getField('organization'),
+      eventDate: getField('eventDate'),
+      eventTime: getField('eventTime'),
+      setupTime: getField('setupTime'),
+      attendance: getNumField('attendance'),
+      playbackFromDevice: getBoolField('playbackFromDevice'),
+      hasLiveMusic: getBoolField('hasLiveMusic'),
+      needsMic: getBoolField('needsMic'),
+      hasDJ: getBoolField('hasDJ'),
+      hasBand: getBoolField('hasBand'),
+      bandCount: getNumField('bandCount'),
+      bandNames: getField('bandNames'),
+      bandSetup: getField('bandSetup'),
+      needsDJTable: getBoolField('needsDJTable'),
+      needsCDJs: getBoolField('needsCDJs'),
+      cdjType: getField('cdjType'),
+      hasSpeeches: getBoolField('hasSpeeches'),
+      needsWirelessMic: getBoolField('needsWirelessMic'),
+      needsLectern: getBoolField('needsLectern'),
+      needsAmbientMusic: getBoolField('needsAmbientMusic'),
+      additionalInfo: getField('additionalInfo'),
+      location: getField('location'),
+      venueContact: getField('venueContact'),
+      indoorOutdoor: getField('indoorOutdoor'),
+      wetWeatherPlan: getField('wetWeatherPlan'),
+      needsGenerator: getBoolField('needsGenerator'),
+      powerAccess: getField('powerAccess'),
+      hasStage: getBoolField('hasStage'),
+      stageDetails: getField('stageDetails'),
+      contactName: getField('contactName'),
+      contactEmail: getField('contactEmail'),
+      contactPhone: getField('contactPhone'),
+      details: getField('details'),
+      content: getField('content'),
+      stageProvider: getField('stageProvider'),
+    };
+
+    // Get tech rider file if present
+    const techRiderFile = formData.get('techRider') as File | null;
+    let techRiderRequirements: TechRiderRequirements | null = null;
+    let techRiderDriveId: string | null = null;
+
+    // Parse tech rider if uploaded (supports PDF and DOCX)
+    if (techRiderFile && techRiderFile.size > 0) {
+      console.log(`Processing tech rider: ${techRiderFile.name} (${techRiderFile.size} bytes)`);
+      const buffer = Buffer.from(await techRiderFile.arrayBuffer());
+
+      // Parse with AI (auto-detects PDF vs DOCX)
+      techRiderRequirements = await parseTechRider(buffer, techRiderFile.name);
+      if (techRiderRequirements) {
+        console.log('Tech rider parsed:', JSON.stringify(techRiderRequirements, null, 2));
+      }
+
+      // Upload to Google Drive (preserve original extension)
+      const ext = techRiderFile.name.toLowerCase().endsWith('.docx') ? '.docx' : '.pdf';
+      techRiderDriveId = await uploadTechRiderToDrive(buffer, `TechRider-${Date.now()}${ext}`, 'fullsystem');
+    }
 
     // 1. Save to Supabase
     const supabaseAdmin = getSupabaseAdmin();
@@ -56,17 +130,20 @@ export async function POST(request: Request) {
 
     // 2. Generate quote and PDF (only for small, medium, large packages)
     let pdfBuffer: Buffer | null = null;
+    let jobSheetBuffer: Buffer | null = null;
     let quoteNumber = '';
     let quoteTotal = 0;
     let driveFileId: string | null = null;
+    let jobSheetDriveId: string | null = null;
+    let quoteData: SoundQuoteOutput | null = null;
 
     // Check if this is a sound system inquiry with a valid package
     const validPackages = ['small', 'medium', 'large'];
     if (body.package && validPackages.includes(body.package)) {
       try {
         const quoteInput: SoundQuoteInput = {
-          package: body.package,
-          eventType: body.eventType,
+          package: body.package as 'small' | 'medium' | 'large' | 'extra_large',
+          eventType: body.eventType as 'wedding' | 'corporate' | 'festival' | 'private_party' | 'other' | undefined,
           eventName: body.eventName,
           organization: body.organization,
           eventDate: body.eventDate,
@@ -100,14 +177,16 @@ export async function POST(request: Request) {
           contactName: body.contactName,
           contactEmail: body.contactEmail,
           contactPhone: body.contactPhone,
-          details: body.details
+          details: body.details,
+          techRiderRequirements: techRiderRequirements || undefined,
         };
 
         const quote = await generateSoundQuote(quoteInput);
+        quoteData = quote;
         quoteNumber = quote.quoteNumber;
         quoteTotal = quote.total;
 
-        // Generate PDF
+        // Generate Quote PDF
         pdfBuffer = await generateSoundQuotePDF(
           quote,
           body.contactName,
@@ -118,9 +197,54 @@ export async function POST(request: Request) {
 
         console.log(`Sound quote ${quoteNumber} generated successfully`);
 
-        // Upload to Google Drive
+        // Upload quote to Google Drive
         if (pdfBuffer) {
           driveFileId = await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'fullsystem');
+        }
+
+        // Build content requirements for job sheet
+        const contentReqs: string[] = [];
+        if (body.playbackFromDevice) contentReqs.push('Playback from device');
+        if (body.hasLiveMusic) contentReqs.push('Live music');
+        if (body.needsMic) contentReqs.push('Microphone required');
+        if (body.hasDJ) contentReqs.push('DJ');
+        if (body.hasBand) contentReqs.push(`Live band(s)${body.bandCount ? ` (${body.bandCount})` : ''}`);
+        if (body.hasSpeeches) contentReqs.push('Speeches/presentations');
+        if (body.needsWirelessMic) contentReqs.push('Wireless mic');
+
+        // Generate Job Sheet PDF with AI-generated execution notes and suggested gear
+        const jobSheetInput: JobSheetInput = {
+          eventName: body.eventName || quote.subtitle,
+          eventDate: body.eventDate || '',
+          eventTime: body.eventTime || null,
+          location: body.location || '',
+          quoteNumber: quote.quoteNumber,
+          contractorName: 'TBC', // Not assigned yet
+          hourlyRate: null,
+          estimatedHours: null,
+          payAmount: 0, // Not assigned yet
+          tasksDescription: null,
+          executionNotes: quote.executionNotes,
+          equipment: [], // No confirmed equipment yet
+          suggestedGear: quote.suggestedGear,
+          unavailableGear: quote.unavailableGear, // Items not in inventory
+          eventType: body.eventType || null,
+          attendance: body.attendance?.toString() || null,
+          setupTime: body.setupTime || null,
+          indoorOutdoor: body.indoorOutdoor || null,
+          contentRequirements: contentReqs,
+          additionalNotes: body.additionalInfo || body.details || null,
+          clientName: body.contactName,
+          clientPhone: body.contactPhone,
+          clientEmail: body.contactEmail,
+        };
+
+        jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
+        console.log(`Job sheet for ${quoteNumber} generated successfully`);
+
+        // Upload job sheet to Google Drive
+        if (jobSheetBuffer) {
+          jobSheetDriveId = await uploadJobSheetToDrive(jobSheetBuffer, `JobSheet-${quoteNumber}.pdf`, 'fullsystem');
         }
       } catch (quoteError) {
         console.error('Error generating sound quote:', quoteError);
@@ -165,6 +289,24 @@ export async function POST(request: Request) {
         },
         additionalInfo: body.additionalInfo || null,
         details: body.details || null,
+        techRider: techRiderRequirements ? {
+          inputChannels: techRiderRequirements.inputChannels,
+          monitorMixes: techRiderRequirements.monitorMixes,
+          specificGear: techRiderRequirements.specificGear,
+          stageBoxNeeded: techRiderRequirements.stageBoxNeeded,
+          iemNeeded: techRiderRequirements.iemNeeded,
+          drumMicsNeeded: techRiderRequirements.drumMicsNeeded,
+          powerRequirements: techRiderRequirements.powerRequirements,
+          stageLayout: techRiderRequirements.stageLayout,
+          additionalNotes: techRiderRequirements.additionalNotes,
+          driveFileId: techRiderDriveId,
+        } : null,
+        // AI-generated quote data for job sheets
+        lineItems: quoteData?.lineItems || null,
+        executionNotes: quoteData?.executionNotes || null,
+        suggestedGear: quoteData?.suggestedGear || null,
+        unavailableGear: quoteData?.unavailableGear || null,
+        jobSheetDriveFileId: jobSheetDriveId,
       };
 
       const { error: bookingError } = await supabaseAdmin
@@ -270,6 +412,21 @@ export async function POST(request: Request) {
           ${body.details ? `<p><strong>Additional Details:</strong> ${body.details}</p>` : ''}
 
           ${pdfBuffer ? '<p><em>Quote PDF attached</em></p>' : '<p><em>Quote PDF not generated (extra-large package or generation failed)</em></p>'}
+          ${jobSheetBuffer ? '<p><em>Job Sheet PDF attached (with AI-generated execution notes and suggested gear)</em></p>' : ''}
+
+          ${quoteData?.unavailableGear && quoteData.unavailableGear.length > 0 ? `
+          <hr />
+          <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #dc2626;">
+            <h3 style="color: #dc2626; margin: 0 0 10px 0;">⚠️ Gear Requiring Attention</h3>
+            <p style="color: #991b1b; margin: 0 0 10px 0;">The following items were suggested but do NOT exactly match available inventory:</p>
+            <ul style="color: #dc2626; margin: 0;">
+              ${quoteData.unavailableGear.map(item => `<li style="color: #dc2626;">${item}</li>`).join('')}
+            </ul>
+            <p style="color: #991b1b; font-size: 12px; margin: 10px 0 0 0; font-style: italic;">
+              Please check inventory and confirm availability before sending quote to client.
+            </p>
+          </div>
+          ` : ''}
 
           ${approvalToken ? `
           <hr />
@@ -286,14 +443,22 @@ export async function POST(request: Request) {
         `,
       };
 
-      // Add PDF attachment if generated successfully
+      // Add PDF attachments if generated successfully
+      const attachments: { filename: string; content: Buffer }[] = [];
       if (pdfBuffer) {
-        emailOptions.attachments = [
-          {
-            filename: `Quote-${quoteNumber}.pdf`,
-            content: pdfBuffer
-          }
-        ];
+        attachments.push({
+          filename: `Quote-${quoteNumber}.pdf`,
+          content: pdfBuffer
+        });
+      }
+      if (jobSheetBuffer) {
+        attachments.push({
+          filename: `JobSheet-${quoteNumber}.pdf`,
+          content: jobSheetBuffer
+        });
+      }
+      if (attachments.length > 0) {
+        emailOptions.attachments = attachments;
       }
 
       await resend.emails.send(emailOptions);

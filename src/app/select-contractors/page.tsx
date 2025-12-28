@@ -394,7 +394,7 @@ function SelectContractorsContent() {
 
       {/* Summary */}
       {selectedCount > 0 && (
-        <div className="bg-blue-50 rounded-lg p-4">
+        <div className="bg-stone-50 rounded-lg p-4">
           <div className="flex justify-between items-center">
             <div>
               <p className="font-semibold">{selectedCount} contractor{selectedCount !== 1 ? 's' : ''} selected</p>
@@ -410,7 +410,7 @@ function SelectContractorsContent() {
           <button
             onClick={handleSave}
             disabled={saving || selectedCount === 0}
-            className="w-full bg-gray-800 text-white py-3 px-4 rounded-md font-semibold hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-black text-white py-3 px-4 rounded-md font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving...' : 'Save Selections'}
           </button>
@@ -418,7 +418,7 @@ function SelectContractorsContent() {
           <button
             onClick={handleNotify}
             disabled={notifying}
-            className="w-full bg-green-600 text-white py-3 px-4 rounded-md font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-black text-white py-3 px-4 rounded-md font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {notifying ? 'Sending...' : `Notify ${selectedCount} Contractor${selectedCount !== 1 ? 's' : ''}`}
           </button>

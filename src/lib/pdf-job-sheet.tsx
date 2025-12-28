@@ -18,8 +18,17 @@ export interface JobSheetInput {
   payAmount: number;
   tasksDescription: string | null;
 
-  // Equipment (from details_json)
+  // AI-generated execution notes (used for initial job sheet before contractor assignment)
+  executionNotes?: string[];
+
+  // Equipment (from details_json - confirmed equipment after assignment)
   equipment: Array<{ name: string; quantity: number; notes?: string | null }>;
+
+  // AI-suggested gear (for initial job sheet)
+  suggestedGear?: Array<{ item: string; quantity: number; notes?: string; matchedInInventory?: boolean }>;
+
+  // Items that don't match available inventory
+  unavailableGear?: string[];
 
   // Event details (from details_json)
   eventType: string | null;
@@ -190,6 +199,52 @@ const styles = StyleSheet.create({
     color: '#92400e',
     lineHeight: 1.4,
   },
+  // Suggested gear section
+  suggestedHeader: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottom: '1 solid #e5e5e5',
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  suggestedLabel: {
+    fontSize: 8,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    marginBottom: 6,
+  },
+  // Unavailable gear section (red warning)
+  unavailableBox: {
+    backgroundColor: '#fef2f2',
+    border: '2 solid #dc2626',
+    padding: 12,
+    borderRadius: 4,
+    marginBottom: 15,
+  },
+  unavailableTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#dc2626',
+    marginBottom: 6,
+  },
+  unavailableLabel: {
+    fontSize: 8,
+    color: '#991b1b',
+    marginBottom: 6,
+  },
+  unavailableItem: {
+    fontSize: 10,
+    color: '#dc2626',
+    marginBottom: 3,
+  },
+  // Suggested gear with unavailable marker
+  equipmentUnavailable: {
+    flex: 1,
+    fontSize: 10,
+    color: '#dc2626',
+  },
 });
 
 function formatDate(dateStr: string): string {
@@ -241,15 +296,18 @@ function getLogoBase64(): string | null {
 export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer> {
   const logoBase64 = getLogoBase64();
 
-  // Build pay breakdown string
+  // Build pay breakdown string (only show if payAmount > 0, i.e., contractor assigned)
+  const showPayBox = input.payAmount > 0;
   const payBreakdown = input.hourlyRate && input.estimatedHours
     ? `$${input.hourlyRate}/hr x ${input.estimatedHours} hrs = $${input.payAmount.toFixed(0)}`
     : `$${input.payAmount.toFixed(0)}`;
 
-  // Parse tasks into array
-  const tasks = input.tasksDescription
-    ? input.tasksDescription.split('\n').filter(t => t.trim())
-    : [];
+  // Use execution notes from AI, or parse tasksDescription as fallback
+  const tasks = input.executionNotes && input.executionNotes.length > 0
+    ? input.executionNotes
+    : input.tasksDescription
+      ? input.tasksDescription.split('\n').filter(t => t.trim())
+      : [];
 
   const pdfDocument = (
     <Document>
@@ -275,16 +333,20 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
           <Text style={styles.eventDetail}>QUOTE #: {input.quoteNumber}</Text>
         </View>
 
-        {/* Pay Box */}
-        <View style={styles.payBox}>
-          <Text style={styles.payLabel}>Your Pay</Text>
-          <Text style={styles.payAmount}>{payBreakdown}</Text>
-        </View>
+        {/* Pay Box - only show when contractor is assigned */}
+        {showPayBox && (
+          <View style={styles.payBox}>
+            <Text style={styles.payLabel}>Your Pay</Text>
+            <Text style={styles.payAmount}>{payBreakdown}</Text>
+          </View>
+        )}
 
-        {/* Tasks Section */}
+        {/* Tasks / Execution Notes Section */}
         {tasks.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Tasks</Text>
+            <Text style={styles.sectionTitle}>
+              {input.executionNotes && input.executionNotes.length > 0 ? 'Execution Notes' : 'Your Tasks'}
+            </Text>
             <View style={styles.sectionContent}>
               {tasks.map((task, index) => (
                 <Text key={index} style={styles.taskItem}>• {task.trim()}</Text>
@@ -293,7 +355,43 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
           </View>
         )}
 
-        {/* Equipment List Section */}
+        {/* Unavailable Gear Warning Section - for initial job sheets */}
+        {input.unavailableGear && input.unavailableGear.length > 0 && (
+          <View style={styles.unavailableBox}>
+            <Text style={styles.unavailableTitle}>⚠ Gear Requiring Attention</Text>
+            <Text style={styles.unavailableLabel}>
+              These items were suggested but do NOT exactly match available inventory:
+            </Text>
+            {input.unavailableGear.map((item, index) => (
+              <Text key={index} style={styles.unavailableItem}>• {item}</Text>
+            ))}
+          </View>
+        )}
+
+        {/* Suggested Gear Section - for initial job sheets */}
+        {input.suggestedGear && input.suggestedGear.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.suggestedHeader}>Suggested Gear</Text>
+            <Text style={styles.suggestedLabel}>Based on event requirements - confirm before booking</Text>
+            <View style={styles.sectionContent}>
+              {input.suggestedGear.map((item, index) => (
+                <View key={index}>
+                  <View style={styles.equipmentRow}>
+                    <Text style={styles.equipmentQty}>{item.quantity}x</Text>
+                    <Text style={item.matchedInInventory === false ? styles.equipmentUnavailable : styles.equipmentName}>
+                      {item.item}{item.matchedInInventory === false ? ' ⚠' : ''}
+                    </Text>
+                  </View>
+                  {item.notes && (
+                    <Text style={styles.equipmentNotes}>{item.notes}</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Equipment List Section - for confirmed equipment */}
         {input.equipment.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Equipment List</Text>

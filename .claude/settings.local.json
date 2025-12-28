@@ -16,7 +16,11 @@
       "Bash(ls:*)",
       "Bash(node scripts/update-backline.js:*)",
       "Bash(xargs:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(node scripts/generate-demo-techrider.js:*)",
+      "Bash(node -e:*)",
+      "Bash(cat:*)",
+      "Bash(node scripts/import-audio-equipment.js:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

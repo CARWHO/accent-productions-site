@@ -15,6 +15,12 @@ const jobSheetFolderEnvKeys: Record<FolderType, string> = {
   soundtech: 'GOOGLE_DRIVE_SOUND_TECH_JOBSHEET_FOLDER_ID',
 };
 
+const techRiderFolderEnvKeys: Record<FolderType, string> = {
+  backline: 'GOOGLE_DRIVE_BACKLINE_TECHRIDER_FOLDER_ID',
+  fullsystem: 'GOOGLE_DRIVE_FULL_SYSTEM_TECHRIDER_FOLDER_ID',
+  soundtech: 'GOOGLE_DRIVE_SOUND_TECH_TECHRIDER_FOLDER_ID',
+};
+
 /**
  * Extract folder ID from a Google Drive URL or return as-is if already an ID
  * Handles URLs like: https://drive.google.com/drive/folders/ABC123?usp=sharing
@@ -180,3 +186,50 @@ export async function uploadJobSheetToDrive(
   }
 }
 
+/**
+ * Upload a Tech Rider PDF to the appropriate tech riders folder
+ */
+export async function uploadTechRiderToDrive(
+  fileBuffer: Buffer,
+  filename: string,
+  folderType: FolderType
+): Promise<string | null> {
+  try {
+    const rawFolderId = process.env[techRiderFolderEnvKeys[folderType]];
+    const folderId = rawFolderId ? extractFolderId(rawFolderId) : null;
+    const oauth2Client = getOAuth2Client();
+
+    if (!folderId || !oauth2Client) {
+      console.warn(`Google Drive not configured for ${folderType} tech riders, skipping upload`);
+      return null;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    // Determine mime type based on file extension
+    const lowerFilename = filename.toLowerCase();
+    let mimeType = 'application/pdf';
+    if (lowerFilename.endsWith('.docx')) {
+      mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (lowerFilename.endsWith('.doc')) {
+      mimeType = 'application/msword';
+    }
+
+    const response = await drive.files.create({
+      requestBody: {
+        name: filename,
+        parents: [folderId],
+      },
+      media: {
+        mimeType,
+        body: Readable.from(fileBuffer),
+      },
+    });
+
+    console.log(`Uploaded Tech Rider ${filename} to Google Drive ${folderType} folder (ID: ${response.data.id})`);
+    return response.data.id || null;
+  } catch (error) {
+    console.error('Error uploading Tech Rider to Google Drive:', error);
+    return null;
+  }
+}
