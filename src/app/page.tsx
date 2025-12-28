@@ -171,7 +171,7 @@ export default function Home() {
             <div className="flex flex-wrap gap-4">
               <Link
                 href="/inquiry"
-                className="bg-[#FFFFFF] text-black px-8 py-3 rounded-md font-bold hover:bg-[#FFFFF] transition-colors border border-[#000000]"
+                className="bg-[#FFFFFF] text-black px-8 py-3 rounded-md font-bold border border-[#000000]"
               >
                 Get a Quote
               </Link>

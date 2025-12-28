@@ -26,6 +26,7 @@ function ReviewQuoteContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<string>('');
+  const [depositPercent, setDepositPercent] = useState<string>('50');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -69,6 +70,7 @@ function ReviewQuoteContent() {
         body: JSON.stringify({
           bookingId: booking.id,
           notes: notes || null,
+          depositPercent: depositPercent ? parseFloat(depositPercent) : 50,
         }),
       });
 
@@ -176,6 +178,27 @@ function ReviewQuoteContent() {
           <p className="text-gray-600 text-sm">{booking.client_phone}</p>
         </div>
 
+        {/* Deposit Percent */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Deposit Required
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              value={depositPercent}
+              onChange={(e) => setDepositPercent(e.target.value)}
+              placeholder="50"
+              min="0"
+              max="100"
+              step="10"
+              className={`${inputStyles} pr-8`}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">%</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Percentage of total to request upfront (default 50%)</p>
+        </div>
+
         {/* Notes */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -198,14 +221,13 @@ function ReviewQuoteContent() {
           disabled={sending}
           className="w-full bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
         >
-          {sending ? 'Sending...' : 'Send to Client for Approval'}
+          {sending ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Sending...
+            </span>
+          ) : 'Send to Client for Approval'}
         </button>
-        <a
-          href={`/select-contractors?token=${token}`}
-          className="w-full border-2 border-gray-300 text-gray-700 py-3 rounded-md font-bold text-base transition-colors hover:border-gray-400 text-center"
-        >
-          Skip → Select Contractors Directly
-        </a>
       </div>
       </div>
     </PageCard>

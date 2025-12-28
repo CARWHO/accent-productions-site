@@ -178,10 +178,13 @@ export async function generateQuotePDF(
   clientName: string,
   clientEmail: string,
   clientPhone: string,
-  eventDate: string
+  eventDate: string,
+  options?: { isInvoice?: boolean; invoiceNumber?: string }
 ): Promise<Buffer> {
   const today = formatDate();
   const logoBase64 = getLogoBase64();
+  const isInvoice = options?.isInvoice ?? false;
+  const documentNumber = isInvoice ? (options?.invoiceNumber || quote.quoteNumber) : quote.quoteNumber;
 
   const pdfDocument = (
     <Document>
@@ -203,12 +206,12 @@ export async function generateQuotePDF(
           <Text>23 Moxham Ave</Text>
           <Text>Hataitai Wellington 6021</Text>
           <Text>Tel 027 602 3869</Text>
-          <Text>Email hello@accent-productions.co.nz.com</Text>
+          <Text>Email hello@accent-productions.co.nz</Text>
         </View>
 
-        {/* Quote Number and Date */}
+        {/* Quote/Invoice Number and Date */}
         <Text style={styles.quoteHeader}>
-          Quote Nº: {quote.quoteNumber}   Issued: {today}
+          {isInvoice ? 'Invoice' : 'Quote'} Nº: {documentNumber}   Issued: {today}
         </Text>
 
         {/* Client Info */}
@@ -218,8 +221,10 @@ export async function generateQuotePDF(
           <Text>{clientPhone}</Text>
         </View>
 
-        {/* Validity Note */}
-        <Text style={styles.validityNote}>Quote valid for 28 days</Text>
+        {/* Validity Note / Payment Note */}
+        <Text style={[styles.validityNote, isInvoice ? { color: '#dc2626' } : {}]}>
+          {isInvoice ? 'Payment due prior to event' : 'Quote valid for 28 days'}
+        </Text>
 
         {/* Quote Table */}
         <View style={styles.tableContainer}>

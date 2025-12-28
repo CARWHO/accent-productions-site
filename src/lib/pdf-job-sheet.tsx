@@ -33,7 +33,7 @@ export interface JobSheetInput {
   // Event details (from details_json)
   eventType: string | null;
   attendance: string | null;
-  setupTime: string | null;
+  setupTime?: string | null;
   indoorOutdoor: string | null;
   contentRequirements: string[];
   additionalNotes: string | null;

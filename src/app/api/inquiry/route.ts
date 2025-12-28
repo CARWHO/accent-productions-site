@@ -33,8 +33,8 @@ export async function POST(request: Request) {
       eventName: getField('eventName'),
       organization: getField('organization'),
       eventDate: getField('eventDate'),
-      eventTime: getField('eventTime'),
-      setupTime: getField('setupTime'),
+      eventStartTime: getField('eventStartTime'),
+      eventEndTime: getField('eventEndTime'),
       attendance: getNumField('attendance'),
       playbackFromDevice: getBoolField('playbackFromDevice'),
       hasLiveMusic: getBoolField('hasLiveMusic'),
@@ -101,8 +101,7 @@ export async function POST(request: Request) {
           organization: body.organization,
           event_name: body.eventName,
           event_date: body.eventDate,
-          event_time: body.eventTime,
-          setup_time: body.setupTime,
+          event_time: body.eventStartTime && body.eventEndTime ? `${body.eventStartTime} - ${body.eventEndTime}` : null,
           attendance: body.attendance,
           location: body.location,
           venue_contact: body.venueContact,
@@ -147,8 +146,8 @@ export async function POST(request: Request) {
           eventName: body.eventName,
           organization: body.organization,
           eventDate: body.eventDate,
-          eventTime: body.eventTime,
-          setupTime: body.setupTime,
+          eventStartTime: body.eventStartTime,
+          eventEndTime: body.eventEndTime,
           attendance: body.attendance,
           playbackFromDevice: body.playbackFromDevice,
           hasLiveMusic: body.hasLiveMusic,
@@ -213,10 +212,14 @@ export async function POST(request: Request) {
         if (body.needsWirelessMic) contentReqs.push('Wireless mic');
 
         // Generate Job Sheet PDF with AI-generated execution notes and suggested gear
+        const formattedEventTime = body.eventStartTime && body.eventEndTime
+          ? `${body.eventStartTime} - ${body.eventEndTime}`
+          : null;
+
         const jobSheetInput: JobSheetInput = {
           eventName: body.eventName || quote.subtitle,
           eventDate: body.eventDate || '',
-          eventTime: body.eventTime || null,
+          eventTime: formattedEventTime,
           location: body.location || '',
           quoteNumber: quote.quoteNumber,
           contractorName: 'TBC', // Not assigned yet
@@ -230,7 +233,6 @@ export async function POST(request: Request) {
           unavailableGear: quote.unavailableGear, // Items not in inventory
           eventType: body.eventType || null,
           attendance: body.attendance?.toString() || null,
-          setupTime: body.setupTime || null,
           indoorOutdoor: body.indoorOutdoor || null,
           contentRequirements: contentReqs,
           additionalNotes: body.additionalInfo || body.details || null,
@@ -275,7 +277,8 @@ export async function POST(request: Request) {
         eventType: body.eventType || null,
         organization: body.organization || null,
         attendance: body.attendance || null,
-        setupTime: body.setupTime || null,
+        eventStartTime: body.eventStartTime || null,
+        eventEndTime: body.eventEndTime || null,
         contentRequirements,
         bandNames: body.bandNames || null,
         bandSetup: body.bandSetup || null,
@@ -317,7 +320,7 @@ export async function POST(request: Request) {
           booking_type: 'fullsystem',
           status: 'pending',
           event_date: body.eventDate || null,
-          event_time: body.eventTime || null,
+          event_time: body.eventStartTime && body.eventEndTime ? `${body.eventStartTime} - ${body.eventEndTime}` : null,
           location: body.location || null,
           event_name: body.eventName || null,
           job_description: body.details || null,
@@ -379,8 +382,7 @@ export async function POST(request: Request) {
           <p><strong>Event Name:</strong> ${body.eventName || 'N/A'}</p>
           <p><strong>Organization:</strong> ${body.organization || 'N/A'}</p>
           <p><strong>Date:</strong> ${body.eventDate || 'N/A'}</p>
-          <p><strong>Time:</strong> ${body.eventTime || 'N/A'}</p>
-          <p><strong>Setup/Packout:</strong> ${body.setupTime || 'N/A'}</p>
+          <p><strong>Time:</strong> ${body.eventStartTime && body.eventEndTime ? `${body.eventStartTime} - ${body.eventEndTime}` : 'N/A'}</p>
           <p><strong>Attendance:</strong> ${body.attendance || 'N/A'}</p>
 
           <hr />
@@ -413,6 +415,7 @@ export async function POST(request: Request) {
 
           ${pdfBuffer ? '<p><em>Quote PDF attached</em></p>' : '<p><em>Quote PDF not generated (extra-large package or generation failed)</em></p>'}
           ${jobSheetBuffer ? '<p><em>Job Sheet PDF attached (with AI-generated execution notes and suggested gear)</em></p>' : ''}
+          ${techRiderFile && techRiderFile.size > 0 ? '<p><em>Tech rider attached</em></p>' : ''}
 
           ${quoteData?.unavailableGear && quoteData.unavailableGear.length > 0 ? `
           <hr />
@@ -455,6 +458,14 @@ export async function POST(request: Request) {
         attachments.push({
           filename: `JobSheet-${quoteNumber}.pdf`,
           content: jobSheetBuffer
+        });
+      }
+      // Add tech rider if uploaded
+      if (techRiderFile && techRiderFile.size > 0) {
+        const techRiderBuffer = Buffer.from(await techRiderFile.arrayBuffer());
+        attachments.push({
+          filename: techRiderFile.name || 'tech-rider.pdf',
+          content: techRiderBuffer
         });
       }
       if (attachments.length > 0) {

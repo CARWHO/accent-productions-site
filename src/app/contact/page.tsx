@@ -73,7 +73,7 @@ export default function ContactPage() {
               </p>
               <a
                 href="/"
-                className="inline-block bg-black text-white px-8 py-3 rounded-md font-medium hover:bg-gray-800 transition-colors"
+                className="inline-block bg-black text-white px-8 py-3 rounded-md font-medium"
               >
                 Return Home
               </a>
@@ -97,8 +97,8 @@ export default function ContactPage() {
     </section>
 
     <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid lg:grid-cols-2 gap-16">
 
           {/* form */}
           <div>
@@ -183,9 +183,14 @@ export default function ContactPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-black text-white px-8 py-4 rounded-md font-semibold text-lg hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="w-full bg-black text-white px-8 py-4 rounded-md font-semibold text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Sending...' : 'Send Message'}
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Sending...
+                  </span>
+                ) : 'Send Message'}
               </button>
             </div>
           </form>

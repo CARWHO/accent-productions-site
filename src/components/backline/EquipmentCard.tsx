@@ -46,7 +46,7 @@ export function EquipmentCard({ id, name, category, notes, hireRate, stockQuanti
               <button
                 type="button"
                 onClick={() => updateQuantity(id, quantity - 1)}
-                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md"
               >
                 -
               </button>
@@ -55,7 +55,7 @@ export function EquipmentCard({ id, name, category, notes, hireRate, stockQuanti
                 type="button"
                 onClick={() => updateQuantity(id, quantity + 1)}
                 disabled={atMax}
-                className={`w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md transition-colors ${atMax ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                className={`w-8 h-8 flex items-center justify-center border border-gray-300 rounded-md ${atMax ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 +
               </button>
@@ -63,7 +63,7 @@ export function EquipmentCard({ id, name, category, notes, hireRate, stockQuanti
           ) : (
             <button
               onClick={handleAdd}
-              className="w-full py-2 bg-[#000000] text-white font-medium rounded-md hover:bg-gray-800 transition-colors text-sm"
+              className="w-full py-2 bg-[#000000] text-white font-medium rounded-md text-sm"
             >
               Add
             </button>

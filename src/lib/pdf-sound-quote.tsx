@@ -195,10 +195,13 @@ export async function generateSoundQuotePDF(
   clientName: string,
   clientEmail: string,
   clientPhone: string,
-  organization?: string
+  organization?: string,
+  options?: { isInvoice?: boolean; invoiceNumber?: string }
 ): Promise<Buffer> {
   const today = formatDate();
   const logoBase64 = getLogoBase64();
+  const isInvoice = options?.isInvoice ?? false;
+  const documentNumber = isInvoice ? (options?.invoiceNumber || quote.quoteNumber) : quote.quoteNumber;
 
   // Build line items array for rendering
   const lineItems: { description: string; cost: number }[] = [];
@@ -249,9 +252,9 @@ export async function generateSoundQuotePDF(
           <Text>Email hello@accent-productions.co.nz</Text>
         </View>
 
-        {/* Quote Number and Date */}
+        {/* Quote/Invoice Number and Date */}
         <Text style={styles.quoteHeader}>
-          Quote Nº: {quote.quoteNumber}   Issued: {today}
+          {isInvoice ? 'Invoice' : 'Quote'} Nº: {documentNumber}   Issued: {today}
         </Text>
 
         {/* Client Info */}
@@ -262,8 +265,10 @@ export async function generateSoundQuotePDF(
           <Text>{clientPhone}</Text>
         </View>
 
-        {/* Validity Note */}
-        <Text style={styles.validityNote}>Quote valid for 28 days</Text>
+        {/* Validity Note / Payment Note */}
+        <Text style={[styles.validityNote, isInvoice ? { color: '#dc2626' } : {}]}>
+          {isInvoice ? 'Payment due prior to event' : 'Quote valid for 28 days'}
+        </Text>
 
         {/* Quote Table */}
         <View style={styles.tableContainer}>

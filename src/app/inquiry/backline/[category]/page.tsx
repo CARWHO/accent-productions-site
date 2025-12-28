@@ -80,7 +80,7 @@ export default function CategoryPage() {
       <div className="flex flex-col h-full">
         <div className="flex items-start justify-between mb-2">
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{categoryName}</h1>
-          <Link href="/inquiry/backline" className="text-gray-700 font-bold hover:text-gray-900 transition-colors text-sm">
+          <Link href="/inquiry/backline" className="text-gray-700 font-bold text-sm">
             Back
           </Link>
         </div>
@@ -108,7 +108,7 @@ export default function CategoryPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <div className="animate-spin h-8 w-8 border-4 border-black border-t-transparent rounded-full"></div>
           </div>
         ) : error ? (
           <div className="text-center py-12">

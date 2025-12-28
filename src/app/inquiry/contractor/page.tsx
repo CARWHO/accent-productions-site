@@ -138,7 +138,7 @@ export default function ContractorInquiryPage() {
             <button
               type="button"
               onClick={fillTestData}
-              className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300 hover:bg-yellow-200"
+              className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300"
             >
               Fill Test Data
             </button>
@@ -225,7 +225,7 @@ export default function ContractorInquiryPage() {
               </div>
 
               <div className="flex gap-4 mt-auto pt-5">
-                <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</a>
+                <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold">Back</a>
                 <button
                   onClick={() => {
                     if (!formData.eventDate || !formData.startTime || !formData.endTime || !formData.location || !formData.eventDescription) {
@@ -295,7 +295,7 @@ export default function ContractorInquiryPage() {
               </div>
 
               <div className="flex gap-4 mt-auto pt-5">
-                <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+                <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
                 <button
                   onClick={() => {
                     if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -308,7 +308,12 @@ export default function ContractorInquiryPage() {
                   disabled={isSubmitting}
                   className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Sending...' : 'Get Quote'}
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Sending...
+                    </span>
+                  ) : 'Get Quote'}
                 </button>
               </div>
             </div>

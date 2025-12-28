@@ -69,7 +69,7 @@ export default function ServicesPage() {
         setTimeout(() => {
           const element = document.querySelector(hash);
           if (element) {
-            const headerOffset = 80; // Account for sticky header
+            const headerOffset = 230; // Account for sticky header
             const elementPosition = element.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 

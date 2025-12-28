@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
-import { generateInvoicePDF, InvoiceInput } from '@/lib/pdf-invoice';
+import { generateQuotePDF } from '@/lib/pdf-quote';
+import { QuoteOutput } from '@/lib/gemini-quote';
+import { generateSoundQuotePDF } from '@/lib/pdf-sound-quote';
+import { SoundQuoteOutput } from '@/lib/gemini-sound-quote';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -10,7 +13,7 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { bookingId, adjustedAmount, notes } = body;
+    const { bookingId, adjustedAmount, notes, depositPercent } = body;
 
     if (!bookingId) {
       return NextResponse.json({ success: false, message: 'Missing booking ID' }, { status: 400 });
@@ -45,6 +48,10 @@ export async function POST(request: Request) {
     const subtotal = finalAmount / 1.15; // Remove GST to get subtotal
     const gst = finalAmount - subtotal;
 
+    // Calculate deposit amount from percentage (default 50%)
+    const depositPercentValue = depositPercent ?? 50;
+    const depositAmount = (finalAmount * depositPercentValue) / 100;
+
     // Build line items from details
     const lineItems: Array<{ description: string; amount: number }> = [];
     if (details?.equipment && Array.isArray(details.equipment)) {
@@ -70,6 +77,7 @@ export async function POST(request: Request) {
         booking_id: bookingId,
         adjusted_quote_total: finalAmount,
         quote_notes: notes || null,
+        deposit_amount: depositAmount || null,
         client_approval_token: clientApprovalToken,
         sent_to_client_at: new Date().toISOString(),
         client_email: booking.client_email,
@@ -102,29 +110,41 @@ export async function POST(request: Request) {
         });
       };
 
-      // Generate Invoice PDF with payment link
-      const stripePaymentUrl = `${baseUrl}/payment?invoice=${invoiceNumber}&amount=${finalAmount.toFixed(2)}`;
-
-      const invoiceInput: InvoiceInput = {
-        invoiceNumber,
-        quoteNumber: booking.quote_number || undefined,
-        clientName: booking.client_name,
-        clientEmail: booking.client_email,
-        clientPhone: booking.client_phone || '',
-        eventName: booking.event_name || 'Event',
-        eventDate: booking.event_date,
-        location: booking.location || undefined,
-        lineItems,
-        subtotal,
-        gst,
-        total: finalAmount,
-        notes: notes || undefined,
-        paymentUrl: stripePaymentUrl,
-      };
-
+      // Generate invoice PDF using the same format as the original quote
       let invoicePdfBuffer: Buffer | null = null;
       try {
-        invoicePdfBuffer = await generateInvoicePDF(invoiceInput);
+        if (booking.booking_type === 'soundgear' && booking.quote_json) {
+          // Sound quote - use the stored quote data
+          const soundQuote = booking.quote_json as SoundQuoteOutput;
+          invoicePdfBuffer = await generateSoundQuotePDF(
+            soundQuote,
+            booking.client_name,
+            booking.client_email,
+            booking.client_phone || '',
+            booking.organization || undefined,
+            { isInvoice: true, invoiceNumber }
+          );
+        } else {
+          // Backline quote - build from details
+          const quoteData: QuoteOutput = {
+            quoteNumber: booking.quote_number || invoiceNumber,
+            title: booking.event_name || 'Event',
+            description: booking.location || '',
+            lineItems: lineItems.map(item => ({ description: item.description, amount: item.amount })),
+            subtotal,
+            gst,
+            total: finalAmount,
+            rentalDays: 1,
+          };
+          invoicePdfBuffer = await generateQuotePDF(
+            quoteData,
+            booking.client_name,
+            booking.client_email,
+            booking.client_phone || '',
+            booking.event_date,
+            { isInvoice: true, invoiceNumber }
+          );
+        }
       } catch (pdfError) {
         console.error('Error generating invoice PDF:', pdfError);
       }
@@ -157,6 +177,14 @@ export async function POST(request: Request) {
                 <div><strong>Location:</strong> ${booking.location || 'TBC'}</div>
               </div>
             </div>
+
+            ${depositAmount > 0 ? `
+            <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: left;">
+              <div style="font-size: 14px; color: #92400e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Deposit Required (${depositPercentValue}%)</div>
+              <div style="font-size: 28px; font-weight: bold; color: #b45309;">$${depositAmount.toFixed(2)}</div>
+              <p style="margin: 10px 0 0 0; color: #92400e; font-size: 14px;">This deposit is required upfront to confirm your booking.</p>
+            </div>
+            ` : ''}
 
             ${notes ? `
             <div style="background: #e8f4fd; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3; text-align: left;">

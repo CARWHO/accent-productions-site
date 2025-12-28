@@ -41,9 +41,7 @@ function SelectContractorsContent() {
   const [assignments, setAssignments] = useState<Record<string, Assignment>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [notified, setNotified] = useState(false);
 
   useEffect(() => {
@@ -121,7 +119,7 @@ function SelectContractorsContent() {
     }));
   };
 
-  const handleSave = async () => {
+  const handleNotify = async () => {
     if (!booking || Object.keys(assignments).length === 0) return;
 
     // Validate all assignments have hourly rate and hours
@@ -135,9 +133,10 @@ function SelectContractorsContent() {
       return;
     }
 
-    setSaving(true);
+    setNotifying(true);
     try {
-      const res = await fetch('/api/select-contractors', {
+      // First save the assignments
+      const saveRes = await fetch('/api/select-contractors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -154,22 +153,10 @@ function SelectContractorsContent() {
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to save');
-      setSaved(true);
-    } catch (err) {
-      console.error('Error saving:', err);
-      alert('Failed to save. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
+      if (!saveRes.ok) throw new Error('Failed to save');
 
-  const handleNotify = async () => {
-    if (!booking) return;
-
-    setNotifying(true);
-    try {
-      const res = await fetch('/api/notify-contractors', {
+      // Then notify contractors
+      const notifyRes = await fetch('/api/notify-contractors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -178,10 +165,10 @@ function SelectContractorsContent() {
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to notify');
+      if (!notifyRes.ok) throw new Error('Failed to notify');
       setNotified(true);
     } catch (err) {
-      console.error('Error notifying:', err);
+      console.error('Error:', err);
       alert('Failed to send notifications. Please try again.');
     } finally {
       setNotifying(false);
@@ -374,13 +361,13 @@ function SelectContractorsContent() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tasks / Notes
+                        Extra Notes
                       </label>
                       <textarea
                         value={assignment.tasks_description}
                         onChange={(e) => updateAssignment(contractor.id, 'tasks_description', e.target.value)}
                         placeholder="Describe what this contractor will do..."
-                        rows={2}
+                        rows={4}
                         className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-transparent resize-none text-sm"
                       />
                     </div>
@@ -404,31 +391,20 @@ function SelectContractorsContent() {
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="flex flex-col gap-3 pt-4 border-t border-stone-200">
-        {!saved ? (
-          <button
-            onClick={handleSave}
-            disabled={saving || selectedCount === 0}
-            className="w-full bg-black text-white py-3 px-4 rounded-md font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Saving...' : 'Save Selections'}
-          </button>
-        ) : (
-          <button
-            onClick={handleNotify}
-            disabled={notifying}
-            className="w-full bg-black text-white py-3 px-4 rounded-md font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {notifying ? 'Sending...' : `Notify ${selectedCount} Contractor${selectedCount !== 1 ? 's' : ''}`}
-          </button>
-        )}
-
-        {saved && !notified && (
-          <p className="text-center text-sm text-gray-500">
-            Selections saved. Click above to send notifications.
-          </p>
-        )}
+      {/* Action Button */}
+      <div className="pt-4 border-t border-stone-200">
+        <button
+          onClick={handleNotify}
+          disabled={notifying || selectedCount === 0}
+          className="w-full bg-black text-white py-3 px-4 rounded-md font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {notifying ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Sending...
+            </span>
+          ) : `Notify ${selectedCount} Contractor${selectedCount !== 1 ? 's' : ''}`}
+        </button>
       </div>
       </div>
     </PageCard>

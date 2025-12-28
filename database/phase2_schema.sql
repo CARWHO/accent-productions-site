@@ -63,3 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_contractor_selection_token ON bookings(c
 ALTER TABLE booking_contractor_assignments
 ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2),
 ADD COLUMN IF NOT EXISTS estimated_hours DECIMAL(5,2);
+
+-- Add deposit amount column to client_approvals
+ALTER TABLE client_approvals
+ADD COLUMN IF NOT EXISTS deposit_amount DECIMAL(10,2);

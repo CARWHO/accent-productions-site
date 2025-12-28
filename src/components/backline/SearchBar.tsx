@@ -98,7 +98,7 @@ export function SearchBar({ placeholder = 'Search equipment...' }: SearchBarProp
         </svg>
         {isLoading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+            <div className="animate-spin h-5 w-5 border-2 border-black border-t-transparent rounded-full"></div>
           </div>
         )}
       </div>
@@ -127,7 +127,7 @@ export function SearchBar({ placeholder = 'Search equipment...' }: SearchBarProp
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.id, quantity - 1)}
-                        className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors text-sm"
+                        className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded text-sm"
                       >
                         -
                       </button>
@@ -135,7 +135,7 @@ export function SearchBar({ placeholder = 'Search equipment...' }: SearchBarProp
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.id, quantity + 1)}
-                        className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors text-sm"
+                        className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded text-sm"
                       >
                         +
                       </button>
@@ -143,7 +143,7 @@ export function SearchBar({ placeholder = 'Search equipment...' }: SearchBarProp
                   ) : (
                     <button
                       onClick={() => handleAddToCart(item)}
-                      className="px-3 py-1.5 bg-[#000000] text-white text-sm font-medium rounded hover:bg-gray-800 transition-colors flex-shrink-0"
+                      className="px-3 py-1.5 bg-[#000000] text-white text-sm font-medium rounded flex-shrink-0"
                     >
                       Add
                     </button>

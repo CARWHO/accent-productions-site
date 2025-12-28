@@ -37,7 +37,7 @@ export default function InquiryPage() {
             <Link
               key={service.title}
               href={service.href}
-              className="flex-1 flex border-2 border-gray-200 rounded-md overflow-hidden transition-all hover:border-gray-400 hover:shadow-sm min-h-0"
+              className="flex-1 flex border-2 border-gray-200 rounded-md overflow-hidden min-h-0"
             >
               <div className="w-1/3 sm:w-2/5 relative flex-shrink-0">
                 <Image
@@ -56,7 +56,7 @@ export default function InquiryPage() {
         </div>
 
         <div className="flex gap-4 pt-5">
-          <Link href="/" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</Link>
+          <Link href="/" className="px-5 py-2.5 text-gray-700 font-bold">Back</Link>
         </div>
       </div>
     </PageCard>

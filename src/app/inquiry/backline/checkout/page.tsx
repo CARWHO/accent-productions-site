@@ -169,7 +169,7 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 onClick={fillTestData}
-                className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300 hover:bg-yellow-200"
+                className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300"
               >
                 Fill Test Data
               </button>
@@ -187,7 +187,7 @@ export default function CheckoutPage() {
                       <p className="text-gray-500 mb-4">Your cart is empty</p>
                       <Link
                         href="/inquiry/backline"
-                        className="inline-block px-4 py-2 bg-[#000000] text-white font-medium rounded-md hover:bg-gray-800 transition-colors"
+                        className="inline-block px-4 py-2 bg-[#000000] text-white font-medium rounded-md"
                       >
                         Browse Equipment
                       </Link>
@@ -204,7 +204,7 @@ export default function CheckoutPage() {
                             <button
                               type="button"
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors text-sm"
+                              className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded text-sm"
                             >
                               -
                             </button>
@@ -212,14 +212,14 @@ export default function CheckoutPage() {
                             <button
                               type="button"
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors text-sm"
+                              className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded text-sm"
                             >
                               +
                             </button>
                             <button
                               type="button"
                               onClick={() => removeItem(item.id)}
-                              className="ml-2 p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                              className="ml-2 p-1.5 text-gray-400 "
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -234,7 +234,7 @@ export default function CheckoutPage() {
                         <textarea
                           value={otherEquipment}
                           onChange={(e) => setOtherEquipment(e.target.value)}
-                          rows={2}
+                          rows={4}
                           className={`${inputStyles} resize-none`}
                           placeholder="Any other equipment you need that's not listed..."
                         />
@@ -244,7 +244,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="flex gap-4 mt-auto pt-5">
-                  <Link href="/inquiry/backline" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</Link>
+                  <Link href="/inquiry/backline" className="px-5 py-2.5 text-gray-700 font-bold">Back</Link>
                   <button
                     onClick={() => {
                       if (!hasItems) {
@@ -313,8 +313,8 @@ export default function CheckoutPage() {
                               formData.deliveryMethod === opt
                                 ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
                                 : showValidation && !formData.deliveryMethod
-                                ? 'border-red-500 text-gray-600 hover:border-red-600'
-                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                ? 'border-red-500 text-gray-600'
+                                : 'border-gray-200 text-gray-600'
                             }`}>
                               {opt === 'pickup' ? 'Pickup' : 'Delivery'}
                             </div>
@@ -381,7 +381,7 @@ export default function CheckoutPage() {
                           <button
                             type="button"
                             onClick={() => updateField('techRider', null)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 "
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -395,7 +395,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="flex gap-4 mt-auto pt-5">
-                  <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+                  <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
                   <button
                     onClick={() => {
                       const needsAddress = formData.deliveryMethod === 'delivery';
@@ -466,7 +466,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="flex gap-4 mt-auto pt-5">
-                  <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+                  <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
                   <button
                     onClick={() => {
                       if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -479,7 +479,12 @@ export default function CheckoutPage() {
                     disabled={isSubmitting}
                     className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
                   >
-                    {isSubmitting ? 'Sending...' : 'Get Quote'}
+                    {isSubmitting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Sending...
+                      </span>
+                    ) : 'Get Quote'}
                   </button>
                 </div>
               </div>

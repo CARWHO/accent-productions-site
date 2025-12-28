@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import PageCard from '@/components/ui/PageCard';
+import type { TechRiderRequirements } from '@/lib/parse-tech-rider';
 
 type PackageType = 'small' | 'medium' | 'large' | 'extra_large';
 type EventType = 'wedding' | 'corporate' | 'festival' | 'private_party' | 'other';
@@ -17,8 +18,8 @@ interface PackageFormData {
   eventName?: string;
   organization?: string;
   eventDate?: string;
-  eventTime?: string;
-  setupTime?: string;
+  eventStartTime?: string;
+  eventEndTime?: string;
   attendance?: number;
 
   // Small event specifics
@@ -103,6 +104,119 @@ const eventTypes: { value: EventType; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
+// Generate common time suggestions (30-minute intervals from 6am to 2am)
+const timeSuggestions: string[] = [];
+for (let hour = 6; hour <= 26; hour++) {
+  const displayHour = hour >= 24 ? hour - 24 : hour;
+  const ampm = (hour >= 12 && hour < 24) ? 'PM' : 'AM';
+  const hour12 = displayHour === 0 ? 12 : (displayHour > 12 ? displayHour - 12 : displayHour);
+  timeSuggestions.push(`${hour12}:00 ${ampm}`);
+  timeSuggestions.push(`${hour12}:30 ${ampm}`);
+}
+
+// Time Input Component - Hybrid combobox (type + select)
+function TimeInput({
+  value,
+  onChange,
+  placeholder,
+  hasError,
+  inputStyles,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  hasError?: boolean;
+  inputStyles: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Sync internal state with external value
+  React.useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  // Filter suggestions based on input
+  const filteredSuggestions = inputValue
+    ? timeSuggestions.filter(t =>
+        t.toLowerCase().replace(/\s/g, '').includes(inputValue.toLowerCase().replace(/\s/g, ''))
+      )
+    : timeSuggestions;
+
+  // Handle click outside to close dropdown
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+    setIsOpen(true);
+    // Pass through immediately for custom times
+    onChange(val);
+  };
+
+  const handleSelect = (time: string) => {
+    setInputValue(time);
+    onChange(time);
+    setIsOpen(false);
+    inputRef.current?.blur();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+    } else if (e.key === 'Enter' && filteredSuggestions.length > 0) {
+      e.preventDefault();
+      handleSelect(filteredSuggestions[0]);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputValue}
+        onChange={handleInputChange}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className={`${inputStyles} ${hasError ? 'border-red-500' : ''}`}
+      />
+      {isOpen && filteredSuggestions.length > 0 && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+        >
+          {filteredSuggestions.slice(0, 12).map((time) => (
+            <div
+              key={time}
+              onClick={() => handleSelect(time)}
+              className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm font-medium"
+            >
+              {time}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InquiryForm() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
@@ -115,12 +229,114 @@ function InquiryForm() {
   const [formData, setFormData] = useState<Partial<PackageFormData>>({});
   const [techRiderFile, setTechRiderFile] = useState<File | null>(null);
 
+  // Tech rider parsing state
+  const [hasTechRider, setHasTechRider] = useState<boolean>(true);
+  const [isParsing, setIsParsing] = useState(false);
+  const [autofilledFields, setAutofilledFields] = useState<Set<string>>(new Set());
+  const [parsedTechRider, setParsedTechRider] = useState<TechRiderRequirements | null>(null);
+
   // When tech rider is uploaded, automatically mark hasBand as true
   const handleTechRiderUpload = (file: File | null) => {
     setTechRiderFile(file);
     if (file) {
       updateField('hasBand', true);
     }
+  };
+
+  // Apply parsed tech rider data to form fields
+  const applyTechRiderToForm = (parsed: TechRiderRequirements) => {
+    const updates: Partial<PackageFormData> = {};
+    const filled = new Set<string>();
+
+    // Event/artist info
+    if (parsed.artistName) {
+      updates.bandNames = parsed.artistName;
+      filled.add('bandNames');
+    }
+    if (parsed.eventName) {
+      updates.eventName = parsed.eventName;
+      filled.add('eventName');
+    }
+    if (parsed.eventType) {
+      updates.eventType = parsed.eventType;
+      filled.add('eventType');
+    }
+    if (parsed.organization) {
+      updates.organization = parsed.organization;
+      filled.add('organization');
+    }
+
+    // Content flags
+    if (parsed.hasBand) {
+      updates.hasBand = true;
+      updates.hasLiveMusic = true;
+      filled.add('hasBand');
+      filled.add('hasLiveMusic');
+    }
+    if (parsed.hasDJ) {
+      updates.hasDJ = true;
+      filled.add('hasDJ');
+    }
+
+    // Additional notes from specific gear requests
+    if (parsed.specificGear?.length > 0 || parsed.additionalNotes) {
+      const notes = [
+        parsed.specificGear?.length ? `Gear requests: ${parsed.specificGear.join(', ')}` : '',
+        parsed.additionalNotes || ''
+      ].filter(Boolean).join('\n\n');
+      if (notes) {
+        updates.additionalInfo = notes;
+        filled.add('additionalInfo');
+      }
+    }
+
+    setFormData(prev => ({ ...prev, ...updates }));
+    setAutofilledFields(filled);
+  };
+
+  // Handle continue from tech rider step
+  const handleTechRiderContinue = async () => {
+    if (hasTechRider && techRiderFile) {
+      setIsParsing(true);
+      try {
+        const formDataObj = new FormData();
+        formDataObj.append('file', techRiderFile);
+
+        const response = await fetch('/api/parse-tech-rider', {
+          method: 'POST',
+          body: formDataObj,
+        });
+
+        if (response.ok) {
+          const parsed = await response.json();
+          if (parsed) {
+            applyTechRiderToForm(parsed);
+            setParsedTechRider(parsed);
+          }
+        }
+      } catch (error) {
+        // Silently fail - user can fill in manually
+        console.error('Tech rider parsing failed:', error);
+      } finally {
+        setIsParsing(false);
+        goToStep(3); // Proceed to Event Basics
+      }
+    } else {
+      goToStep(3); // No tech rider, proceed normally
+    }
+  };
+
+  // Badge component for auto-filled fields
+  const AutofillBadge = ({ field }: { field: string }) => {
+    if (!autofilledFields.has(field)) return null;
+    return (
+      <span className="ml-2 text-xs bg-stone-200 text-stone-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+        </svg>
+        From tech rider
+      </span>
+    );
   };
 
   const fillTestData = () => {
@@ -132,8 +348,8 @@ function InquiryForm() {
       eventName: 'Test Wedding Reception',
       organization: 'Test Corp',
       eventDate: tomorrow.toISOString().split('T')[0],
-      eventTime: '6pm - 11pm',
-      setupTime: '2pm setup / 12am packout',
+      eventStartTime: '6:00 PM',
+      eventEndTime: '11:00 PM',
       attendance: 150,
       hasBand: true,
       hasDJ: true,
@@ -149,7 +365,7 @@ function InquiryForm() {
       contactPhone: '123467',
       details: 'Test booking - please ignore',
     });
-    setStep(2); // Go to step 2 after filling
+    setStep(3); // Go to step 3 (Event Basics) after filling
   };
 
   const updateField = (field: keyof PackageFormData, value: string | number | boolean) => {
@@ -230,13 +446,20 @@ function InquiryForm() {
   }
 
   const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
-  const totalSteps = formData.package === 'extra_large' ? 1 : 4;
-
-  // Stretch on step 2 for medium/large (has tech rider upload)
-  const shouldStretch = step === 2 && (formData.package === 'medium' || formData.package === 'large');
+  // Total steps: extra_large = 2 (Package + Contact), others = 5 (Package + Tech Rider + Event Basics + Details + Contact for small, +Venue for medium/large)
+  const totalSteps = formData.package === 'extra_large' ? 2 : (formData.package === 'small' ? 5 : 6);
 
   return (
-    <PageCard stretch={shouldStretch}>
+    <PageCard>
+      {/* Parsing Loading Overlay */}
+      {isParsing && (
+        <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
+          <div className="animate-spin w-12 h-12 border-4 border-black border-t-transparent rounded-full mb-4" />
+          <p className="text-lg font-medium">Processing your tech rider...</p>
+          <p className="text-sm text-gray-500 mt-2">This may take up to 15 seconds</p>
+        </div>
+      )}
+
       <div className="h-full flex flex-col">
         {/* Error Summary */}
         {showValidation && (
@@ -262,7 +485,7 @@ function InquiryForm() {
         <button
           type="button"
           onClick={fillTestData}
-          className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300 hover:bg-yellow-200"
+          className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300"
         >
           Fill Test Data (Medium Package)
         </button>
@@ -280,7 +503,7 @@ function InquiryForm() {
                   updateField('package', pkg.value);
                   goToStep(2);
                 }}
-                className="cursor-pointer border-2 border-gray-200 rounded-md overflow-hidden transition-all hover:border-gray-300 flex flex-col min-h-0"
+                className="cursor-pointer border-2 border-gray-200 rounded-md overflow-hidden flex flex-col min-h-0"
               >
                 <div className="flex-1 relative min-h-[120px]">
                   <Image src={pkg.image} alt={pkg.label} fill className="object-cover" />
@@ -301,12 +524,113 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 pt-5 flex-shrink-0">
-            <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</a>
+            <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold">Back</a>
           </div>
         </div>
       )}
 
-      {/* Step 2: Extra-Large Contact (or Event Basics for others) */}
+      {/* Step 2: Tech Rider (for small/medium/large - NOT extra_large) */}
+      {step === 2 && formData.package !== 'extra_large' && (
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Do you have a tech rider?</h2>
+            <p className="text-gray-600 mb-6 font-medium">
+              A tech rider contains technical requirements from your band or performers. If you have one, we can automatically extract the requirements.
+            </p>
+
+            {/* Yes/No Toggle */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button
+                type="button"
+                onClick={() => setHasTechRider(true)}
+                className={`py-3 text-center rounded-md border-2 transition-all font-bold ${
+                  hasTechRider
+                    ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
+                    : 'border-gray-200 text-gray-600'
+                }`}
+              >
+                Yes, I have one
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setHasTechRider(false);
+                  setTechRiderFile(null);
+                }}
+                className={`py-3 text-center rounded-md border-2 transition-all font-bold ${
+                  !hasTechRider
+                    ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
+                    : 'border-gray-200 text-gray-600'
+                }`}
+              >
+                No, I don&apos;t
+              </button>
+            </div>
+
+            {/* File Upload (only if Yes) */}
+            {hasTechRider && (
+              <div className="border-2 border-dashed border-gray-300 rounded-md p-6 bg-gray-50">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-black rounded-md flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 mb-1">Upload your tech rider</p>
+                  <p className="text-xs text-gray-500 mb-4">PDF, DOC, or DOCX (max 10MB)</p>
+                  <div className="flex justify-center">
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => setTechRiderFile(e.target.files?.[0] || null)}
+                      className="text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
+                    />
+                  </div>
+                </div>
+                {techRiderFile && (
+                  <div className="flex items-center justify-between mt-4 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                    <p className="text-sm text-green-700 font-medium flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {techRiderFile.name}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setTechRiderFile(null)}
+                      className="text-gray-500"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!hasTechRider && (
+              <div className="bg-stone-50 border border-stone-200 rounded-md p-4">
+                <p className="text-sm text-gray-600">
+                  No problem! We&apos;ll ask you about your audio requirements in the next steps.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-4 mt-auto pt-5">
+            <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button
+              onClick={handleTechRiderContinue}
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Extra-Large Contact */}
       {step === 2 && formData.package === 'extra_large' && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
@@ -370,7 +694,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+            <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
               onClick={() => {
                 if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -383,62 +707,23 @@ function InquiryForm() {
               disabled={isSubmitting}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
             >
-              {isSubmitting ? 'Sending...' : 'Submit Request'}
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Sending...
+                </span>
+              ) : 'Submit Request'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 2: Event Basics (for small/medium/large) */}
-      {step === 2 && formData.package !== 'extra_large' && (
+      {/* Step 3: Event Basics (for small/medium/large) */}
+      {step === 3 && formData.package !== 'extra_large' && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Basics</h2>
             <div className="grid gap-3 lg:gap-4">
-
-            {/* Tech Rider Upload - shown first for medium/large packages */}
-            {(formData.package === 'medium' || formData.package === 'large') && (
-              <div className="border-2 border-dashed border-gray-300 rounded-md p-4 bg-gray-50">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-black rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div className="flex-grow">
-                    <label className="block text-sm font-bold text-gray-900 mb-1">Have a Tech Rider?</label>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Upload it and we&apos;ll extract the requirements automatically. This speeds up your quote!
-                    </p>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      onChange={(e) => handleTechRiderUpload(e.target.files?.[0] || null)}
-                      className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
-                    />
-                    {techRiderFile && (
-                      <div className="flex items-center justify-between mt-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                        <p className="text-sm text-green-700 font-medium flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {techRiderFile.name}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => handleTechRiderUpload(null)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Type of Event *</label>
@@ -482,59 +767,59 @@ function InquiryForm() {
               />
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
-                <input
-                  type="date"
-                  value={formData.eventDate || ''}
-                  onChange={(e) => updateField('eventDate', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.eventDate ? 'border-red-500' : ''}`}
-                />
-                {showValidation && !formData.eventDate && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Time *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 6pm - 11pm"
-                  value={formData.eventTime || ''}
-                  onChange={(e) => updateField('eventTime', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.eventTime ? 'border-red-500' : ''}`}
-                />
-                {showValidation && !formData.eventTime && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-            </div>
-
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Setup / Packout Time *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
               <input
-                type="text"
-                placeholder="e.g., 2pm setup / 12am packout"
-                value={formData.setupTime || ''}
-                onChange={(e) => updateField('setupTime', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.setupTime ? 'border-red-500' : ''}`}
+                type="date"
+                value={formData.eventDate || ''}
+                onChange={(e) => updateField('eventDate', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.eventDate ? 'border-red-500' : ''}`}
               />
-              {showValidation && !formData.setupTime && (
+              {showValidation && !formData.eventDate && (
                 <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
               )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time *</label>
+                <TimeInput
+                  value={formData.eventStartTime || ''}
+                  onChange={(val) => updateField('eventStartTime', val)}
+                  placeholder="e.g., 6:00 PM"
+                  hasError={showValidation && !formData.eventStartTime}
+                  inputStyles={inputStyles}
+                />
+                {showValidation && !formData.eventStartTime && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time *</label>
+                <TimeInput
+                  value={formData.eventEndTime || ''}
+                  onChange={(val) => updateField('eventEndTime', val)}
+                  placeholder="e.g., 11:00 PM"
+                  hasError={showValidation && !formData.eventEndTime}
+                  inputStyles={inputStyles}
+                />
+                {showValidation && !formData.eventEndTime && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
             </div>
           </div>
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
               onClick={() => {
-                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventTime || !formData.setupTime) {
+                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
-                  goToStep(3);
+                  goToStep(4);
                 }
               }}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
@@ -545,8 +830,8 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 3: Small Event Specifics */}
-      {step === 3 && formData.package === 'small' && (
+      {/* Step 4: Small Event Specifics */}
+      {step === 4 && formData.package === 'small' && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Details</h2>
@@ -616,7 +901,7 @@ function InquiryForm() {
               <textarea
                 value={formData.additionalInfo || ''}
                 onChange={(e) => updateField('additionalInfo', e.target.value)}
-                rows={2}
+                rows={4}
                 className={`${inputStyles} resize-none`}
                 placeholder="Any other details we should know..."
               />
@@ -625,9 +910,9 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
-              onClick={() => goToStep(4)}
+              onClick={() => goToStep(5)}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
             >
               Continue
@@ -636,8 +921,8 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 3: Medium/Large Event Configuration */}
-      {step === 3 && (formData.package === 'medium' || formData.package === 'large') && (
+      {/* Step 4: Medium/Large Event Configuration */}
+      {step === 4 && (formData.package === 'medium' || formData.package === 'large') && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             {/* Show simplified version if tech rider uploaded */}
@@ -668,8 +953,11 @@ function InquiryForm() {
                         className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
                       />
                       <div>
-                        <span className="font-semibold text-gray-900 block">DJ Setup</span>
-                        <span className="text-sm text-gray-600">Will there also be a DJ at your event?</span>
+                        <span className="font-semibold text-gray-900 inline-flex items-center">
+                          DJ Setup
+                          <AutofillBadge field="hasDJ" />
+                        </span>
+                        <span className="text-sm text-gray-600 block">Will there also be a DJ at your event?</span>
                       </div>
                     </label>
                   </div>
@@ -691,11 +979,14 @@ function InquiryForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Anything else we should know?</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Anything else we should know?
+                      <AutofillBadge field="additionalInfo" />
+                    </label>
                     <textarea
                       value={formData.additionalInfo || ''}
                       onChange={(e) => updateField('additionalInfo', e.target.value)}
-                      rows={2}
+                      rows={4}
                       className={`${inputStyles} resize-none`}
                       placeholder="Multiple bands, special requirements, etc..."
                     />
@@ -716,8 +1007,11 @@ function InquiryForm() {
                         className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
                       />
                       <div>
-                        <span className="font-semibold text-gray-900 block">Live Band(s)</span>
-                        <span className="text-sm text-gray-600">Will there be live band(s) performing?</span>
+                        <span className="font-semibold text-gray-900 inline-flex items-center">
+                          Live Band(s)
+                          <AutofillBadge field="hasBand" />
+                        </span>
+                        <span className="text-sm text-gray-600 block">Will there be live band(s) performing?</span>
                       </div>
                     </label>
                   </div>
@@ -732,8 +1026,11 @@ function InquiryForm() {
                         className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
                       />
                       <div>
-                        <span className="font-semibold text-gray-900 block">DJ Setup</span>
-                        <span className="text-sm text-gray-600">Will you have a DJ at your event?</span>
+                        <span className="font-semibold text-gray-900 inline-flex items-center">
+                          DJ Setup
+                          <AutofillBadge field="hasDJ" />
+                        </span>
+                        <span className="text-sm text-gray-600 block">Will you have a DJ at your event?</span>
                       </div>
                     </label>
                   </div>
@@ -755,11 +1052,14 @@ function InquiryForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Information</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Additional Information
+                      <AutofillBadge field="additionalInfo" />
+                    </label>
                     <textarea
                       value={formData.additionalInfo || ''}
                       onChange={(e) => updateField('additionalInfo', e.target.value)}
-                      rows={2}
+                      rows={4}
                       className={`${inputStyles} resize-none`}
                       placeholder="Band names, number of performers, any other details..."
                     />
@@ -770,9 +1070,9 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
-              onClick={() => goToStep(4)}
+              onClick={() => goToStep(5)}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
             >
               Continue
@@ -781,8 +1081,8 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 4: Venue & Logistics (only for medium/large) */}
-      {step === 4 && (formData.package === 'medium' || formData.package === 'large') && (
+      {/* Step 5: Venue & Logistics (only for medium/large) */}
+      {step === 5 && (formData.package === 'medium' || formData.package === 'large') && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Venue & Logistics</h2>
@@ -829,8 +1129,8 @@ function InquiryForm() {
                       formData.indoorOutdoor === opt
                         ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
                         : showValidation && !formData.indoorOutdoor
-                        ? 'border-red-500 text-gray-600 hover:border-red-600'
-                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                        ? 'border-red-500 text-gray-600'
+                        : 'border-gray-200 text-gray-600'
                     }`}>
                       {opt}
                     </div>
@@ -862,7 +1162,7 @@ function InquiryForm() {
                   <textarea
                     value={formData.wetWeatherPlan || ''}
                     onChange={(e) => updateField('wetWeatherPlan', e.target.value)}
-                    rows={2}
+                    rows={4}
                     className={`${inputStyles} resize-none`}
                     placeholder="What's your backup plan if it rains?"
                   />
@@ -901,7 +1201,7 @@ function InquiryForm() {
                     placeholder="Stage dimensions, height, access details..."
                     value={formData.stageDetails || ''}
                     onChange={(e) => updateField('stageDetails', e.target.value)}
-                    rows={2}
+                    rows={4}
                     className={`${inputStyles} resize-none`}
                   />
                 </div>
@@ -911,7 +1211,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors">Back</button>
+            <button onClick={() => goToStep(4)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
               onClick={() => {
                 const isOutdoor = formData.indoorOutdoor === 'Outdoor';
@@ -919,7 +1219,7 @@ function InquiryForm() {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
-                  goToStep(5);
+                  goToStep(6);
                 }
               }}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
@@ -930,8 +1230,8 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 5: Contact Information (Small) or Step 4 (Medium/Large) */}
-      {((step === 4 && formData.package === 'small') || (step === 5 && (formData.package === 'medium' || formData.package === 'large'))) && (
+      {/* Step 5: Contact Information (Small) or Step 6 (Medium/Large) */}
+      {((step === 5 && formData.package === 'small') || (step === 6 && (formData.package === 'medium' || formData.package === 'large'))) && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
@@ -984,7 +1284,7 @@ function InquiryForm() {
               <textarea
                 value={formData.details || ''}
                 onChange={(e) => updateField('details', e.target.value)}
-                rows={2}
+                rows={4}
                 className={`${inputStyles} resize-none`}
                 placeholder="Any other information you'd like to share..."
               />
@@ -994,8 +1294,8 @@ function InquiryForm() {
 
           <div className="flex gap-4 mt-auto pt-5">
             <button
-              onClick={() => goToStep(formData.package === 'small' ? 3 : 4)}
-              className="px-5 py-2.5 text-gray-700 font-bold hover:text-gray-900 transition-colors"
+              onClick={() => goToStep(formData.package === 'small' ? 4 : 5)}
+              className="px-5 py-2.5 text-gray-700 font-bold"
             >
               Back
             </button>
@@ -1011,7 +1311,12 @@ function InquiryForm() {
               disabled={isSubmitting}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
             >
-              {isSubmitting ? 'Sending...' : 'Get Quote'}
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Sending...
+                </span>
+              ) : 'Get Quote'}
             </button>
           </div>
         </div>
