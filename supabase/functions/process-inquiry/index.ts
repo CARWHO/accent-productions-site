@@ -904,8 +904,7 @@ serve(async (req) => {
 
       emailHtml = `
         <h1>New Backline Hire Inquiry</h1>
-        <p><strong>Quote Number:</strong> ${quote.quoteNumber}</p>
-        <p><strong>Total:</strong> $${quote.total.toFixed(2)} (incl. GST)</p>
+        ${quote.quoteNumber ? `<p><strong>Quote Number:</strong> ${quote.quoteNumber}</p>` : ""}
         <hr />
 
         <h2>Equipment Requested</h2>
@@ -917,7 +916,6 @@ serve(async (req) => {
         <h2>Rental Details</h2>
         <p><strong>Start Date:</strong> ${formData.startDate}</p>
         <p><strong>End Date:</strong> ${formData.endDate}</p>
-        <p><strong>Rental Days:</strong> ${quote.rentalDays}</p>
         <p><strong>Method:</strong> ${formData.deliveryMethod === "pickup" ? "Pickup" : "Delivery"}</p>
         ${formData.deliveryMethod === "delivery" ? `<p><strong>Delivery Address:</strong> ${formData.deliveryAddress}</p>` : ""}
         ${formData.additionalNotes ? `<p><strong>Additional Notes:</strong> ${formData.additionalNotes}</p>` : ""}
@@ -929,20 +927,13 @@ serve(async (req) => {
         <p><strong>Email:</strong> ${formData.contactEmail}</p>
         <p><strong>Phone:</strong> ${formData.contactPhone}</p>
 
-        <h2>Quote Details</h2>
-        <p><strong>${quote.title}</strong></p>
-        <p>${quote.description}</p>
-        <ul>
-          ${quote.lineItems.map((item) => `<li>${item.description}: $${item.amount.toFixed(2)}</li>`).join("")}
-        </ul>
-        <p><strong>Subtotal:</strong> $${quote.subtotal.toFixed(2)}</p>
-        <p><strong>GST:</strong> $${quote.gst.toFixed(2)}</p>
-        <p><strong>Total:</strong> $${quote.total.toFixed(2)}</p>
-
-        ${pdfBuffer ? "<p><em>Quote PDF attached</em></p>" : "<p><em>Quote PDF generation failed</em></p>"}
+        ${pdfBuffer ? "<p><em>Quote PDF attached</em></p>" : "<p><em>Quote PDF generation failed - please create manually</em></p>"}
 
         <hr />
         <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
+          <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
+            Review the quote and send to client for approval:
+          </p>
           <a href="${SITE_URL}/review-quote?token=${inquiry.approval_token}"
              style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
             Review Quote
@@ -991,137 +982,67 @@ serve(async (req) => {
         `
         : "";
 
-      // Build suggested gear HTML with quantities
-      const suggestedGearHtml = quote.suggestedGear && quote.suggestedGear.length > 0
-        ? `
-          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Suggested Gear</h2>
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-            <thead>
-              <tr style="background: #f5f5f5;">
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #e5e5e5;">Qty</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #e5e5e5;">Item</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #e5e5e5;">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${quote.suggestedGear.map((item) => `
-                <tr>
-                  <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${item.quantity}x</td>
-                  <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${item.item}</td>
-                  <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; color: #666; font-size: 12px;">${item.notes || "-"}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        `
-        : "";
-
-      // Build execution notes HTML
-      const executionNotesHtml = quote.executionNotes && quote.executionNotes.length > 0
-        ? `
-          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Execution Notes</h2>
-          <div style="background: #fffbeb; border: 1px solid #fcd34d; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
-            <ul style="margin: 0; padding-left: 20px; color: #92400e;">
-              ${quote.executionNotes.map((note) => `<li style="margin-bottom: 6px;">${note}</li>`).join("")}
-            </ul>
-          </div>
-        `
-        : "";
-
       emailHtml = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="margin-bottom: 8px;">New Sound System Hire Inquiry</h1>
-          <p style="color: #666; margin-top: 0;"><strong>Package:</strong> ${packageLabel}</p>
+        <h1>New Sound System Hire Inquiry</h1>
+        ${quote.quoteNumber ? `<p><strong>Quote Number:</strong> ${quote.quoteNumber}</p>` : ""}
+        <hr />
 
-          <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
-            <p style="margin: 0;"><strong>Quote Number:</strong> ${quote.quoteNumber}</p>
-            <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold;">$${quote.total.toFixed(2)} <span style="font-size: 14px; font-weight: normal; color: #666;">(incl. GST)</span></p>
-          </div>
+        <h2>Package Selected</h2>
+        <p><strong>Package:</strong> ${packageLabel}</p>
 
-          <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
+        <hr />
 
-          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Event Details</h2>
-          <table style="width: 100%; margin-bottom: 20px;">
-            <tr><td style="padding: 4px 0; color: #666; width: 120px;">Event:</td><td style="padding: 4px 0;"><strong>${formData.eventName || "N/A"}</strong></td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Type:</td><td style="padding: 4px 0;">${formData.eventType || "N/A"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Organization:</td><td style="padding: 4px 0;">${formData.organization || "N/A"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Date:</td><td style="padding: 4px 0;">${formData.eventDate || "N/A"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Time:</td><td style="padding: 4px 0;">${formData.eventStartTime || ""} - ${formData.eventEndTime || ""}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Location:</td><td style="padding: 4px 0;">${formData.location || "N/A"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Attendance:</td><td style="padding: 4px 0;">${formData.attendance || "N/A"}</td></tr>
-          </table>
+        <h2>Event Details</h2>
+        <p><strong>Event Type:</strong> ${formData.eventType || "N/A"}</p>
+        <p><strong>Event Name:</strong> ${formData.eventName || "N/A"}</p>
+        <p><strong>Organization:</strong> ${formData.organization || "N/A"}</p>
+        <p><strong>Date:</strong> ${formData.eventDate || "N/A"}</p>
+        <p><strong>Time:</strong> ${formData.eventTime || "N/A"}</p>
+        <p><strong>Setup/Packout:</strong> ${formData.setupTime || "N/A"}</p>
+        <p><strong>Attendance:</strong> ${formData.attendance || "N/A"}</p>
 
-          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Content Requirements</h2>
-          ${contentReqs.length > 0
-            ? `<ul style="margin: 0 0 20px 0; padding-left: 20px;">${contentReqs.map((req) => `<li style="margin-bottom: 4px;">${req}</li>`).join("")}</ul>`
-            : `<p style="color: #666;">None specified</p>`
-          }
+        <hr />
 
-          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Venue Details</h2>
-          <table style="width: 100%; margin-bottom: 20px;">
-            <tr><td style="padding: 4px 0; color: #666; width: 120px;">Indoor/Outdoor:</td><td style="padding: 4px 0;">${formData.indoorOutdoor || "N/A"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Stage:</td><td style="padding: 4px 0;">${formData.hasStage ? `Yes${formData.stageDetails ? ` - ${formData.stageDetails}` : ""}` : "No"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Power Access:</td><td style="padding: 4px 0;">${formData.powerAccess || "N/A"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Generator:</td><td style="padding: 4px 0;">${formData.needsGenerator ? "Yes" : "No"}</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Wet Weather:</td><td style="padding: 4px 0;">${formData.wetWeatherPlan || "None"}</td></tr>
-            ${formData.venueContact ? `<tr><td style="padding: 4px 0; color: #666;">Venue Contact:</td><td style="padding: 4px 0;">${formData.venueContact}</td></tr>` : ""}
-          </table>
+        <h2>Content Requirements</h2>
+        <p>${contentReqs.length > 0 ? contentReqs.join(", ") : "No specific content requirements"}</p>
+        ${formData.additionalInfo ? `<p><strong>Additional Info:</strong> ${formData.additionalInfo}</p>` : ""}
 
-          ${unavailableGearHtml}
+        <hr />
 
-          ${suggestedGearHtml}
+        <h2>Venue Details</h2>
+        <p><strong>Location:</strong> ${formData.location || "N/A"}</p>
+        <p><strong>Venue Contact:</strong> ${formData.venueContact || "N/A"}</p>
+        <p><strong>Indoor/Outdoor:</strong> ${formData.indoorOutdoor || "N/A"}</p>
+        ${formData.indoorOutdoor === "Outdoor" ? `
+          <p><strong>Power Access:</strong> ${formData.powerAccess || "N/A"}</p>
+          <p><strong>Wet Weather Plan:</strong> ${formData.wetWeatherPlan || "N/A"}</p>
+          <p><strong>Generator Needed:</strong> ${formData.needsGenerator ? "Yes" : "No"}</p>
+        ` : ""}
+        <p><strong>Stage Available:</strong> ${formData.hasStage ? "Yes" : "No"}</p>
+        ${formData.stageDetails ? `<p><strong>Stage Details:</strong> ${formData.stageDetails}</p>` : ""}
 
-          ${executionNotesHtml}
+        <hr />
 
-          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Quote Summary</h2>
-          <p><strong>${quote.title}</strong></p>
-          <p style="color: #666;">${quote.description}</p>
-          <table style="width: 100%; margin: 16px 0;">
-            ${quote.lineItems.map((item) => `
-              <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">${item.description}</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0; text-align: right; width: 100px;">$${item.amount.toFixed(2)}</td>
-              </tr>
-            `).join("")}
-            <tr style="border-top: 2px solid #e5e5e5;">
-              <td style="padding: 8px 0; color: #666;">Subtotal:</td>
-              <td style="padding: 8px 0; text-align: right;">$${quote.subtotal.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #666;">GST (15%):</td>
-              <td style="padding: 8px 0; text-align: right;">$${quote.gst.toFixed(2)}</td>
-            </tr>
-            <tr style="font-weight: bold; font-size: 18px;">
-              <td style="padding: 12px 0;">Total:</td>
-              <td style="padding: 12px 0; text-align: right;">$${quote.total.toFixed(2)}</td>
-            </tr>
-          </table>
+        <h2>Contact Information</h2>
+        <p><strong>Name:</strong> ${formData.contactName}</p>
+        <p><strong>Email:</strong> ${formData.contactEmail}</p>
+        <p><strong>Phone:</strong> ${formData.contactPhone}</p>
+        ${formData.details ? `<p><strong>Additional Details:</strong> ${formData.details}</p>` : ""}
 
-          <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Contact Information</h2>
-          <table style="width: 100%; margin-bottom: 20px;">
-            <tr><td style="padding: 4px 0; color: #666; width: 80px;">Name:</td><td style="padding: 4px 0;"><strong>${formData.contactName}</strong></td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Email:</td><td style="padding: 4px 0;"><a href="mailto:${formData.contactEmail}">${formData.contactEmail}</a></td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">Phone:</td><td style="padding: 4px 0;"><a href="tel:${formData.contactPhone}">${formData.contactPhone}</a></td></tr>
-          </table>
+        ${pdfBuffer ? "<p><em>Quote PDF attached</em></p>" : "<p><em>Quote PDF not generated (extra-large package or generation failed)</em></p>"}
+        ${jobSheetBuffer ? "<p><em>Job Sheet PDF attached (with AI-generated execution notes and suggested gear)</em></p>" : ""}
 
-          ${formData.additionalInfo ? `
-            <h2 style="border-bottom: 1px solid #e5e5e5; padding-bottom: 8px;">Additional Information</h2>
-            <p style="background: #f5f5f5; padding: 12px; border-radius: 4px;">${formData.additionalInfo}</p>
-          ` : ""}
+        ${unavailableGearHtml}
 
-          <p style="color: #666; font-size: 12px;">
-            Attachments: ${pdfBuffer ? "Quote PDF" : "Quote PDF failed"}${jobSheetBuffer ? ", Job Sheet PDF" : ""}
+        <hr />
+        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
+          <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
+            Review the quote and send to client for approval:
           </p>
-
-          <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
-
-          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; border-left: 4px solid #0284c7;">
-            <p style="margin: 0 0 16px 0; color: #666;">Review and approve this quote to proceed</p>
-            <a href="${SITE_URL}/review-quote?token=${inquiry.approval_token}"
-               style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-              Review Quote
-            </a>
-          </div>
+          <a href="${SITE_URL}/review-quote?token=${inquiry.approval_token}"
+             style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+            Review Quote
+          </a>
         </div>
       `;
     }

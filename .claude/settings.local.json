@@ -22,7 +22,9 @@
       "Bash(cat:*)",
       "Bash(node scripts/import-audio-equipment.js:*)",
       "Bash(npm uninstall:*)",
-      "mcp__github-server__get_file_contents"
+      "mcp__github-server__get_file_contents",
+      "mcp__github-server__search_repositories",
+      "mcp__github-server__list_commits"
     ]
   },
   "enableAllProjectMcpServers": true,
