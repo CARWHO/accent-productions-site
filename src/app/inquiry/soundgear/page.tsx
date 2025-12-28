@@ -583,7 +583,7 @@ function InquiryForm() {
                       type="file"
                       accept=".pdf,.doc,.docx"
                       onChange={(e) => setTechRiderFile(e.target.files?.[0] || null)}
-                      className="text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
+                      className="text-transparent file:mr-3 file:py-2 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white cursor-pointer w-[100px]"
                     />
                   </div>
                 </div>
@@ -986,7 +986,7 @@ function InquiryForm() {
                     <textarea
                       value={formData.additionalInfo || ''}
                       onChange={(e) => updateField('additionalInfo', e.target.value)}
-                      rows={4}
+                      rows={10}
                       className={`${inputStyles} resize-none`}
                       placeholder="Multiple bands, special requirements, etc..."
                     />

@@ -187,6 +187,43 @@ export async function uploadJobSheetToDrive(
 }
 
 /**
+ * Update an existing file in Google Drive with new content
+ * Returns true if successful, false otherwise
+ */
+export async function updateFileInDrive(
+  fileId: string,
+  pdfBuffer: Buffer,
+  filename: string
+): Promise<boolean> {
+  try {
+    const oauth2Client = getOAuth2Client();
+    if (!oauth2Client) {
+      console.warn('Google Drive not configured for update');
+      return false;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    await drive.files.update({
+      fileId,
+      requestBody: {
+        name: filename,
+      },
+      media: {
+        mimeType: 'application/pdf',
+        body: Readable.from(pdfBuffer),
+      },
+    });
+
+    console.log(`Updated file ${fileId} in Google Drive with new content: ${filename}`);
+    return true;
+  } catch (error) {
+    console.error('Error updating file in Google Drive:', error);
+    return false;
+  }
+}
+
+/**
  * Upload a Tech Rider PDF to the appropriate tech riders folder
  */
 export async function uploadTechRiderToDrive(

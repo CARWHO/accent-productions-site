@@ -1,21 +1,10 @@
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { generateSoundQuote, SoundQuoteInput, SoundQuoteOutput } from '@/lib/gemini-sound-quote';
-import { generateSoundQuotePDF } from '@/lib/pdf-sound-quote';
-import { generateJobSheetPDF, JobSheetInput } from '@/lib/pdf-job-sheet';
-import { uploadQuoteToDrive, uploadJobSheetToDrive, uploadTechRiderToDrive } from '@/lib/google-drive';
-import { parseTechRider, TechRiderRequirements } from '@/lib/parse-tech-rider';
 import { randomUUID } from 'crypto';
-
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const baseEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
-const businessEmail = baseEmail.replace('@', '+fullevent@');
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
 
 export async function POST(request: Request) {
   try {
-    // Parse FormData instead of JSON
+    // Parse FormData
     const formData = await request.formData();
 
     // Helper to get string fields
@@ -68,421 +57,94 @@ export async function POST(request: Request) {
       stageProvider: getField('stageProvider'),
     };
 
-    // Get tech rider file if present
-    const techRiderFile = formData.get('techRider') as File | null;
-    let techRiderRequirements: TechRiderRequirements | null = null;
-    let techRiderDriveId: string | null = null;
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not initialized');
+      return NextResponse.json(
+        { success: false, message: 'Database not configured' },
+        { status: 500 }
+      );
+    }
 
-    // Parse tech rider if uploaded (supports PDF and DOCX)
+    // Get tech rider file if present and upload to Supabase Storage
+    const techRiderFile = formData.get('techRider') as File | null;
+    let techRiderStoragePath: string | null = null;
+
     if (techRiderFile && techRiderFile.size > 0) {
-      console.log(`Processing tech rider: ${techRiderFile.name} (${techRiderFile.size} bytes)`);
+      const fileExt = techRiderFile.name.split('.').pop() || 'pdf';
+      const fileName = `${randomUUID()}.${fileExt}`;
+      const filePath = `tech-riders/${fileName}`;
+
       const buffer = Buffer.from(await techRiderFile.arrayBuffer());
 
-      // Parse with AI (auto-detects PDF vs DOCX)
-      techRiderRequirements = await parseTechRider(buffer, techRiderFile.name);
-      if (techRiderRequirements) {
-        console.log('Tech rider parsed:', JSON.stringify(techRiderRequirements, null, 2));
-      }
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('inquiry-files')
+        .upload(filePath, buffer, {
+          contentType: techRiderFile.type,
+          upsert: false,
+        });
 
-      // Upload to Google Drive (preserve original extension)
-      const ext = techRiderFile.name.toLowerCase().endsWith('.docx') ? '.docx' : '.pdf';
-      techRiderDriveId = await uploadTechRiderToDrive(buffer, `TechRider-${Date.now()}${ext}`, 'fullsystem');
-    }
-
-    // 1. Save to Supabase
-    const supabaseAdmin = getSupabaseAdmin();
-    let inquiryId: string | null = null;
-
-    if (supabaseAdmin) {
-      const { data: inquiryData, error } = await supabaseAdmin
-        .from('inquiries')
-        .insert({
-          event_type: body.eventType,
-          organization: body.organization,
-          event_name: body.eventName,
-          event_date: body.eventDate,
-          event_time: body.eventStartTime && body.eventEndTime ? `${body.eventStartTime} - ${body.eventEndTime}` : null,
-          attendance: body.attendance,
-          location: body.location,
-          venue_contact: body.venueContact,
-          content: body.content,
-          indoor_outdoor: body.indoorOutdoor,
-          power_access: body.powerAccess,
-          stage_provider: body.stageProvider,
-          details: body.details,
-          contact_name: body.contactName,
-          contact_email: body.contactEmail,
-          contact_phone: body.contactPhone,
-          status: 'new'
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Supabase error:', error);
+      if (uploadError) {
+        console.error('Error uploading tech rider:', uploadError);
       } else {
-        inquiryId = inquiryData?.id || null;
+        techRiderStoragePath = filePath;
+        console.log(`Tech rider uploaded to: ${filePath}`);
       }
-    } else {
-      console.warn('Supabase admin client not initialized');
     }
 
-    // 2. Generate quote and PDF (only for small, medium, large packages)
-    let pdfBuffer: Buffer | null = null;
-    let jobSheetBuffer: Buffer | null = null;
-    let quoteNumber = '';
-    let quoteTotal = 0;
-    let driveFileId: string | null = null;
-    let jobSheetDriveId: string | null = null;
-    let quoteData: SoundQuoteOutput | null = null;
+    // Generate approval token for later use
+    const approvalToken = randomUUID();
 
-    // Check if this is a sound system inquiry with a valid package
-    const validPackages = ['small', 'medium', 'large'];
-    if (body.package && validPackages.includes(body.package)) {
-      try {
-        const quoteInput: SoundQuoteInput = {
-          package: body.package as 'small' | 'medium' | 'large' | 'extra_large',
-          eventType: body.eventType as 'wedding' | 'corporate' | 'festival' | 'private_party' | 'other' | undefined,
-          eventName: body.eventName,
-          organization: body.organization,
-          eventDate: body.eventDate,
-          eventStartTime: body.eventStartTime,
-          eventEndTime: body.eventEndTime,
-          attendance: body.attendance,
-          playbackFromDevice: body.playbackFromDevice,
-          hasLiveMusic: body.hasLiveMusic,
-          needsMic: body.needsMic,
-          hasDJ: body.hasDJ,
-          hasBand: body.hasBand,
-          bandCount: body.bandCount,
-          bandNames: body.bandNames,
-          bandSetup: body.bandSetup,
-          needsDJTable: body.needsDJTable,
-          needsCDJs: body.needsCDJs,
-          cdjType: body.cdjType,
-          hasSpeeches: body.hasSpeeches,
-          needsWirelessMic: body.needsWirelessMic,
-          needsLectern: body.needsLectern,
-          needsAmbientMusic: body.needsAmbientMusic,
-          additionalInfo: body.additionalInfo,
-          location: body.location,
-          venueContact: body.venueContact,
-          indoorOutdoor: body.indoorOutdoor,
-          wetWeatherPlan: body.wetWeatherPlan,
-          needsGenerator: body.needsGenerator,
-          powerAccess: body.powerAccess,
-          hasStage: body.hasStage,
-          stageDetails: body.stageDetails,
-          contactName: body.contactName,
-          contactEmail: body.contactEmail,
-          contactPhone: body.contactPhone,
-          details: body.details,
-          techRiderRequirements: techRiderRequirements || undefined,
-        };
+    // Build form data JSON for Edge Function to process
+    const formDataJson = {
+      ...body,
+      techRiderStoragePath,
+      techRiderOriginalName: techRiderFile?.name || null,
+    };
 
-        const quote = await generateSoundQuote(quoteInput);
-        quoteData = quote;
-        quoteNumber = quote.quoteNumber;
-        quoteTotal = quote.total;
-
-        // Generate Quote PDF
-        pdfBuffer = await generateSoundQuotePDF(
-          quote,
-          body.contactName,
-          body.contactEmail,
-          body.contactPhone,
-          body.organization
-        );
-
-        console.log(`Sound quote ${quoteNumber} generated successfully`);
-
-        // Upload quote to Google Drive
-        if (pdfBuffer) {
-          driveFileId = await uploadQuoteToDrive(pdfBuffer, `Quote-${quoteNumber}.pdf`, 'fullsystem');
-        }
-
-        // Build content requirements for job sheet
-        const contentReqs: string[] = [];
-        if (body.playbackFromDevice) contentReqs.push('Playback from device');
-        if (body.hasLiveMusic) contentReqs.push('Live music');
-        if (body.needsMic) contentReqs.push('Microphone required');
-        if (body.hasDJ) contentReqs.push('DJ');
-        if (body.hasBand) contentReqs.push(`Live band(s)${body.bandCount ? ` (${body.bandCount})` : ''}`);
-        if (body.hasSpeeches) contentReqs.push('Speeches/presentations');
-        if (body.needsWirelessMic) contentReqs.push('Wireless mic');
-
-        // Generate Job Sheet PDF with AI-generated execution notes and suggested gear
-        const formattedEventTime = body.eventStartTime && body.eventEndTime
+    // Save inquiry with status='pending_quote' - Edge Function will process it
+    const { data: inquiryData, error: inquiryError } = await supabaseAdmin
+      .from('inquiries')
+      .insert({
+        event_type: body.eventType,
+        organization: body.organization,
+        event_name: body.eventName,
+        event_date: body.eventDate,
+        event_time: body.eventStartTime && body.eventEndTime
           ? `${body.eventStartTime} - ${body.eventEndTime}`
-          : null;
+          : null,
+        attendance: body.attendance,
+        location: body.location,
+        venue_contact: body.venueContact,
+        content: body.content,
+        indoor_outdoor: body.indoorOutdoor,
+        power_access: body.powerAccess,
+        stage_provider: body.stageProvider,
+        details: body.details,
+        contact_name: body.contactName,
+        contact_email: body.contactEmail,
+        contact_phone: body.contactPhone,
+        status: 'pending_quote',
+        form_data_json: formDataJson,
+        approval_token: approvalToken,
+      })
+      .select('id')
+      .single();
 
-        const jobSheetInput: JobSheetInput = {
-          eventName: body.eventName || quote.subtitle,
-          eventDate: body.eventDate || '',
-          eventTime: formattedEventTime,
-          location: body.location || '',
-          quoteNumber: quote.quoteNumber,
-          contractorName: 'TBC', // Not assigned yet
-          hourlyRate: null,
-          estimatedHours: null,
-          payAmount: 0, // Not assigned yet
-          tasksDescription: null,
-          executionNotes: quote.executionNotes,
-          equipment: [], // No confirmed equipment yet
-          suggestedGear: quote.suggestedGear,
-          unavailableGear: quote.unavailableGear, // Items not in inventory
-          eventType: body.eventType || null,
-          attendance: body.attendance?.toString() || null,
-          indoorOutdoor: body.indoorOutdoor || null,
-          contentRequirements: contentReqs,
-          additionalNotes: body.additionalInfo || body.details || null,
-          clientName: body.contactName,
-          clientPhone: body.contactPhone,
-          clientEmail: body.contactEmail,
-        };
-
-        jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
-        console.log(`Job sheet for ${quoteNumber} generated successfully`);
-
-        // Upload job sheet to Google Drive
-        if (jobSheetBuffer) {
-          jobSheetDriveId = await uploadJobSheetToDrive(jobSheetBuffer, `JobSheet-${quoteNumber}.pdf`, 'fullsystem');
-        }
-      } catch (quoteError) {
-        console.error('Error generating sound quote:', quoteError);
-        // Continue without quote - email will still be sent
-      }
+    if (inquiryError) {
+      console.error('Supabase error:', inquiryError);
+      return NextResponse.json(
+        { success: false, message: 'Failed to save inquiry' },
+        { status: 500 }
+      );
     }
 
-    // 2b. Create booking record for contractor scheduling
-    let approvalToken: string | null = null;
-    if (supabaseAdmin && quoteNumber) {
-      approvalToken = randomUUID();
+    console.log(`Inquiry ${inquiryData.id} saved with status pending_quote - Edge Function will process`);
 
-      // Build content requirements list
-      const contentRequirements: string[] = [];
-      if (body.playbackFromDevice) contentRequirements.push('Playback from device');
-      if (body.hasLiveMusic) contentRequirements.push('Live music');
-      if (body.needsMic) contentRequirements.push('Microphone required');
-      if (body.hasDJ) contentRequirements.push('DJ');
-      if (body.hasBand) contentRequirements.push(`Live band(s)${body.bandCount ? ` (${body.bandCount})` : ''}`);
-      if (body.hasSpeeches) contentRequirements.push('Speeches/presentations');
-      if (body.needsWirelessMic) contentRequirements.push('Wireless mic');
-      if (body.needsLectern) contentRequirements.push('Lectern');
-
-      // Build rich details for contractor emails
-      const detailsJson = {
-        type: 'fullsystem',
-        package: body.package || null,
-        eventType: body.eventType || null,
-        organization: body.organization || null,
-        attendance: body.attendance || null,
-        eventStartTime: body.eventStartTime || null,
-        eventEndTime: body.eventEndTime || null,
-        contentRequirements,
-        bandNames: body.bandNames || null,
-        bandSetup: body.bandSetup || null,
-        venue: {
-          location: body.location || null,
-          venueContact: body.venueContact || null,
-          indoorOutdoor: body.indoorOutdoor || null,
-          powerAccess: body.powerAccess || null,
-          hasStage: body.hasStage || false,
-          stageDetails: body.stageDetails || null,
-        },
-        additionalInfo: body.additionalInfo || null,
-        details: body.details || null,
-        techRider: techRiderRequirements ? {
-          inputChannels: techRiderRequirements.inputChannels,
-          monitorMixes: techRiderRequirements.monitorMixes,
-          specificGear: techRiderRequirements.specificGear,
-          stageBoxNeeded: techRiderRequirements.stageBoxNeeded,
-          iemNeeded: techRiderRequirements.iemNeeded,
-          drumMicsNeeded: techRiderRequirements.drumMicsNeeded,
-          powerRequirements: techRiderRequirements.powerRequirements,
-          stageLayout: techRiderRequirements.stageLayout,
-          additionalNotes: techRiderRequirements.additionalNotes,
-          driveFileId: techRiderDriveId,
-        } : null,
-        // AI-generated quote data for job sheets
-        lineItems: quoteData?.lineItems || null,
-        executionNotes: quoteData?.executionNotes || null,
-        suggestedGear: quoteData?.suggestedGear || null,
-        unavailableGear: quoteData?.unavailableGear || null,
-        jobSheetDriveFileId: jobSheetDriveId,
-      };
-
-      const { error: bookingError } = await supabaseAdmin
-        .from('bookings')
-        .insert({
-          inquiry_id: inquiryId,
-          quote_number: quoteNumber,
-          booking_type: 'fullsystem',
-          status: 'pending',
-          event_date: body.eventDate || null,
-          event_time: body.eventStartTime && body.eventEndTime ? `${body.eventStartTime} - ${body.eventEndTime}` : null,
-          location: body.location || null,
-          event_name: body.eventName || null,
-          job_description: body.details || null,
-          client_name: body.contactName,
-          client_email: body.contactEmail,
-          client_phone: body.contactPhone,
-          approval_token: approvalToken,
-          details_json: detailsJson,
-          quote_drive_file_id: driveFileId,
-          quote_total: quoteTotal,
-        });
-
-      if (bookingError) {
-        console.error('Error creating booking:', bookingError);
-        approvalToken = null; // Don't show button if booking failed
-      }
-    }
-
-    // 3. Send email notification with PDF attachment if available
-    if (resend) {
-      // Build content summary for small events
-      const contentSummary: string[] = [];
-      if (body.playbackFromDevice) contentSummary.push('Playback from device');
-      if (body.hasLiveMusic) contentSummary.push('Live music');
-      if (body.needsMic) contentSummary.push('Microphone required');
-      if (body.hasDJ) contentSummary.push('DJ');
-      if (body.hasBand) contentSummary.push('Live band(s)');
-      if (body.hasSpeeches) contentSummary.push('Speeches/presentations');
-
-      const packageLabels: Record<string, string> = {
-        small: 'Small Event (10-50 people)',
-        medium: 'Medium Event (50-200 people)',
-        large: 'Large Event (200-1000 people)',
-        extra_large: 'Extra-Large Event (1000+ people)'
-      };
-
-      const emailOptions: {
-        from: string;
-        to: string[];
-        subject: string;
-        html: string;
-        attachments?: { filename: string; content: Buffer }[];
-      } = {
-        from: 'Accent Productions <notifications@accent-productions.co.nz>',
-        to: [businessEmail],
-        subject: `Sound System Inquiry from ${body.contactName}${quoteNumber ? ` - Quote ${quoteNumber}` : ''}`,
-        html: `
-          <h1>New Sound System Hire Inquiry</h1>
-          ${quoteNumber ? `<p><strong>Quote Number:</strong> ${quoteNumber}</p>` : ''}
-          <hr />
-
-          <h2>Package Selected</h2>
-          <p><strong>Package:</strong> ${body.package ? packageLabels[body.package] || body.package : 'Not selected'}</p>
-
-          <hr />
-
-          <h2>Event Details</h2>
-          <p><strong>Event Type:</strong> ${body.eventType || 'N/A'}</p>
-          <p><strong>Event Name:</strong> ${body.eventName || 'N/A'}</p>
-          <p><strong>Organization:</strong> ${body.organization || 'N/A'}</p>
-          <p><strong>Date:</strong> ${body.eventDate || 'N/A'}</p>
-          <p><strong>Time:</strong> ${body.eventStartTime && body.eventEndTime ? `${body.eventStartTime} - ${body.eventEndTime}` : 'N/A'}</p>
-          <p><strong>Attendance:</strong> ${body.attendance || 'N/A'}</p>
-
-          <hr />
-
-          <h2>Content Requirements</h2>
-          <p>${contentSummary.length > 0 ? contentSummary.join(', ') : 'No specific content requirements'}</p>
-          ${body.additionalInfo ? `<p><strong>Additional Info:</strong> ${body.additionalInfo}</p>` : ''}
-
-          <hr />
-
-          <h2>Venue Details</h2>
-          <p><strong>Location:</strong> ${body.location || 'N/A'}</p>
-          <p><strong>Venue Contact:</strong> ${body.venueContact || 'N/A'}</p>
-          <p><strong>Indoor/Outdoor:</strong> ${body.indoorOutdoor || 'N/A'}</p>
-          ${body.indoorOutdoor === 'Outdoor' ? `
-            <p><strong>Power Access:</strong> ${body.powerAccess || 'N/A'}</p>
-            <p><strong>Wet Weather Plan:</strong> ${body.wetWeatherPlan || 'N/A'}</p>
-            <p><strong>Generator Needed:</strong> ${body.needsGenerator ? 'Yes' : 'No'}</p>
-          ` : ''}
-          <p><strong>Stage Available:</strong> ${body.hasStage ? 'Yes' : 'No'}</p>
-          ${body.stageDetails ? `<p><strong>Stage Details:</strong> ${body.stageDetails}</p>` : ''}
-
-          <hr />
-
-          <h2>Contact Information</h2>
-          <p><strong>Name:</strong> ${body.contactName}</p>
-          <p><strong>Email:</strong> ${body.contactEmail}</p>
-          <p><strong>Phone:</strong> ${body.contactPhone}</p>
-          ${body.details ? `<p><strong>Additional Details:</strong> ${body.details}</p>` : ''}
-
-          ${pdfBuffer ? '<p><em>Quote PDF attached</em></p>' : '<p><em>Quote PDF not generated (extra-large package or generation failed)</em></p>'}
-          ${jobSheetBuffer ? '<p><em>Job Sheet PDF attached (with AI-generated execution notes and suggested gear)</em></p>' : ''}
-          ${techRiderFile && techRiderFile.size > 0 ? '<p><em>Tech rider attached</em></p>' : ''}
-
-          ${quoteData?.unavailableGear && quoteData.unavailableGear.length > 0 ? `
-          <hr />
-          <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #dc2626;">
-            <h3 style="color: #dc2626; margin: 0 0 10px 0;">⚠️ Gear Requiring Attention</h3>
-            <p style="color: #991b1b; margin: 0 0 10px 0;">The following items were suggested but do NOT exactly match available inventory:</p>
-            <ul style="color: #dc2626; margin: 0;">
-              ${quoteData.unavailableGear.map(item => `<li style="color: #dc2626;">${item}</li>`).join('')}
-            </ul>
-            <p style="color: #991b1b; font-size: 12px; margin: 10px 0 0 0; font-style: italic;">
-              Please check inventory and confirm availability before sending quote to client.
-            </p>
-          </div>
-          ` : ''}
-
-          ${approvalToken ? `
-          <hr />
-          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
-            <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
-              Review the quote and send to client for approval:
-            </p>
-            <a href="${baseUrl}/review-quote?token=${approvalToken}"
-               style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-              Review Quote
-            </a>
-          </div>
-          ` : ''}
-        `,
-      };
-
-      // Add PDF attachments if generated successfully
-      const attachments: { filename: string; content: Buffer }[] = [];
-      if (pdfBuffer) {
-        attachments.push({
-          filename: `Quote-${quoteNumber}.pdf`,
-          content: pdfBuffer
-        });
-      }
-      if (jobSheetBuffer) {
-        attachments.push({
-          filename: `JobSheet-${quoteNumber}.pdf`,
-          content: jobSheetBuffer
-        });
-      }
-      // Add tech rider if uploaded
-      if (techRiderFile && techRiderFile.size > 0) {
-        const techRiderBuffer = Buffer.from(await techRiderFile.arrayBuffer());
-        attachments.push({
-          filename: techRiderFile.name || 'tech-rider.pdf',
-          content: techRiderBuffer
-        });
-      }
-      if (attachments.length > 0) {
-        emailOptions.attachments = attachments;
-      }
-
-      await resend.emails.send(emailOptions);
-    } else {
-      console.warn('Resend API key missing, skipping email notification');
-    }
-
-    console.log('Sound system inquiry processed successfully');
-
+    // Return success immediately - Edge Function handles the rest
     return NextResponse.json({
       success: true,
       message: 'Inquiry submitted successfully',
-      quoteNumber: quoteNumber || undefined
     });
   } catch (error) {
     console.error('Error processing inquiry:', error);

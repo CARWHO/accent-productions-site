@@ -20,7 +20,8 @@
       "Bash(node scripts/generate-demo-techrider.js:*)",
       "Bash(node -e:*)",
       "Bash(cat:*)",
-      "Bash(node scripts/import-audio-equipment.js:*)"
+      "Bash(node scripts/import-audio-equipment.js:*)",
+      "Bash(npm uninstall:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

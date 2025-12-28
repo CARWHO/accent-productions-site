@@ -1,10 +1,24 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { TechRiderRequirements } from './parse-tech-rider';
 import { getSupabaseAdmin } from './supabase';
 
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
+// Initialize Google GenAI with Vertex AI
+function getGenAIClient(): GoogleGenAI | null {
+  const project = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
+
+  // GOOGLE_API_KEY is read automatically by the SDK from env
+  if (!process.env.GOOGLE_API_KEY || !project) {
+    console.warn('[SoundQuote] GenAI not configured - missing GOOGLE_API_KEY or GOOGLE_CLOUD_PROJECT');
+    return null;
+  }
+
+  return new GoogleGenAI({
+    vertexai: true,
+    project,
+    location,
+  });
+}
 
 // Audio equipment from database
 interface AudioEquipmentItem {
@@ -486,14 +500,15 @@ export async function generateSoundQuote(input: SoundQuoteInput): Promise<SoundQ
   let executionNotes: string[];
   let suggestedGear: SuggestedGearItem[];
 
-  if (genAI) {
+  const client = getGenAIClient();
+  if (client) {
     try {
-      const result = await generateWithAI(input, basePrice, inventory);
+      const result = await generateWithAI(input, basePrice, inventory, client);
       lineItems = result.lineItems;
       executionNotes = result.executionNotes;
       suggestedGear = result.suggestedGear;
     } catch (error) {
-      console.error('Gemini API error:', error);
+      console.error('GenAI error:', error);
       const fallback = generateFallbackQuote(input, basePrice, inventory);
       lineItems = fallback.lineItems;
       executionNotes = fallback.executionNotes;
@@ -538,9 +553,9 @@ export async function generateSoundQuote(input: SoundQuoteInput): Promise<SoundQ
 async function generateWithAI(
   input: SoundQuoteInput,
   basePrice: number,
-  inventory: AudioEquipmentItem[]
+  inventory: AudioEquipmentItem[],
+  client: GoogleGenAI
 ): Promise<{ lineItems: QuoteLineItems; executionNotes: string[]; suggestedGear: SuggestedGearItem[] }> {
-  const model = genAI!.getGenerativeModel({ model: 'gemini-2.5-flash' });
   const inventorySection = formatInventoryForPrompt(inventory);
 
   const prompt = `You are creating a quote for Accent Entertainment, an audio production company in Wellington, New Zealand.
@@ -654,8 +669,11 @@ Concise instructions for the sound tech:
 
 Return ONLY the JSON object, no other text.`;
 
-  const result = await model.generateContent(prompt);
-  const responseText = result.response.text();
+  const result = await client.models.generateContent({
+    model: 'gemini-2.5-pro',
+    contents: prompt,
+  });
+  const responseText = result.text || '';
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
   if (jsonMatch) {

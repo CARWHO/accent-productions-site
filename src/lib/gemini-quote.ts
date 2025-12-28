@@ -1,33 +1,21 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
+// Initialize Google GenAI with Vertex AI
+function getGenAIClient(): GoogleGenAI | null {
+  const project = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
 
-// Retry helper with exponential backoff for transient API errors
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  baseDelay = 1000
-): Promise<T> {
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error: unknown) {
-      lastError = error as Error;
-      const errorMessage = lastError?.message || '';
-      // Only retry on 503 (overloaded) or network errors
-      if (errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('ECONNRESET')) {
-        const delay = baseDelay * Math.pow(2, attempt);
-        console.log(`Gemini API retry ${attempt + 1}/${maxRetries} after ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        throw error; // Don't retry other errors
-      }
-    }
+  // GOOGLE_API_KEY is read automatically by the SDK from env
+  if (!process.env.GOOGLE_API_KEY || !project) {
+    console.warn('[Quote] GenAI not configured - missing GOOGLE_API_KEY or GOOGLE_CLOUD_PROJECT');
+    return null;
   }
-  throw lastError;
+
+  return new GoogleGenAI({
+    vertexai: true,
+    project,
+    location,
+  });
 }
 
 export interface EquipmentItem {
@@ -126,14 +114,13 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteOutput> {
   const gst = Math.round(subtotal * 0.15 * 100) / 100;
   const total = subtotal + gst;
 
-  // Generate AI description if Gemini is available
+  // Generate AI description if GenAI is available
   let description = '';
   let title = 'Backline Hire';
 
-  if (genAI) {
+  const client = getGenAIClient();
+  if (client) {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
       const equipmentSummary = input.equipment
         .map(e => `${e.quantity}x ${e.name}${e.notes ? ` (${e.notes})` : ''}`)
         .join(', ');
@@ -158,8 +145,11 @@ DESCRIPTION: [your description]
 
 Keep it concise and professional. Do not include pricing - that's handled separately.`;
 
-      const result = await model.generateContent(prompt);
-      const response = result.response.text();
+      const result = await client.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: prompt,
+      });
+      const response = result.text || '';
 
       // Parse the response
       const titleMatch = response.match(/TITLE:\s*(.+?)(?:\n|$)/i);
@@ -168,7 +158,7 @@ Keep it concise and professional. Do not include pricing - that's handled separa
       if (titleMatch) title = titleMatch[1].trim();
       if (descMatch) description = descMatch[1].trim();
     } catch (error) {
-      console.error('Gemini API error:', error);
+      console.error('GenAI error:', error);
       // Fall back to basic description
       description = generateBasicDescription(input, rentalDays);
     }

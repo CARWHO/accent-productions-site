@@ -1,5 +1,57 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import mammoth from 'mammoth';
+
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 5000; // 5 seconds
+
+// Initialize Google GenAI with Vertex AI
+function getGenAIClient(): GoogleGenAI | null {
+  const project = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
+
+  // GOOGLE_API_KEY is read automatically by the SDK from env
+  if (!process.env.GOOGLE_API_KEY || !project) {
+    console.warn('[TechRider] GenAI not configured - missing GOOGLE_API_KEY or GOOGLE_CLOUD_PROJECT');
+    return null;
+  }
+
+  return new GoogleGenAI({
+    vertexai: true,
+    project,
+    location,
+  });
+}
+
+/**
+ * Helper to call Gemini with retry logic for rate limits
+ */
+async function callGeminiWithRetry(
+  client: GoogleGenAI,
+  model: string,
+  contents: Parameters<GoogleGenAI['models']['generateContent']>[0]['contents'],
+  retries = MAX_RETRIES
+): Promise<string | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await client.models.generateContent({
+        model,
+        contents,
+      });
+      return response.text || '';
+    } catch (error: unknown) {
+      const isRateLimit = error instanceof Error &&
+        (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('quota'));
+
+      if (isRateLimit && attempt < retries) {
+        console.log(`[TechRider] Rate limited, retrying in ${RETRY_DELAY_MS / 1000}s (attempt ${attempt + 1}/${retries})...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      } else {
+        throw error;
+      }
+    }
+  }
+  return null;
+}
 
 export interface TechRiderRequirements {
   // Technical requirements
@@ -77,10 +129,10 @@ export async function parseTechRiderPDF(
   pdfBuffer: Buffer,
   filename?: string
 ): Promise<TechRiderRequirements | null> {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+  const client = getGenAIClient();
 
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('[TechRider] Gemini API key not configured');
+  if (!client) {
+    console.warn('[TechRider] GenAI not configured');
     return null;
   }
 
@@ -88,7 +140,6 @@ export async function parseTechRiderPDF(
     console.log(`[TechRider] Parsing PDF (${(pdfBuffer.length / 1024).toFixed(2)} KB)`);
     const startTime = Date.now();
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const base64PDF = pdfBuffer.toString('base64');
 
     // Include filename in prompt for artist name inference
@@ -97,25 +148,32 @@ export async function parseTechRiderPDF(
       : TECH_RIDER_PROMPT;
 
     console.log('[TechRider] Sending PDF to Gemini...');
-    const result = await model.generateContent([
-      promptWithFilename,
-      {
-        inlineData: {
-          mimeType: 'application/pdf',
-          data: base64PDF,
+    const responseText = await callGeminiWithRetry(
+      client,
+      'gemini-2.5-flash',
+      [
+        { text: promptWithFilename },
+        {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: base64PDF,
+          },
         },
-      },
-    ]);
+      ]
+    );
+
+    if (!responseText) {
+      console.warn('[TechRider] Gemini call returned null after retries');
+      return null;
+    }
 
     const duration = Date.now() - startTime;
     console.log(`[TechRider] Gemini response received in ${duration}ms`);
-
-    const responseText = result.response.text();
     console.log(`[TechRider] Response length: ${responseText.length} chars`);
 
     return parseGeminiResponse(responseText);
   } catch (error) {
-    console.error('[TechRider] Error parsing PDF:', error);
+    console.error('[TechRider] Error parsing PDF (after retries):', error);
     return null;
   }
 }
@@ -128,10 +186,10 @@ export async function parseTechRiderDOCX(
   docxBuffer: Buffer,
   filename?: string
 ): Promise<TechRiderRequirements | null> {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+  const client = getGenAIClient();
 
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('[TechRider] Gemini API key not configured');
+  if (!client) {
+    console.warn('[TechRider] GenAI not configured');
     return null;
   }
 
@@ -150,28 +208,32 @@ export async function parseTechRiderDOCX(
 
     console.log(`[TechRider] Extracted ${extractedText.length} chars from DOCX`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
     // Include filename in prompt for artist name inference
     const filenameHint = filename
       ? `\n\nFilename: "${filename}" - Use this to help infer the artist/band name if not clearly visible in the document.`
       : '';
 
     console.log('[TechRider] Sending DOCX text to Gemini...');
-    const result = await model.generateContent([
-      TECH_RIDER_PROMPT + filenameHint,
-      `\n\nDocument content:\n${extractedText}`,
-    ]);
+    const responseText = await callGeminiWithRetry(
+      client,
+      'gemini-2.5-flash',
+      [
+        { text: TECH_RIDER_PROMPT + filenameHint + `\n\nDocument content:\n${extractedText}` },
+      ]
+    );
+
+    if (!responseText) {
+      console.warn('[TechRider] Gemini call returned null after retries');
+      return null;
+    }
 
     const duration = Date.now() - startTime;
     console.log(`[TechRider] Gemini response received in ${duration}ms`);
-
-    const responseText = result.response.text();
     console.log(`[TechRider] Response length: ${responseText.length} chars`);
 
     return parseGeminiResponse(responseText);
   } catch (error) {
-    console.error('[TechRider] Error parsing DOCX:', error);
+    console.error('[TechRider] Error parsing DOCX (after retries):', error);
     return null;
   }
 }
