@@ -124,11 +124,11 @@ async function sendEmail(options: { to: string[]; subject: string; html: string 
 // EMAIL HTML BUILDERS
 // ============================================
 
-function getDriveViewLink(fileId: string): string {
-  return `https://drive.google.com/file/d/${fileId}/view`;
+function getSheetEditLink(sheetId: string): string {
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
 }
 
-function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, approvalToken: string, quoteFileId: string | null): string {
+function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, approvalToken: string, quoteSheetId: string | null): string {
   // Count total items
   const totalItems = formData.equipment.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -151,14 +151,13 @@ function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, 
            style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
           Review Quote
         </a>
+        ${quoteSheetId ? `<a href="${getSheetEditLink(quoteSheetId)}" style="margin-left: 12px; color: #64748b; font-size: 13px;">Edit in Sheets</a>` : ""}
       </div>
-
-      ${quoteFileId ? `<p style="font-size: 12px; color: #94a3b8;">Full details in <a href="${getDriveViewLink(quoteFileId)}" style="color: #64748b;">Quote PDF</a></p>` : ""}
     </div>
   `;
 }
 
-function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutput, approvalToken: string, quoteFileId: string | null, jobSheetFileId: string | null): string {
+function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutput, approvalToken: string, quoteSheetId: string | null): string {
   const eventTime = formData.eventTime || (formData.eventStartTime && formData.eventEndTime ? `${formData.eventStartTime} - ${formData.eventEndTime}` : null);
 
   return `
@@ -174,8 +173,7 @@ function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutp
            style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">
           Review #${quote.quoteNumber}
         </a>
-        ${quoteFileId ? `<a href="${getDriveViewLink(quoteFileId)}" style="margin-left: 12px; color: #64748b; font-size: 13px;">PDF</a>` : ""}
-        ${jobSheetFileId ? `<a href="${getDriveViewLink(jobSheetFileId)}" style="margin-left: 8px; color: #64748b; font-size: 13px;">Job Sheet</a>` : ""}
+        ${quoteSheetId ? `<a href="${getSheetEditLink(quoteSheetId)}" style="margin-left: 12px; color: #64748b; font-size: 13px;">Edit in Sheets</a>` : ""}
       </div>
     </div>
   `;
@@ -206,14 +204,13 @@ serve(async (req) => {
 
     if (!quote) throw new Error("No quote_data found");
 
-    // Get Drive file IDs for links
-    const quoteFileId = inquiry.drive_file_id || null;
-    const jobSheetFileId = inquiry.job_sheet_drive_file_id || null;
+    // Get Sheet ID for edit link (no PDFs in initial email)
+    const quoteSheetId = inquiry.quote_sheet_id || null;
 
     // Build email HTML
     const emailHtml = isBackline
-      ? buildBacklineEmailHtml(formData, quote, inquiry.approval_token, quoteFileId)
-      : buildFullSystemEmailHtml(formData as FullSystemFormData, quote, inquiry.approval_token, quoteFileId, jobSheetFileId);
+      ? buildBacklineEmailHtml(formData, quote, inquiry.approval_token, quoteSheetId)
+      : buildFullSystemEmailHtml(formData as FullSystemFormData, quote, inquiry.approval_token, quoteSheetId);
 
     console.log(`[send-email] Sending email...`);
     const emailTag = isBackline ? "+dryhire@" : "+fullevent@";
