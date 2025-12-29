@@ -215,6 +215,12 @@ export async function generateSoundQuotePDF(
       : 'Monitor';
     lineItems.push({ description: monitorLabel, cost: quote.lineItems.monitors.cost });
   }
+  if (quote.lineItems.microphones?.cost > 0) {
+    const micLabel = quote.lineItems.microphones.count > 1
+      ? `Microphones (${quote.lineItems.microphones.count}x)`
+      : 'Microphone';
+    lineItems.push({ description: micLabel, cost: quote.lineItems.microphones.cost });
+  }
   if (quote.lineItems.console > 0) {
     lineItems.push({ description: 'Console', cost: quote.lineItems.console });
   }

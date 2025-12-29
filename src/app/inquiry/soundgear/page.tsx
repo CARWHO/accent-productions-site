@@ -235,11 +235,46 @@ function InquiryForm() {
   const [autofilledFields, setAutofilledFields] = useState<Set<string>>(new Set());
   const [parsedTechRider, setParsedTechRider] = useState<TechRiderRequirements | null>(null);
 
-  // When tech rider is uploaded, automatically mark hasBand as true
+  // Background parsing state - start parsing when file is uploaded, not when Continue is clicked
+  const [parsingPromise, setParsingPromise] = useState<Promise<TechRiderRequirements | null> | null>(null);
+  const [backgroundParsedResult, setBackgroundParsedResult] = useState<TechRiderRequirements | null>(null);
+
+  // Start parsing in background immediately when file is uploaded
+  const startBackgroundParsing = (file: File) => {
+    // Clear any previous result
+    setBackgroundParsedResult(null);
+
+    const formDataObj = new FormData();
+    formDataObj.append('file', file);
+
+    const promise = fetch('/api/parse-tech-rider', {
+      method: 'POST',
+      body: formDataObj,
+    })
+      .then(res => res.json())
+      .then((data: TechRiderRequirements | null) => {
+        setBackgroundParsedResult(data);
+        return data;
+      })
+      .catch(err => {
+        console.error('Background tech rider parsing failed:', err);
+        return null;
+      });
+
+    setParsingPromise(promise);
+  };
+
+  // When tech rider is uploaded, automatically mark hasBand as true and start background parsing
   const handleTechRiderUpload = (file: File | null) => {
     setTechRiderFile(file);
+    // Clear previous parsing state
+    setBackgroundParsedResult(null);
+    setParsingPromise(null);
+
     if (file) {
       updateField('hasBand', true);
+      // Start parsing immediately in background
+      startBackgroundParsing(file);
     }
   };
 
@@ -299,26 +334,40 @@ function InquiryForm() {
     if (hasTechRider && techRiderFile) {
       setIsParsing(true);
       try {
-        const formDataObj = new FormData();
-        formDataObj.append('file', techRiderFile);
+        let result = backgroundParsedResult;
 
-        const response = await fetch('/api/parse-tech-rider', {
-          method: 'POST',
-          body: formDataObj,
-        });
+        // If background parsing is still in progress, wait for it
+        if (!result && parsingPromise) {
+          result = await parsingPromise;
+        }
 
-        if (response.ok) {
-          const parsed = await response.json();
-          if (parsed) {
-            applyTechRiderToForm(parsed);
-            setParsedTechRider(parsed);
+        // If no background parsing was started (shouldn't happen), parse now as fallback
+        if (!result && !parsingPromise) {
+          const formDataObj = new FormData();
+          formDataObj.append('file', techRiderFile);
+
+          const response = await fetch('/api/parse-tech-rider', {
+            method: 'POST',
+            body: formDataObj,
+          });
+
+          if (response.ok) {
+            result = await response.json();
           }
+        }
+
+        if (result) {
+          applyTechRiderToForm(result);
+          setParsedTechRider(result);
         }
       } catch (error) {
         // Silently fail - user can fill in manually
         console.error('Tech rider parsing failed:', error);
       } finally {
         setIsParsing(false);
+        // Clear background parsing state
+        setParsingPromise(null);
+        setBackgroundParsedResult(null);
         goToStep(3); // Proceed to Event Basics
       }
     } else {
@@ -455,8 +504,8 @@ function InquiryForm() {
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
           <div className="animate-spin w-12 h-12 border-4 border-black border-t-transparent rounded-full mb-4" />
-          <p className="text-lg font-medium">Processing your tech rider...</p>
-          <p className="text-sm text-gray-500 mt-2">This may take up to 15 seconds</p>
+          <p className="text-lg font-medium">Loading your Tech Rider...</p>
+          <p className="text-sm text-gray-500 mt-2">This can take 30-40 seconds</p>
         </div>
       )}
 
@@ -582,7 +631,7 @@ function InquiryForm() {
                     <input
                       type="file"
                       accept=".pdf,.doc,.docx"
-                      onChange={(e) => setTechRiderFile(e.target.files?.[0] || null)}
+                      onChange={(e) => handleTechRiderUpload(e.target.files?.[0] || null)}
                       className="text-transparent file:mr-3 file:py-2 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white cursor-pointer w-[100px]"
                     />
                   </div>
@@ -597,7 +646,7 @@ function InquiryForm() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => setTechRiderFile(null)}
+                      onClick={() => handleTechRiderUpload(null)}
                       className="text-gray-500"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -90,7 +90,33 @@ interface FullSystemFormData {
 
 type FormData = BacklineFormData | FullSystemFormData;
 
+// Structured line items for itemized quotes (like Quote-2025-1685)
+interface QuoteLineItems {
+  foh: number;
+  monitors: { count: number; cost: number };
+  microphones: { count: number; cost: number };
+  console: number;
+  cables: number;
+  vehicle: number;
+  techTime: { hours: number; rate: number; cost: number };
+}
+
 interface QuoteOutput {
+  quoteNumber: string;
+  title: string;
+  description: string;
+  lineItems: QuoteLineItems;
+  subtotal: number;
+  gst: number;
+  total: number;
+  rentalDays?: number;
+  executionNotes?: string[];
+  suggestedGear?: { item: string; quantity: number; notes?: string }[];
+  unavailableGear?: string[];
+}
+
+// Legacy format for backline quotes
+interface BacklineQuoteOutput {
   quoteNumber: string;
   title: string;
   description: string;
@@ -99,9 +125,6 @@ interface QuoteOutput {
   gst: number;
   total: number;
   rentalDays?: number;
-  executionNotes?: string[];
-  suggestedGear?: { item: string; quantity: number; notes?: string }[];
-  unavailableGear?: string[];
 }
 
 // ============================================
@@ -125,6 +148,219 @@ function calculateRentalDays(startDate: string, endDate: string): number {
 
 function isBacklineInquiry(formData: FormData): formData is BacklineFormData {
   return (formData as BacklineFormData).type === "backline";
+}
+
+// Default hourly rate for tech time (minimum $65/hr)
+const DEFAULT_TECH_RATE = 65;
+
+/**
+ * Parse time string to 24-hour format
+ */
+function parseTimeTo24Hour(time: string): { hours: number; minutes: number } | null {
+  if (!time) return null;
+  const trimmed = time.trim().toUpperCase();
+
+  // Try 12-hour format: "6:00 PM", "11:30 AM"
+  const match12 = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2] ? parseInt(match12[2], 10) : 0;
+    const period = match12[3];
+    if (period === "PM" && hours !== 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+    return { hours, minutes };
+  }
+
+  // Try 24-hour format: "18:00"
+  const match24 = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    return { hours: parseInt(match24[1], 10), minutes: parseInt(match24[2], 10) };
+  }
+  return null;
+}
+
+/**
+ * Calculate event duration in hours
+ */
+function calculateEventDuration(startTime?: string, endTime?: string): number {
+  if (!startTime || !endTime) return 4;
+  const start = parseTimeTo24Hour(startTime);
+  const end = parseTimeTo24Hour(endTime);
+  if (!start || !end) return 4;
+
+  const startMinutes = start.hours * 60 + start.minutes;
+  let endMinutes = end.hours * 60 + end.minutes;
+  if (endMinutes <= startMinutes) endMinutes += 24 * 60; // spans midnight
+  return (endMinutes - startMinutes) / 60;
+}
+
+/**
+ * Format time for display
+ */
+function formatTime(time?: string): string {
+  if (!time) return "";
+  if (time.toUpperCase().includes("AM") || time.toUpperCase().includes("PM")) return time;
+  const parsed = parseTimeTo24Hour(time);
+  if (!parsed) return time;
+  const { hours, minutes } = parsed;
+  const ampm = hours >= 12 && hours < 24 ? "PM" : "AM";
+  const hour12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${hour12}:${String(minutes).padStart(2, "0")} ${ampm}`;
+}
+
+// ============================================
+// EQUIPMENT RULES (from gemini-sound-quote.ts)
+// ============================================
+
+const EQUIPMENT_RULES = `
+## BASE PACKAGES
+
+### Small Package (10-50 people)
+- 2x EV8 (ZLX 8P G2) or 2x EV10 (ELX200)
+- 2x speaker stands
+- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
+- 1x SM58 microphone + stand
+- Supporting cabling
+- 30 min setup time
+
+### Medium Package (50-200 people)
+- 2x EV12 (EKX12) - main FOH
+- 2x EV8 (ZLX 8P G2) - delay speakers
+- 4x speaker stands
+- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
+- 1x SM58 microphone + stand
+- Supporting cabling
+- 1 hour setup time
+
+### Large Package (200-1000 people)
+- 4x EV12 (EKX12)
+- 2x EV8 (ZLX 8P G2)
+- 6x speaker stands
+- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
+- 1x SM58 microphone + stand
+- Supporting cabling
+- 2 hours setup time
+
+## CONDITIONAL ADD-ONS
+
+### Bluetooth Playback Only
+- Use Behringer Flow 8
+- EV8 (ZLX 8P G2)
+- +15 min tech time
+
+### DJ / Loud Dance Music (IMPORTANT - WHEN TO ADD SUBS)
+Apply this rule when ANY of these are true:
+- User has selected "DJ" option
+- Event type is wedding/party with dancing expected
+- Client mentions dance floor, DJ, loud music, bass, or club-style sound
+- Tech rider mentions DJ equipment or heavy bass music
+
+When triggered:
+- ADD: 2x Sub (EV EKX18) - REQUIRED for proper bass response
+- ADD: 2x sub poles (these REPLACE 2 speaker stands - mains sit on subs)
+- DO NOT include separate speaker stands for the mains when subs are used
+- +15 min tech time
+
+### Professional DJ
+- ADD: Booth speaker - EV10 (ELX200) or EV12 (EKX12)
+
+### Live Band (CRITICAL - READ CAREFULLY)
+When there is a live band:
+
+SPEAKERS:
+- ADD: 2x Sub (EV EKX18) - REQUIRED for any band with drums/bass
+- Mains: Use EV EKX12 or EV ELX200-12P (NOT QSC)
+- Delays: Only if venue is long/deep - for audience coverage, NOT for speeches
+
+MONITORS (assign by STAGE POSITION, not mix count):
+- 6 monitor mixes does NOT mean 6 wedges
+- Typically: 1 wedge per vocal mic, 1-2 for drums
+- Horn sections/brass can SHARE wedges (2-3 players per wedge)
+- Use EV ELX200-12P or EV EKX12 for monitors (NOT QSC K12)
+- Example: 11-piece brass band = 3-4 wedges, not 6
+
+MICROPHONES (must be included in quote):
+- Count ALL inputs from tech rider
+- Vocal mics: SM58 or Beta58a
+- Instrument mics: SM57, E906, etc.
+- Drum mics: Beta52A/D112 for kick, E604/SM57 for toms/snare
+- Include microphone stands for each mic
+
+CONSOLE & STAGE BOX:
+- UPGRADE: X32 Compact or X32 Rack (for 16+ channels)
+- ADD: Digital stage box S16 (for clean stage runs)
+
+### Wireless Microphone
+- ADD: Shure SM58 BLX wireless
+
+## TECH TIME CALCULATION (IMPORTANT)
+Tech time = Event Duration + Setup Time + Load Time + Unload Time + Pack-out Time
+
+Formula:
+- Event duration: Parse from event time (e.g., 6pm-11pm = 5 hours)
+- Setup time: From form input, or estimate (small=1hr, medium=2hr, large=3hr)
+- Load time: 30 minutes (standard)
+- Unload time: 30 minutes (standard)
+- Pack-out time: Half of setup time
+
+Example for 5hr event with 2hr setup:
+5 + 2 + 0.5 + 0.5 + 1 = 9 hours total
+
+NEVER just guess "4 hours" - always calculate using this formula.
+`;
+
+// ============================================
+// INVENTORY
+// ============================================
+
+interface AudioEquipmentItem {
+  id: string;
+  category: string;
+  name: string;
+  notes: string | null;
+  hire_rate_per_day: number;
+  stock_quantity: number;
+}
+
+async function fetchAudioEquipment(supabase: ReturnType<typeof createClient>): Promise<AudioEquipmentItem[]> {
+  // Fetch from audio_equipment table
+  const { data: audioData, error: audioError } = await supabase
+    .from("audio_equipment")
+    .select("id, category, name, notes, hire_rate_per_day, stock_quantity")
+    .eq("available", true)
+    .order("category")
+    .order("name");
+
+  if (audioError) console.error("Error fetching audio equipment:", audioError);
+
+  // Fetch from hire_items table
+  const { data: hireData, error: hireError } = await supabase
+    .from("hire_items")
+    .select("id, category, name, notes, hire_rate_per_day, stock_quantity")
+    .eq("available", true)
+    .order("category")
+    .order("name");
+
+  if (hireError) console.error("Error fetching hire items:", hireError);
+
+  return [...(audioData || []), ...(hireData || [])];
+}
+
+function formatInventoryForPrompt(inventory: AudioEquipmentItem[]): string {
+  if (inventory.length === 0) return "No inventory data available - suggest standard professional audio gear.";
+
+  const byCategory: Record<string, string[]> = {};
+  for (const item of inventory) {
+    if (!byCategory[item.category]) byCategory[item.category] = [];
+    byCategory[item.category].push(`${item.name} (qty: ${item.stock_quantity}, $${item.hire_rate_per_day}/day)`);
+  }
+
+  let result = "AVAILABLE INVENTORY - USE THESE ITEMS AND PRICES:\n";
+  for (const [category, items] of Object.entries(byCategory)) {
+    result += `\n${category}:\n`;
+    result += items.map((i) => `  - ${i}`).join("\n");
+  }
+  return result;
 }
 
 // ============================================
@@ -193,7 +429,7 @@ async function sendEmail(options: { to: string[]; subject: string; html: string 
 // QUOTE GENERATION
 // ============================================
 
-async function generateBacklineQuote(formData: BacklineFormData, supabase: ReturnType<typeof createClient>): Promise<QuoteOutput> {
+async function generateBacklineQuote(formData: BacklineFormData, supabase: ReturnType<typeof createClient>): Promise<BacklineQuoteOutput> {
   const quoteNumber = generateQuoteNumber();
   const rentalDays = calculateRentalDays(formData.startDate, formData.endDate);
 
@@ -253,33 +489,136 @@ DESCRIPTION: [2-3 sentence professional description]`;
   return { quoteNumber, title, description, lineItems, subtotal, gst, total: subtotal + gst, rentalDays };
 }
 
-async function generateFullSystemQuote(formData: FullSystemFormData): Promise<QuoteOutput> {
+async function generateFullSystemQuote(formData: FullSystemFormData, supabase: ReturnType<typeof createClient>): Promise<QuoteOutput> {
   const quoteNumber = generateQuoteNumber();
 
-  const eventSummary = `
-Event: ${formData.eventName || "Event"}, Type: ${formData.eventType || "N/A"}
-Date: ${formData.eventDate || "TBC"}, Time: ${formData.eventStartTime} - ${formData.eventEndTime}
-Location: ${formData.location || "TBC"}, Attendance: ${formData.attendance || "N/A"}, Package: ${formData.package}
-Content: Playback=${formData.playbackFromDevice}, LiveMusic=${formData.hasLiveMusic}, DJ=${formData.hasDJ}, Band=${formData.hasBand}, Speeches=${formData.hasSpeeches}
-Venue: ${formData.indoorOutdoor || "N/A"}, Stage=${formData.hasStage}, Generator=${formData.needsGenerator}
-${formData.additionalInfo ? `Notes: ${formData.additionalInfo}` : ""}`.trim();
+  // Fetch inventory from database
+  const inventory = await fetchAudioEquipment(supabase);
+  console.log(`[generate-quote] Loaded ${inventory.length} equipment items from database`);
 
-  const quotePrompt = `You are a professional audio equipment hire company in New Zealand. Generate a quote:
+  // Calculate event duration and tech time
+  const eventDuration = calculateEventDuration(formData.eventStartTime, formData.eventEndTime);
+  const setupHours = formData.package === "small" ? 1 : formData.package === "medium" ? 2 : 3;
+  const packoutHours = formData.package === "small" ? 0.5 : formData.package === "medium" ? 1 : 1.5;
+  const totalTechHours = eventDuration + setupHours + 1 + packoutHours; // 1 hour for load/unload
 
-${eventSummary}
+  // Format package size for display
+  const packageSizes: Record<string, string> = {
+    small: "10-50 people",
+    medium: "50-200 people",
+    large: "200-1000 people",
+  };
 
-Return JSON:
-{"title": "Short title", "description": "2-3 sentences", "lineItems": [{"description": "Item", "amount": 123}], "executionNotes": ["Setup notes array"], "suggestedGear": [{"item": "Name", "quantity": 2, "notes": "optional"}], "unavailableGear": ["Items needing external hire"]}
+  const quotePrompt = `You are creating a quote for Accent Entertainment, an audio production company in Wellington, New Zealand.
 
-Pricing (NZD): Small (10-50): $500-800, Medium (50-200): $1200-2000, Large (200-1000): $3000-5000
-Only return JSON.`;
+## EQUIPMENT SELECTION RULES
+Follow these rules to select equipment based on package size and requirements:
+${EQUIPMENT_RULES}
+
+## AVAILABLE INVENTORY
+${formatInventoryForPrompt(inventory)}
+
+## EVENT DETAILS
+- Type: ${formData.eventType || "Event"}
+- Name: ${formData.eventName || "Not specified"}
+- Package Size: ${formData.package} (${packageSizes[formData.package] || "N/A"})
+- Date: ${formData.eventDate || "TBC"}
+- Event Time: ${formatTime(formData.eventStartTime)} - ${formatTime(formData.eventEndTime)}
+- Event Duration: ${eventDuration} hours
+- Location: ${formData.location || "TBC"}
+- Environment: ${formData.indoorOutdoor || "TBC"}
+${formData.powerAccess ? `- Power Access: ${formData.powerAccess}` : ""}
+${formData.hasStage ? `- Stage: Yes ${formData.stageDetails ? `(${formData.stageDetails})` : ""}` : ""}
+
+CONTENT REQUIREMENTS:
+${formData.playbackFromDevice ? "- Playback from device (iPhone/Laptop)" : ""}
+${formData.hasLiveMusic ? "- Live music" : ""}
+${formData.hasBand ? "- Live band(s)" : ""}
+${formData.hasDJ ? "- DJ setup required" : ""}
+${formData.hasSpeeches ? "- Speeches/presentations" : ""}
+${formData.needsWirelessMic ? "- Wireless microphones" : ""}
+${formData.additionalInfo ? `- Additional: ${formData.additionalInfo}` : ""}
+${formData.details ? `- Other details: ${formData.details}` : ""}
+
+Return a JSON object with this EXACT structure:
+{
+  "title": "Sound System Hire @ [Location] ([Date])",
+  "description": "Brief 2-3 sentence description",
+  "lineItems": {
+    "foh": <number - FOH speakers + subs cost>,
+    "monitors": { "count": <number of wedges>, "cost": <number> },
+    "microphones": { "count": <number of mics>, "cost": <number> },
+    "console": <number - mixing console + stage box cost>,
+    "cables": <number - cables, DI boxes, accessories cost>,
+    "vehicle": <number - delivery/pickup cost, usually 100-150>,
+    "techTime": { "hours": ${totalTechHours}, "rate": ${DEFAULT_TECH_RATE}, "cost": ${totalTechHours * DEFAULT_TECH_RATE} }
+  },
+  "executionNotes": [
+    "<bullet point 1 - specific setup instruction>",
+    "<bullet point 2 - monitor mix assignments>",
+    "<bullet point 3 - FOH position>",
+    "<etc - 5-8 concise execution notes>"
+  ],
+  "suggestedGear": [
+    { "item": "EV ELX200-15P", "quantity": 2, "notes": "FOH L/R" },
+    { "item": "SM58", "quantity": 4, "notes": "Vocals" }
+  ],
+  "unavailableGear": []
+}
+
+## INSTRUCTIONS
+1. Start with BASE PACKAGE equipment from EQUIPMENT SELECTION RULES for package: ${formData.package}
+2. Apply CONDITIONAL ADD-ONS based on content requirements (DJ=${formData.hasDJ}, band=${formData.hasBand}, wireless=${formData.needsWirelessMic})
+3. Match gear names to AVAILABLE INVENTORY where possible (use exact inventory names)
+4. Calculate costs by summing hire rates from inventory for each category
+5. Tech time is pre-calculated: ${totalTechHours} hours × $${DEFAULT_TECH_RATE}/hr = $${totalTechHours * DEFAULT_TECH_RATE}
+
+## PRICING GUIDELINES
+- FOH: Sum hire rates for all FOH speakers + subs
+- Monitors: Sum hire rates for all monitor wedges
+- Console: Hire rate for mixing console + stage box if needed
+- Cables: $150-300 depending on complexity
+- Vehicle: $100-150 depending on gear quantity
+
+Return ONLY the JSON object, no other text.`;
 
   const aiResponse = await callGemini(quotePrompt);
   const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("Failed to parse AI quote response");
 
   const parsed = JSON.parse(jsonMatch[0]);
-  const subtotal = parsed.lineItems.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0);
+
+  // Parse structured line items
+  const lineItems: QuoteLineItems = {
+    foh: parsed.lineItems?.foh ?? 0,
+    monitors: {
+      count: parsed.lineItems?.monitors?.count ?? 0,
+      cost: parsed.lineItems?.monitors?.cost ?? 0,
+    },
+    microphones: {
+      count: parsed.lineItems?.microphones?.count ?? 0,
+      cost: parsed.lineItems?.microphones?.cost ?? 0,
+    },
+    console: parsed.lineItems?.console ?? 0,
+    cables: parsed.lineItems?.cables ?? 0,
+    vehicle: parsed.lineItems?.vehicle ?? 100,
+    techTime: {
+      hours: parsed.lineItems?.techTime?.hours ?? totalTechHours,
+      rate: parsed.lineItems?.techTime?.rate ?? DEFAULT_TECH_RATE,
+      cost: parsed.lineItems?.techTime?.cost ?? totalTechHours * DEFAULT_TECH_RATE,
+    },
+  };
+
+  // Calculate subtotal from structured line items
+  const subtotal =
+    lineItems.foh +
+    lineItems.monitors.cost +
+    lineItems.microphones.cost +
+    lineItems.console +
+    lineItems.cables +
+    lineItems.vehicle +
+    lineItems.techTime.cost;
+
   const gst = Math.round(subtotal * 0.15 * 100) / 100;
 
   let executionNotes: string[] = [];
@@ -295,9 +634,9 @@ Only return JSON.`;
 
   return {
     quoteNumber,
-    title: parsed.title || "Sound System Hire",
+    title: parsed.title || `Sound System Hire @ ${formData.location || "TBC"}`,
     description: parsed.description || "",
-    lineItems: parsed.lineItems || [],
+    lineItems,
     subtotal,
     gst,
     total: subtotal + gst,
@@ -329,7 +668,7 @@ serve(async (req) => {
     const formData: FormData = inquiry.form_data_json;
     const isBackline = isBacklineInquiry(formData);
 
-    let quote: QuoteOutput;
+    let quote: BacklineQuoteOutput | QuoteOutput;
     if (isBackline) {
       quote = await generateBacklineQuote(formData, supabase);
     } else {
@@ -343,7 +682,7 @@ serve(async (req) => {
         await supabase.from("inquiries").update({ status: "new" }).eq("id", inquiry_id);
         return new Response(JSON.stringify({ success: true, manual: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      quote = await generateFullSystemQuote(formData);
+      quote = await generateFullSystemQuote(formData, supabase);
     }
 
     console.log(`[generate-quote] Quote ${quote.quoteNumber} generated`);

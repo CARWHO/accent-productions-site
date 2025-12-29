@@ -2,7 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import mammoth from 'mammoth';
 
 const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 5000; // 5 seconds
+const RETRY_DELAY_MS = 2000; // 2 seconds (reduced from 5s for faster retries)
 
 // Initialize Google GenAI with Vertex AI using Service Account
 function getGenAIClient(): GoogleGenAI | null {

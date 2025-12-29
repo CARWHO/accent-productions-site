@@ -74,11 +74,29 @@ interface FullSystemFormData {
 
 type FormData = BacklineFormData | FullSystemFormData;
 
+// Structured line items for full system quotes (like Quote-2025-1685)
+interface StructuredLineItems {
+  foh: number;
+  monitors: { count: number; cost: number };
+  microphones: { count: number; cost: number };
+  console: number;
+  cables: number;
+  vehicle: number;
+  techTime: { hours: number; rate: number; cost: number };
+}
+
+// Legacy line items for backline quotes
+interface LegacyLineItem {
+  description: string;
+  amount: number;
+}
+
+// Quote can have either structured (full system) or legacy (backline) line items
 interface QuoteOutput {
   quoteNumber: string;
   title: string;
   description: string;
-  lineItems: { description: string; amount: number }[];
+  lineItems: StructuredLineItems | LegacyLineItem[];
   subtotal: number;
   gst: number;
   total: number;
