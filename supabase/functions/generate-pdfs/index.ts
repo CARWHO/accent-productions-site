@@ -1,7 +1,7 @@
 // Supabase Edge Function: generate-pdfs
-// Step 2 of 3: Generates PDFs and uploads to Google Drive
-// Triggered by database webhook when status = 'quote_generated'
-// PDFs are stored in Drive only - fetched from Drive when emailing
+// On-demand PDF generation from Google Sheet data
+// Called when: 1) Admin completes review (Invoice PDF) 2) Contractor selected (Jobsheet PDF)
+// Reads edited data from Google Sheets, generates PDF, uploads to Drive
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -32,51 +32,20 @@ const corsHeaders = {
 // TYPES
 // ============================================
 
-interface BacklineFormData {
-  type: "backline";
-  startDate: string;
-  endDate: string;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
-}
-
-interface FullSystemFormData {
-  type?: "fullsystem";
+interface QuoteSheetData {
+  quoteNumber: string;
+  issuedDate: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  clientAddress: string;
   eventName: string;
   eventDate: string;
-  eventStartTime: string;
-  eventEndTime: string;
-  eventType: string;
-  attendance?: number;
-  location: string;
-  indoorOutdoor: string;
-  additionalInfo: string;
-  playbackFromDevice: boolean;
-  hasLiveMusic: boolean;
-  needsMic: boolean;
-  hasDJ: boolean;
-  hasBand: boolean;
-  hasSpeeches: boolean;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
-}
-
-type FormData = BacklineFormData | FullSystemFormData;
-
-interface QuoteOutput {
-  quoteNumber: string;
-  title: string;
-  description: string;
-  lineItems: { description: string; amount: number }[];
+  eventLocation: string;
+  lineItems: { quantity: number; cost: number; rate: string; description: string }[];
   subtotal: number;
   gst: number;
   total: number;
-  rentalDays?: number;
-  executionNotes?: string[];
-  suggestedGear?: { item: string; quantity: number; notes?: string }[];
-  unavailableGear?: string[];
 }
 
 interface JobSheetInput {
@@ -103,14 +72,6 @@ interface JobSheetInput {
   clientName: string;
   clientPhone: string;
   clientEmail: string;
-}
-
-// ============================================
-// UTILITIES
-// ============================================
-
-function isBacklineInquiry(formData: FormData): formData is BacklineFormData {
-  return (formData as BacklineFormData).type === "backline";
 }
 
 // ============================================
@@ -161,73 +122,114 @@ async function uploadToDrive(pdfBuffer: Uint8Array, filename: string, folderId: 
   const data = await response.json();
   console.log(`Uploaded ${filename} to Drive (ID: ${data.id})`);
 
-  // Set "anyone with link can view" permission for email links
   await setDriveFilePublic(data.id, accessToken);
-
   return data.id;
 }
 
 async function setDriveFilePublic(fileId: string, accessToken: string): Promise<void> {
   try {
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        role: "reader",
-        type: "anyone",
-      }),
+      body: JSON.stringify({ role: "reader", type: "anyone" }),
     });
-
-    if (!response.ok) {
-      console.error("Failed to set file permission:", await response.text());
-    } else {
-      console.log(`Set public permission for file ${fileId}`);
-    }
   } catch (error) {
     console.error("Error setting file permission:", error);
   }
 }
 
+function getDriveLink(fileId: string): string {
+  return `https://drive.google.com/file/d/${fileId}/view`;
+}
+
 // ============================================
-// PDF GENERATION & UPLOAD (one at a time to save memory)
+// READ DATA FROM GOOGLE SHEET
 // ============================================
 
-async function generateAndUploadQuotePDF(
-  quote: QuoteOutput,
-  clientName: string,
-  clientEmail: string,
-  clientPhone: string,
-  eventDate: string,
-  folderId: string,
-  accessToken: string
-): Promise<string | null> {
+async function readQuoteSheetData(spreadsheetId: string): Promise<QuoteSheetData | null> {
   try {
-    console.log("[generate-pdfs] Generating Quote PDF...");
-    const response = await fetch(`${SITE_URL}/api/generate-pdf`, {
+    const response = await fetch(`${SITE_URL}/api/read-quote-sheet`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EDGE_FUNCTION_SECRET}` },
-      body: JSON.stringify({ quote, clientName, clientEmail, clientPhone, eventDate }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${EDGE_FUNCTION_SECRET}`,
+      },
+      body: JSON.stringify({ spreadsheetId }),
     });
+
     if (!response.ok) {
-      console.error("Quote PDF failed:", await response.text());
+      console.error("Failed to read quote sheet:", await response.text());
       return null;
     }
-    const pdfBuffer = new Uint8Array(await response.arrayBuffer());
 
-    console.log("[generate-pdfs] Uploading Quote PDF to Drive...");
-    const driveId = await uploadToDrive(pdfBuffer, `Quote-${quote.quoteNumber}.pdf`, folderId, accessToken);
-    // Buffer will be garbage collected after this function returns
-    return driveId;
+    return await response.json();
   } catch (error) {
-    console.error("Quote PDF error:", error);
+    console.error("Error reading quote sheet:", error);
     return null;
   }
 }
 
-async function generateAndUploadJobSheetPDF(
+// ============================================
+// PDF GENERATION
+// ============================================
+
+async function generateInvoicePDF(
+  sheetData: QuoteSheetData,
+  invoiceNumber: string,
+  folderId: string,
+  accessToken: string
+): Promise<string | null> {
+  try {
+    console.log("[generate-pdfs] Generating Invoice PDF from sheet data...");
+
+    // Convert sheet data to quote format for PDF generation
+    const quote = {
+      quoteNumber: sheetData.quoteNumber,
+      title: sheetData.eventName,
+      description: sheetData.eventLocation,
+      lineItems: sheetData.lineItems.map(item => ({
+        description: item.description,
+        amount: item.cost * item.quantity,
+      })),
+      subtotal: sheetData.subtotal,
+      gst: sheetData.gst,
+      total: sheetData.total,
+    };
+
+    const response = await fetch(`${SITE_URL}/api/generate-pdf`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${EDGE_FUNCTION_SECRET}`,
+      },
+      body: JSON.stringify({
+        quote,
+        clientName: sheetData.clientName,
+        clientEmail: sheetData.clientEmail,
+        clientPhone: sheetData.clientPhone,
+        eventDate: sheetData.eventDate,
+        options: { isInvoice: true, invoiceNumber },
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Invoice PDF failed:", await response.text());
+      return null;
+    }
+
+    const pdfBuffer = new Uint8Array(await response.arrayBuffer());
+    console.log("[generate-pdfs] Uploading Invoice PDF to Drive...");
+    return await uploadToDrive(pdfBuffer, `Invoice-${invoiceNumber}.pdf`, folderId, accessToken);
+  } catch (error) {
+    console.error("Invoice PDF error:", error);
+    return null;
+  }
+}
+
+async function generateJobSheetPDF(
   input: JobSheetInput,
   folderId: string,
   accessToken: string
@@ -236,19 +238,21 @@ async function generateAndUploadJobSheetPDF(
     console.log("[generate-pdfs] Generating Job Sheet PDF...");
     const response = await fetch(`${SITE_URL}/api/generate-job-sheet`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EDGE_FUNCTION_SECRET}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${EDGE_FUNCTION_SECRET}`,
+      },
       body: JSON.stringify(input),
     });
+
     if (!response.ok) {
       console.error("Job Sheet PDF failed:", await response.text());
       return null;
     }
-    const pdfBuffer = new Uint8Array(await response.arrayBuffer());
 
+    const pdfBuffer = new Uint8Array(await response.arrayBuffer());
     console.log("[generate-pdfs] Uploading Job Sheet PDF to Drive...");
-    const driveId = await uploadToDrive(pdfBuffer, `JobSheet-${input.quoteNumber}.pdf`, folderId, accessToken);
-    // Buffer will be garbage collected after this function returns
-    return driveId;
+    return await uploadToDrive(pdfBuffer, `JobSheet-${input.quoteNumber}.pdf`, folderId, accessToken);
   } catch (error) {
     console.error("Job Sheet PDF error:", error);
     return null;
@@ -264,107 +268,150 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const inquiry_id = payload.record?.id || payload.inquiry_id;
-    if (!inquiry_id) return new Response(JSON.stringify({ error: "Missing inquiry_id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const { inquiry_id, booking_id, pdfType } = payload;
 
-    console.log(`[generate-pdfs] Processing: ${inquiry_id}`);
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    const { data: inquiry, error: fetchError } = await supabase.from("inquiries").select("*").eq("id", inquiry_id).single();
-    if (fetchError || !inquiry) throw new Error(`Failed to fetch inquiry: ${fetchError?.message}`);
-    if (inquiry.status !== "quote_generated") return new Response(JSON.stringify({ success: true, skipped: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-    const formData: FormData = inquiry.form_data_json;
-    const quote: QuoteOutput = inquiry.quote_data;
-    const isBackline = isBacklineInquiry(formData);
-
-    if (!quote) throw new Error("No quote_data found");
-
-    // Get Drive access token once
-    const accessToken = await getDriveAccessToken();
-    if (!accessToken) throw new Error("Failed to get Drive access token");
-
-    const eventDate = isBackline ? `${formData.startDate} - ${formData.endDate}` : (formData as FullSystemFormData).eventDate || "TBC";
-    const quoteFolderId = isBackline ? GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID;
-
-    // Generate and upload Quote PDF (then release memory)
-    let quoteDriveFileId: string | null = null;
-    if (quoteFolderId) {
-      quoteDriveFileId = await generateAndUploadQuotePDF(
-        quote,
-        formData.contactName,
-        formData.contactEmail,
-        formData.contactPhone,
-        eventDate,
-        quoteFolderId,
-        accessToken
+    // Require either inquiry_id or booking_id
+    if (!inquiry_id && !booking_id) {
+      return new Response(
+        JSON.stringify({ error: "Missing inquiry_id or booking_id" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Generate and upload Job Sheet PDF (fullsystem only)
-    let jobSheetDriveFileId: string | null = null;
-    const jobSheetFolderId = isBackline ? GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID;
-    if (!isBackline && jobSheetFolderId) {
-      const fsData = formData as FullSystemFormData;
-      const contentReqs: string[] = [];
-      if (fsData.playbackFromDevice) contentReqs.push("Playback from device");
-      if (fsData.hasLiveMusic) contentReqs.push("Live music");
-      if (fsData.needsMic) contentReqs.push("Microphone required");
-      if (fsData.hasDJ) contentReqs.push("DJ");
-      if (fsData.hasBand) contentReqs.push("Live band(s)");
-      if (fsData.hasSpeeches) contentReqs.push("Speeches/presentations");
+    // Require pdfType: 'invoice' or 'jobsheet'
+    if (!pdfType || !["invoice", "jobsheet"].includes(pdfType)) {
+      return new Response(
+        JSON.stringify({ error: "pdfType must be 'invoice' or 'jobsheet'" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[generate-pdfs] Generating ${pdfType} PDF for ${inquiry_id || booking_id}`);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Fetch inquiry or booking
+    let record;
+    if (booking_id) {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*, inquiries(*)")
+        .eq("id", booking_id)
+        .single();
+      if (error || !data) throw new Error(`Booking not found: ${error?.message}`);
+      record = { ...data, inquiry: data.inquiries };
+    } else {
+      const { data, error } = await supabase
+        .from("inquiries")
+        .select("*")
+        .eq("id", inquiry_id)
+        .single();
+      if (error || !data) throw new Error(`Inquiry not found: ${error?.message}`);
+      record = data;
+    }
+
+    const isBackline = record.form_data_json?.type === "backline" || record.booking_type === "backline";
+
+    // Get Drive access token
+    const accessToken = await getDriveAccessToken();
+    if (!accessToken) throw new Error("Failed to get Drive access token");
+
+    let driveFileId: string | null = null;
+    let driveLink: string | null = null;
+
+    if (pdfType === "invoice") {
+      // Generate Invoice PDF from Quote Sheet data
+      const quoteSheetId = record.quote_sheet_id;
+      if (!quoteSheetId) throw new Error("No quote_sheet_id found - cannot generate invoice");
+
+      const sheetData = await readQuoteSheetData(quoteSheetId);
+      if (!sheetData) throw new Error("Failed to read quote sheet data");
+
+      const invoiceNumber = record.invoice_number || `INV-${sheetData.quoteNumber.replace("Quote-", "")}`;
+      const folderId = isBackline ? GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID;
+
+      if (!folderId) throw new Error("Drive folder not configured");
+
+      driveFileId = await generateInvoicePDF(sheetData, invoiceNumber, folderId, accessToken);
+
+      if (driveFileId) {
+        driveLink = getDriveLink(driveFileId);
+        // Update record with invoice drive file ID
+        if (booking_id) {
+          await supabase.from("bookings").update({ invoice_drive_file_id: driveFileId }).eq("id", booking_id);
+        } else {
+          await supabase.from("inquiries").update({ invoice_drive_file_id: driveFileId }).eq("id", inquiry_id);
+        }
+      }
+    } else {
+      // Generate Jobsheet PDF
+      const jobsheetSheetId = record.jobsheet_sheet_id;
+      // For now, use original quote data for jobsheet (can add sheet reading later)
+      const quoteData = record.quote_data || record.inquiry?.quote_data;
+      const formData = record.form_data_json || record.inquiry?.form_data_json;
+
+      if (!quoteData) throw new Error("No quote data found for jobsheet");
+
+      const folderId = isBackline ? GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID;
+      if (!folderId) throw new Error("Jobsheet folder not configured");
 
       const jobSheetInput: JobSheetInput = {
-        eventName: fsData.eventName || "Event",
-        eventDate: fsData.eventDate || "TBC",
-        eventTime: fsData.eventStartTime && fsData.eventEndTime ? `${fsData.eventStartTime} - ${fsData.eventEndTime}` : null,
-        location: fsData.location || "TBC",
-        quoteNumber: quote.quoteNumber,
-        contractorName: "TBC",
-        hourlyRate: null,
-        estimatedHours: null,
-        payAmount: 0,
-        tasksDescription: null,
-        executionNotes: quote.executionNotes || [],
+        eventName: formData?.eventName || record.event_name || "Event",
+        eventDate: formData?.eventDate || record.event_date || "TBC",
+        eventTime: formData?.eventStartTime && formData?.eventEndTime
+          ? `${formData.eventStartTime} - ${formData.eventEndTime}`
+          : null,
+        location: formData?.location || record.location || "TBC",
+        quoteNumber: quoteData.quoteNumber || record.quote_number,
+        contractorName: record.contractor_name || "TBC",
+        hourlyRate: record.contractor_hourly_rate || null,
+        estimatedHours: record.contractor_hours || null,
+        payAmount: record.contractor_pay || 0,
+        tasksDescription: record.contractor_tasks || null,
+        executionNotes: quoteData.executionNotes || [],
         equipment: [],
-        suggestedGear: quote.suggestedGear || [],
-        unavailableGear: quote.unavailableGear || [],
-        eventType: fsData.eventType || null,
-        attendance: fsData.attendance ? String(fsData.attendance) : null,
-        setupTime: null,
-        indoorOutdoor: fsData.indoorOutdoor || null,
-        contentRequirements: contentReqs,
-        additionalNotes: fsData.additionalInfo || null,
-        clientName: fsData.contactName,
-        clientPhone: fsData.contactPhone,
-        clientEmail: fsData.contactEmail,
+        suggestedGear: quoteData.suggestedGear || [],
+        unavailableGear: quoteData.unavailableGear || [],
+        eventType: formData?.eventType || null,
+        attendance: formData?.attendance ? String(formData.attendance) : null,
+        setupTime: formData?.setupTime || null,
+        indoorOutdoor: formData?.indoorOutdoor || null,
+        contentRequirements: [],
+        additionalNotes: formData?.additionalInfo || null,
+        clientName: formData?.contactName || record.client_name,
+        clientPhone: formData?.contactPhone || record.client_phone,
+        clientEmail: formData?.contactEmail || record.client_email,
       };
 
-      jobSheetDriveFileId = await generateAndUploadJobSheetPDF(jobSheetInput, jobSheetFolderId, accessToken);
+      driveFileId = await generateJobSheetPDF(jobSheetInput, folderId, accessToken);
+
+      if (driveFileId) {
+        driveLink = getDriveLink(driveFileId);
+        // Update record with jobsheet drive file ID
+        if (booking_id) {
+          await supabase.from("bookings").update({ job_sheet_drive_file_id: driveFileId }).eq("id", booking_id);
+        } else {
+          await supabase.from("inquiries").update({ job_sheet_drive_file_id: driveFileId }).eq("id", inquiry_id);
+        }
+      }
     }
 
-    // Update inquiry with Drive file IDs only (no base64)
-    const updateData: Record<string, unknown> = { status: "pdfs_ready" };
-    if (quoteDriveFileId) updateData.drive_file_id = quoteDriveFileId;
-    if (jobSheetDriveFileId) updateData.job_sheet_drive_file_id = jobSheetDriveFileId;
-
-    await supabase.from("inquiries").update(updateData).eq("id", inquiry_id);
-
-    // Also update booking record
-    if (quoteDriveFileId) {
-      await supabase.from("bookings").update({ quote_drive_file_id: quoteDriveFileId }).eq("inquiry_id", inquiry_id);
+    if (!driveFileId) {
+      throw new Error(`Failed to generate ${pdfType} PDF`);
     }
 
-    console.log(`[generate-pdfs] Done, status -> pdfs_ready`);
+    console.log(`[generate-pdfs] ${pdfType} PDF generated: ${driveLink}`);
     return new Response(JSON.stringify({
       success: true,
-      quoteDriveFileId,
-      jobSheetDriveFileId,
-      hasPdf: !!quoteDriveFileId,
-      hasJobSheet: !!jobSheetDriveFileId
+      pdfType,
+      driveFileId,
+      driveLink,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   } catch (error) {
     console.error("[generate-pdfs] Error:", error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(
+      JSON.stringify({ error: (error as Error).message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });

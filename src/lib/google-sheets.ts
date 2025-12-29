@@ -171,6 +171,93 @@ export async function createQuoteSheet(
   }
 }
 
+export interface QuoteSheetData {
+  quoteNumber: string;
+  issuedDate: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  clientAddress: string;
+  eventName: string;
+  eventDate: string;
+  eventLocation: string;
+  lineItems: { quantity: number; cost: number; rate: string; description: string }[];
+  subtotal: number;
+  gst: number;
+  total: number;
+}
+
+/**
+ * Read data from a quote Google Sheet (for PDF generation)
+ */
+export async function readQuoteSheetData(
+  spreadsheetId: string
+): Promise<QuoteSheetData | null> {
+  try {
+    const oauth2Client = getOAuth2Client();
+    if (!oauth2Client) {
+      console.warn('Google not configured');
+      return null;
+    }
+
+    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+
+    // Read Data tab
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Data!A1:B20',
+    });
+
+    const dataRows = dataResponse.data.values || [];
+    const dataMap: Record<string, string> = {};
+    for (const row of dataRows) {
+      if (row[0] && row[1] !== undefined) {
+        dataMap[row[0]] = String(row[1]);
+      }
+    }
+
+    // Read LineItems tab
+    const lineItemsResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'LineItems!A2:D100',
+    });
+
+    const lineItemRows = lineItemsResponse.data.values || [];
+    const lineItems = lineItemRows
+      .filter(row => row[0] || row[1] || row[3]) // Has quantity, cost, or description
+      .map(row => ({
+        quantity: Number(row[0]) || 1,
+        cost: Number(row[1]) || 0,
+        rate: String(row[2] || ''),
+        description: String(row[3] || ''),
+      }));
+
+    // Calculate totals from line items
+    const subtotal = lineItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0);
+    const gst = subtotal * 0.15;
+    const total = subtotal + gst;
+
+    return {
+      quoteNumber: dataMap['quote_number'] || '',
+      issuedDate: dataMap['issued_date'] || '',
+      clientName: dataMap['client_name'] || '',
+      clientEmail: dataMap['client_email'] || '',
+      clientPhone: dataMap['client_phone'] || '',
+      clientAddress: dataMap['client_address'] || '',
+      eventName: dataMap['event_name'] || '',
+      eventDate: dataMap['event_date'] || '',
+      eventLocation: dataMap['event_location'] || '',
+      lineItems,
+      subtotal,
+      gst,
+      total,
+    };
+  } catch (error) {
+    console.error('Error reading quote sheet:', error);
+    return null;
+  }
+}
+
 /**
  * Export a Google Sheet tab as PDF
  */
