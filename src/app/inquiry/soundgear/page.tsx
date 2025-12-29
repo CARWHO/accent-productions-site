@@ -491,7 +491,7 @@ function InquiryForm() {
   const totalSteps = formData.package === 'small' ? 2 : 4;
 
   return (
-    <PageCard stretch>
+    <PageCard stretch={step === 1 || step === 3}>
       {/* Parsing Loading Overlay */}
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
