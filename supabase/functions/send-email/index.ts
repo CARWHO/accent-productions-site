@@ -164,28 +164,19 @@ function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutp
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px;">
       <p style="margin: 0 0 15px 0;">
-        <strong>Client:</strong> ${formData.contactName}${formData.organization ? ` (${formData.organization})` : ""}<br>
-        <strong>Request:</strong> ${formData.eventName || "Sound System"}<br>
-        <strong>Job at:</strong> ${formData.location || "TBC"}<br>
-        <strong>Time:</strong> ${formData.eventDate}${eventTime ? ` · ${eventTime}` : ""}
-      </p>
-
-      <p style="margin: 0 0 20px 0; color: #666;">
-        ${formData.contactEmail} · ${formData.contactPhone}
+        <strong>${formData.contactName}</strong>${formData.organization ? ` · ${formData.organization}` : ""}<br>
+        ${formData.eventName || "Sound System"} · ${formData.location || "TBC"}<br>
+        ${formData.eventDate}${eventTime ? ` · ${eventTime}` : ""}
       </p>
 
       <div style="margin: 20px 0;">
         <a href="${SITE_URL}/review-quote?token=${approvalToken}"
            style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-          Review Quote #${quote.quoteNumber}
+          Review #${quote.quoteNumber}
         </a>
+        ${quoteFileId ? `<a href="${getDriveViewLink(quoteFileId)}" style="margin-left: 12px; color: #64748b; font-size: 13px;">PDF</a>` : ""}
+        ${jobSheetFileId ? `<a href="${getDriveViewLink(jobSheetFileId)}" style="margin-left: 8px; color: #64748b; font-size: 13px;">Job Sheet</a>` : ""}
       </div>
-
-      <p style="font-size: 12px; color: #94a3b8;">
-        ${quoteFileId ? `<a href="${getDriveViewLink(quoteFileId)}" style="color: #64748b;">Quote PDF</a>` : ""}
-        ${quoteFileId && jobSheetFileId ? " · " : ""}
-        ${jobSheetFileId ? `<a href="${getDriveViewLink(jobSheetFileId)}" style="color: #64748b;">Job Sheet</a>` : ""}
-      </p>
     </div>
   `;
 }

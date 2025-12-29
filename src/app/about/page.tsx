@@ -24,13 +24,16 @@ export default function AboutPage() {
               </h2>
               <div className="space-y-5 text-gray-700 text-lg font-medium">
                 <p>
-                  Starting in 2005, Accent Productions has provided audio solutions for over 2000 events in Wellington.
+                  Since 2005, Accent Productions has been the go-to sound team for events across Wellington. Over 2000 gigs later, we're still at it..
                 </p>
                 <p className="font-semibold">Notable partnerships:</p>
                 <ul className="list-none space-y-1">
-                  <li>Newton Festival: 2005–2026</li>
-                  <li>Cuba Dupa: 2022–2026</li>
+                  <li>Newtown Festival: 2005–2026 (20+ years)</li>
+                  <li>Cuba Dupa: 2022–2026 (4 years)</li>
                 </ul>
+                <p>
+                  We've worked everything from backyard weddings to multi-stage street festivals. Same crew, same gear, same approach every time: show up early, get it right, pack it out clean.
+                </p>
                 <p>
                   We handle delivery, setup, operation, and breakdown. You focus on your event.
                 </p>

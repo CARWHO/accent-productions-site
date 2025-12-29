@@ -220,8 +220,6 @@ function TimeInput({
 function InquiryForm() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
@@ -432,20 +430,9 @@ function InquiryForm() {
   };
 
   const goToStep = (newStep: number) => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setIsVisible(false);
-    // Clear validation when changing steps
     setShowValidation(false);
-
-    setTimeout(() => {
-      setStep(newStep);
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      setTimeout(() => {
-        setIsVisible(true);
-        setIsTransitioning(false);
-      }, 50);
-    }, 100);
+    setStep(newStep);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   async function handleSubmit() {
@@ -470,12 +457,8 @@ function InquiryForm() {
         body: formDataObj,
       });
       if (response.ok) {
-        setIsVisible(false);
-        setTimeout(() => {
-          setSubmitted(true);
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          setIsVisible(true);
-        }, 100);
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'instant' });
       }
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -487,7 +470,7 @@ function InquiryForm() {
   if (submitted) {
     return (
       <PageCard centered>
-        <div className={`flex flex-col items-center text-center transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex flex-col items-center text-center">
           <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -551,7 +534,7 @@ function InquiryForm() {
 
       {/* Step 1: Package Selection */}
       {step === 1 && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col min-h-[350px] lg:min-h-[678px] ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col min-h-[350px] lg:min-h-[678px]`}>
           <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
             {packages.map((pkg) => (
@@ -589,7 +572,7 @@ function InquiryForm() {
 
       {/* Step 2: Tech Rider (for small/medium/large - NOT extra_large) */}
       {step === 2 && formData.package !== 'extra_large' && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Do you have a tech rider?</h2>
             <p className="text-gray-600 mb-6 font-medium">
@@ -690,7 +673,7 @@ function InquiryForm() {
 
       {/* Step 2: Extra-Large Contact */}
       {step === 2 && formData.package === 'extra_large' && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
             <p className="text-gray-600 mb-4 font-medium">
@@ -778,7 +761,7 @@ function InquiryForm() {
 
       {/* Step 3: Venue & Logistics (medium/large) */}
       {step === 3 && (formData.package === 'medium' || formData.package === 'large') && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Venue & Logistics</h2>
             <div className="grid gap-3 lg:gap-4">
@@ -927,7 +910,7 @@ function InquiryForm() {
 
       {/* Step 3: Contact Info (small packages only) */}
       {step === 3 && formData.package === 'small' && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
             <div className="grid gap-3 lg:gap-4">
@@ -998,7 +981,7 @@ function InquiryForm() {
 
       {/* Step 4: Contact Info (medium/large) */}
       {step === 4 && (formData.package === 'medium' || formData.package === 'large') && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
             <div className="grid gap-3 lg:gap-4">
@@ -1069,7 +1052,7 @@ function InquiryForm() {
 
       {/* Step 4: Event Basics + Details (small packages - FINAL STEP) */}
       {step === 4 && formData.package === 'small' && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Details</h2>
             <div className="grid gap-3 lg:gap-4">
@@ -1246,9 +1229,9 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 5: Event Basics + Content (medium/large - FINAL STEP) */}
+      {/* Step 5: Event Details (medium/large) */}
       {step === 5 && (formData.package === 'medium' || formData.package === 'large') && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow overflow-y-auto">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Details</h2>
             <div className="grid gap-3 lg:gap-4">
@@ -1350,14 +1333,38 @@ function InquiryForm() {
                 )}
               </div>
             </div>
+          </div>
+          </div>
 
-            {/* Content options - simplified if tech rider uploaded */}
-            <div className="border-t border-gray-200 pt-4 mt-2">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Content & Setup</p>
+          <div className="flex gap-4 mt-auto pt-5">
+            <button onClick={() => goToStep(4)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button
+              onClick={() => {
+                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
+                  setShowValidation(true);
+                } else {
+                  setShowValidation(false);
+                  goToStep(6);
+                }
+              }}
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 6: Content & Setup (medium/large - FINAL STEP) */}
+      {step === 6 && (formData.package === 'medium' || formData.package === 'large') && (
+        <div className={`flex-grow flex flex-col`}>
+          <div className="flex-grow overflow-y-auto">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Content & Setup</h2>
+            <div className="grid gap-3 lg:gap-4">
 
               {/* Band Section - hide if tech rider (we'll get it from there) */}
               {!techRiderFile && (
-                <div className="border border-gray-200 rounded-md p-3 mb-3">
+                <div className="border border-gray-200 rounded-md p-3">
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1377,7 +1384,7 @@ function InquiryForm() {
               )}
 
               {/* DJ Section */}
-              <div className="border border-gray-200 rounded-md p-3 mb-3">
+              <div className="border border-gray-200 rounded-md p-3">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1396,7 +1403,7 @@ function InquiryForm() {
               </div>
 
               {/* Speeches Section */}
-              <div className="border border-gray-200 rounded-md p-3 mb-3">
+              <div className="border border-gray-200 rounded-md p-3">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1410,36 +1417,28 @@ function InquiryForm() {
                   </div>
                 </label>
               </div>
-            </div>
 
-            {/* Additional Information */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Additional Information
-                <AutofillBadge field="additionalInfo" />
-              </label>
-              <textarea
-                value={formData.additionalInfo || ''}
-                onChange={(e) => updateField('additionalInfo', e.target.value)}
-                rows={4}
-                className={`${inputStyles} resize-none`}
-                placeholder={techRiderFile ? "Multiple bands, special requirements, etc..." : "Band names, number of performers, any other details..."}
-              />
+              {/* Additional Information */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Additional Information
+                  <AutofillBadge field="additionalInfo" />
+                </label>
+                <textarea
+                  value={formData.additionalInfo || ''}
+                  onChange={(e) => updateField('additionalInfo', e.target.value)}
+                  rows={4}
+                  className={`${inputStyles} resize-none`}
+                  placeholder={techRiderFile ? "Multiple bands, special requirements, etc..." : "Band names, number of performers, any other details..."}
+                />
+              </div>
             </div>
-          </div>
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(4)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(5)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
-              onClick={() => {
-                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
-                  setShowValidation(true);
-                } else {
-                  setShowValidation(false);
-                  handleSubmit();
-                }
-              }}
+              onClick={() => handleSubmit()}
               disabled={isSubmitting}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
             >
