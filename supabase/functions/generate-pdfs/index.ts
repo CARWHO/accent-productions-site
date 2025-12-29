@@ -357,6 +357,55 @@ async function generateQuoteSheet(
   }
 }
 
+async function generateJobsheetSheet(
+  quoteNumber: string,
+  eventName: string,
+  eventDate: string,
+  eventTime: string | null,
+  location: string,
+  clientName: string,
+  clientEmail: string,
+  clientPhone: string,
+  equipment: { item: string; quantity: number; notes?: string }[],
+  folderType: "backline" | "fullsystem"
+): Promise<SheetResult | null> {
+  try {
+    console.log(`[generate-pdfs] Generating Jobsheet Sheet for ${folderType}...`);
+    const response = await fetch(`${SITE_URL}/api/generate-jobsheet-sheet`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${EDGE_FUNCTION_SECRET}`
+      },
+      body: JSON.stringify({
+        quoteNumber,
+        eventName,
+        eventDate,
+        eventTime: eventTime || "TBC",
+        location,
+        clientName,
+        clientEmail,
+        clientPhone,
+        equipment,
+        folderType
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Jobsheet Sheet generation failed:", errorText);
+      return null;
+    }
+
+    const result = await response.json();
+    console.log(`[generate-pdfs] Created Jobsheet Sheet: ${result.spreadsheetId}`);
+    return result;
+  } catch (error) {
+    console.error("Jobsheet Sheet error:", error);
+    return null;
+  }
+}
+
 // ============================================
 // MAIN HANDLER
 // ============================================
@@ -414,97 +463,59 @@ serve(async (req) => {
       quoteSheetUrl = sheetResult.spreadsheetUrl;
     }
 
-    // Generate and upload Quote PDF (then release memory)
-    let quoteDriveFileId: string | null = null;
-    if (quoteFolderId) {
-      quoteDriveFileId = await generateAndUploadQuotePDF(
-        quote,
-        formData.contactName,
-        formData.contactEmail,
-        formData.contactPhone,
-        eventDate,
-        quoteFolderId,
-        accessToken,
-        quoteOptions
-      );
+    // Generate Jobsheet Sheet (for both backline and fullsystem)
+    let jobsheetSheetId: string | null = null;
+    let jobsheetSheetUrl: string | null = null;
+    const fsData = !isBackline ? formData as FullSystemFormData : null;
+
+    // Build equipment list from suggested gear
+    const equipment = (quote.suggestedGear || []).map(item => ({
+      item: item.item,
+      quantity: item.quantity,
+      notes: item.notes || ""
+    }));
+
+    const jobsheetResult = await generateJobsheetSheet(
+      quote.quoteNumber,
+      fsData?.eventName || "Backline Hire",
+      fsData?.eventDate || (formData as BacklineFormData).startDate || "TBC",
+      fsData?.eventStartTime || null,
+      fsData?.location || "TBC",
+      formData.contactName,
+      formData.contactEmail,
+      formData.contactPhone,
+      equipment,
+      isBackline ? "backline" : "fullsystem"
+    );
+    if (jobsheetResult) {
+      jobsheetSheetId = jobsheetResult.spreadsheetId;
+      jobsheetSheetUrl = jobsheetResult.spreadsheetUrl;
     }
 
-    // Generate and upload Job Sheet PDF (fullsystem only)
-    let jobSheetDriveFileId: string | null = null;
-    const jobSheetFolderId = isBackline ? GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID;
-    if (!isBackline && jobSheetFolderId) {
-      const fsData = formData as FullSystemFormData;
-      const contentReqs: string[] = [];
-      if (fsData.playbackFromDevice) contentReqs.push("Playback from device");
-      if (fsData.hasLiveMusic) contentReqs.push("Live music");
-      if (fsData.needsMic) contentReqs.push("Microphone required");
-      if (fsData.hasDJ) contentReqs.push("DJ");
-      if (fsData.hasBand) contentReqs.push("Live band(s)");
-      if (fsData.hasSpeeches) contentReqs.push("Speeches/presentations");
-
-      const jobSheetInput: JobSheetInput = {
-        eventName: fsData.eventName || "Event",
-        eventDate: fsData.eventDate || "TBC",
-        eventTime: fsData.eventStartTime || null,
-        eventEndTime: fsData.eventEndTime || null,
-        location: fsData.location || "TBC",
-        quoteNumber: quote.quoteNumber,
-        contractorName: "TBC",
-        hourlyRate: null,
-        estimatedHours: null,
-        payAmount: 0,
-        tasksDescription: null,
-        executionNotes: quote.executionNotes || [],
-        equipment: [],
-        suggestedGear: quote.suggestedGear || [],
-        unavailableGear: quote.unavailableGear || [],
-        eventType: fsData.eventType || null,
-        attendance: fsData.attendance ? String(fsData.attendance) : null,
-        setupTime: fsData.setupTime || null,
-        indoorOutdoor: fsData.indoorOutdoor || null,
-        contentRequirements: contentReqs,
-        additionalNotes: fsData.additionalInfo || null,
-        // Venue details
-        venueContact: fsData.venueContact || null,
-        hasStage: fsData.hasStage || false,
-        stageDetails: fsData.stageDetails || null,
-        powerAccess: fsData.powerAccess || null,
-        wetWeatherPlan: fsData.wetWeatherPlan || null,
-        needsGenerator: fsData.needsGenerator || false,
-        clientName: fsData.contactName,
-        clientPhone: fsData.contactPhone,
-        clientEmail: fsData.contactEmail,
-      };
-
-      jobSheetDriveFileId = await generateAndUploadJobSheetPDF(jobSheetInput, jobSheetFolderId, accessToken);
-    }
-
-    // Update inquiry with Drive file IDs and Sheet IDs
-    const updateData: Record<string, unknown> = { status: "pdfs_ready" };
-    if (quoteDriveFileId) updateData.drive_file_id = quoteDriveFileId;
-    if (jobSheetDriveFileId) updateData.job_sheet_drive_file_id = jobSheetDriveFileId;
+    // Update inquiry with Sheet IDs (no PDFs at this stage)
+    const updateData: Record<string, unknown> = { status: "sheets_ready" };
     if (quoteSheetId) updateData.quote_sheet_id = quoteSheetId;
+    if (jobsheetSheetId) updateData.jobsheet_sheet_id = jobsheetSheetId;
 
     await supabase.from("inquiries").update(updateData).eq("id", inquiry_id);
 
     // Also update booking record
     const bookingUpdate: Record<string, unknown> = {};
-    if (quoteDriveFileId) bookingUpdate.quote_drive_file_id = quoteDriveFileId;
     if (quoteSheetId) bookingUpdate.quote_sheet_id = quoteSheetId;
+    if (jobsheetSheetId) bookingUpdate.jobsheet_sheet_id = jobsheetSheetId;
     if (Object.keys(bookingUpdate).length > 0) {
       await supabase.from("bookings").update(bookingUpdate).eq("inquiry_id", inquiry_id);
     }
 
-    console.log(`[generate-pdfs] Done, status -> pdfs_ready`);
+    console.log(`[generate-pdfs] Done, status -> sheets_ready`);
     return new Response(JSON.stringify({
       success: true,
-      quoteDriveFileId,
-      jobSheetDriveFileId,
       quoteSheetId,
       quoteSheetUrl,
-      hasPdf: !!quoteDriveFileId,
-      hasJobSheet: !!jobSheetDriveFileId,
-      hasSheet: !!quoteSheetId
+      jobsheetSheetId,
+      jobsheetSheetUrl,
+      hasQuoteSheet: !!quoteSheetId,
+      hasJobsheetSheet: !!jobsheetSheetId
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("[generate-pdfs] Error:", error);

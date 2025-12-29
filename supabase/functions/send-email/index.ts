@@ -128,7 +128,7 @@ function getSheetEditLink(sheetId: string): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
 }
 
-function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, approvalToken: string, quoteSheetId: string | null): string {
+function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, approvalToken: string, quoteSheetId: string | null, jobsheetSheetId: string | null): string {
   // Count total items
   const totalItems = formData.equipment.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -151,13 +151,17 @@ function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, 
            style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
           Review Quote
         </a>
-        ${quoteSheetId ? `<a href="${getSheetEditLink(quoteSheetId)}" style="margin-left: 12px; color: #64748b; font-size: 13px;">Edit in Sheets</a>` : ""}
+      </div>
+
+      <div style="margin: 20px 0;">
+        ${quoteSheetId ? `<a href="${getSheetEditLink(quoteSheetId)}" style="margin-right: 16px; color: #2563eb; font-size: 14px;">Edit Quote Sheet</a>` : ""}
+        ${jobsheetSheetId ? `<a href="${getSheetEditLink(jobsheetSheetId)}" style="color: #2563eb; font-size: 14px;">Edit Jobsheet</a>` : ""}
       </div>
     </div>
   `;
 }
 
-function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutput, approvalToken: string, quoteSheetId: string | null): string {
+function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutput, approvalToken: string, quoteSheetId: string | null, jobsheetSheetId: string | null): string {
   const eventTime = formData.eventTime || (formData.eventStartTime && formData.eventEndTime ? `${formData.eventStartTime} - ${formData.eventEndTime}` : null);
 
   return `
@@ -173,7 +177,11 @@ function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutp
            style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">
           Review #${quote.quoteNumber}
         </a>
-        ${quoteSheetId ? `<a href="${getSheetEditLink(quoteSheetId)}" style="margin-left: 12px; color: #64748b; font-size: 13px;">Edit in Sheets</a>` : ""}
+      </div>
+
+      <div style="margin: 20px 0;">
+        ${quoteSheetId ? `<a href="${getSheetEditLink(quoteSheetId)}" style="margin-right: 16px; color: #2563eb; font-size: 14px;">Edit Quote Sheet</a>` : ""}
+        ${jobsheetSheetId ? `<a href="${getSheetEditLink(jobsheetSheetId)}" style="color: #2563eb; font-size: 14px;">Edit Jobsheet</a>` : ""}
       </div>
     </div>
   `;
@@ -196,7 +204,7 @@ serve(async (req) => {
 
     const { data: inquiry, error: fetchError } = await supabase.from("inquiries").select("*").eq("id", inquiry_id).single();
     if (fetchError || !inquiry) throw new Error(`Failed to fetch inquiry: ${fetchError?.message}`);
-    if (inquiry.status !== "pdfs_ready") return new Response(JSON.stringify({ success: true, skipped: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (inquiry.status !== "sheets_ready") return new Response(JSON.stringify({ success: true, skipped: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const formData: FormData = inquiry.form_data_json;
     const quote: QuoteOutput = inquiry.quote_data;
@@ -204,13 +212,14 @@ serve(async (req) => {
 
     if (!quote) throw new Error("No quote_data found");
 
-    // Get Sheet ID for edit link (no PDFs in initial email)
+    // Get Sheet IDs for edit links (no PDFs in initial email)
     const quoteSheetId = inquiry.quote_sheet_id || null;
+    const jobsheetSheetId = inquiry.jobsheet_sheet_id || null;
 
     // Build email HTML
     const emailHtml = isBackline
-      ? buildBacklineEmailHtml(formData, quote, inquiry.approval_token, quoteSheetId)
-      : buildFullSystemEmailHtml(formData as FullSystemFormData, quote, inquiry.approval_token, quoteSheetId);
+      ? buildBacklineEmailHtml(formData, quote, inquiry.approval_token, quoteSheetId, jobsheetSheetId)
+      : buildFullSystemEmailHtml(formData as FullSystemFormData, quote, inquiry.approval_token, quoteSheetId, jobsheetSheetId);
 
     console.log(`[send-email] Sending email...`);
     const emailTag = isBackline ? "+dryhire@" : "+fullevent@";
