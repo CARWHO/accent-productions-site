@@ -4,21 +4,6 @@ import type { FolderType } from '@/lib/google-drive';
 
 const EDGE_FUNCTION_SECRET = process.env.EDGE_FUNCTION_SECRET || 'default-secret-change-me';
 
-interface StructuredLineItems {
-  foh: number;
-  monitors: { count: number; cost: number };
-  microphones: { count: number; cost: number };
-  console: number;
-  cables: number;
-  vehicle: number;
-  techTime: { hours: number; rate: number; cost: number };
-}
-
-function isStructuredQuote(lineItems: unknown): lineItems is StructuredLineItems {
-  if (!lineItems || Array.isArray(lineItems)) return false;
-  return typeof lineItems === 'object' && 'foh' in lineItems;
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-NZ', {
     day: 'numeric',
@@ -27,6 +12,33 @@ function formatDate(dateStr: string): string {
   });
 }
 
+/**
+ * Generate a quote Google Sheet from quote data
+ *
+ * NEW FORMAT (2024):
+ * - LineItems use gear names from Master Equipment Sheet
+ * - Pricing is auto-calculated via VLOOKUP formulas
+ * - Required: gearName, quantity, days
+ *
+ * Expected body format:
+ * {
+ *   quote: {
+ *     quoteNumber: string,
+ *     title?: string,
+ *     lineItems: Array<{
+ *       gearName: string,      // Must match Master Sheet equipment names
+ *       quantity: number,
+ *       days?: number          // Defaults to 1
+ *     }>
+ *   },
+ *   clientName: string,
+ *   clientEmail: string,
+ *   clientPhone?: string,
+ *   eventDate: string,
+ *   options?: { eventName?: string, location?: string },
+ *   folderType?: 'fullsystem' | 'backline' | 'soundtech'
+ * }
+ */
 export async function POST(request: Request) {
   try {
     // Verify request is from Edge Function
@@ -36,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { quote, clientName, clientEmail, clientPhone, eventDate, options, folderType } = body;
+    const { quote, clientName, clientEmail, clientPhone, eventDate, options, folderType, rentalDays } = body;
 
     if (!quote || !clientName || !clientEmail || !eventDate) {
       return NextResponse.json(
@@ -57,31 +69,23 @@ export async function POST(request: Request) {
       eventLocation: options?.location || 'TBC',
     };
 
-    // Convert line items to sheet format
+    // Convert line items to new format (gearName, quantity, days)
+    // Pricing is auto-calculated by sheet formulas from Master Equipment Sheet
+    const defaultDays = rentalDays || 1;
     let lineItems: LineItem[] = [];
 
-    if (isStructuredQuote(quote.lineItems)) {
-      // Full system quote - structured format
-      const items = quote.lineItems;
-      lineItems = [
-        { description: 'FOH System', cost: items.foh },
-        { description: `Monitors (${items.monitors.count}x)`, cost: items.monitors.cost },
-        { description: `Microphones (${items.microphones.count}x)`, cost: items.microphones.cost },
-        { description: 'Console', cost: items.console },
-        { description: 'Cables & Accessories', cost: items.cables },
-        { description: 'Vehicle', cost: items.vehicle },
-        { description: `Tech Time (${items.techTime.hours} hrs @ $${items.techTime.rate}/hr)`, cost: items.techTime.cost },
-      ].filter(item => item.cost > 0);
-    } else if (Array.isArray(quote.lineItems)) {
-      // Backline quote - array format
-      lineItems = quote.lineItems.map((item: { item?: string; description?: string; cost?: number; price?: number }) => ({
-        description: item.item || item.description || '',
-        cost: item.cost || item.price || 0,
-      }));
+    if (Array.isArray(quote.lineItems)) {
+      lineItems = quote.lineItems
+        .filter((item: Record<string, unknown>) => item.gearName || item.item || item.description)
+        .map((item: Record<string, unknown>) => ({
+          gearName: String(item.gearName || item.item || item.description || ''),
+          quantity: Number(item.quantity || item.qty || 1),
+          days: Number(item.days || defaultDays),
+        }));
     }
 
     // Determine folder type
-    const type: FolderType = folderType || 'fullsystem';
+    const type: FolderType = folderType || 'backline';
 
     // Create the sheet
     const result = await createQuoteSheet(type, quoteData, lineItems);

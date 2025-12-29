@@ -185,9 +185,11 @@ export async function generateQuotePDF(
     organization?: string;
     packageName?: string;
     eventName?: string;
+    issuedDate?: string;
   }
 ): Promise<Buffer> {
-  const today = formatDate();
+  // Use provided issuedDate or fall back to today's date
+  const issuedDate = options?.issuedDate || formatDate();
   const logoBase64 = getLogoBase64();
   const isInvoice = options?.isInvoice ?? false;
   const documentNumber = isInvoice ? (options?.invoiceNumber || quote.quoteNumber) : quote.quoteNumber;
@@ -217,7 +219,7 @@ export async function generateQuotePDF(
 
         {/* Quote/Invoice Number and Date */}
         <Text style={styles.quoteHeader}>
-          {isInvoice ? 'Invoice' : 'Quote'} Nº: {documentNumber}   Issued: {today}
+          {isInvoice ? 'Invoice' : 'Quote'} Nº: {documentNumber}   Issued: {issuedDate}
         </Text>
 
         {/* Client Info */}

@@ -163,7 +163,7 @@ async function createQuoteTemplate() {
 
   console.log('\n✅ Template created successfully!');
   console.log(`\nSpreadsheet URL: https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`);
-  console.log(`\nAdd this to your .env.local:`);
+  console.log(`\nAdd this to your .env:`);
   console.log(`GOOGLE_FULLSYSTEM_QUOTE_TEMPLATE_ID=${spreadsheetId}`);
 }
 

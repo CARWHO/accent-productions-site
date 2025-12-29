@@ -26,7 +26,8 @@
       "mcp__github-server__search_repositories",
       "mcp__github-server__list_commits",
       "Bash(git add:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

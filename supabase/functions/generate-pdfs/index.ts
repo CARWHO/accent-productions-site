@@ -42,7 +42,13 @@ interface QuoteSheetData {
   eventName: string;
   eventDate: string;
   eventLocation: string;
-  lineItems: { quantity: number; cost: number; rate: string; description: string }[];
+  lineItems: {
+    gearName: string;
+    quantity: number;
+    days: number;
+    unitRate: number;
+    lineTotal: number;
+  }[];
   subtotal: number;
   gst: number;
   total: number;
@@ -186,13 +192,16 @@ async function generateInvoicePDF(
     console.log("[generate-pdfs] Generating Invoice PDF from sheet data...");
 
     // Convert sheet data to quote format for PDF generation
+    // New format: gearName, quantity, days, unitRate, lineTotal
     const quote = {
       quoteNumber: sheetData.quoteNumber,
       title: sheetData.eventName,
       description: sheetData.eventLocation,
       lineItems: sheetData.lineItems.map(item => ({
-        description: item.description,
-        amount: item.cost * item.quantity,
+        description: item.quantity > 1 || item.days > 1
+          ? `${item.gearName} (${item.quantity}x, ${item.days} day${item.days > 1 ? 's' : ''})`
+          : item.gearName,
+        amount: item.lineTotal,
       })),
       subtotal: sheetData.subtotal,
       gst: sheetData.gst,
@@ -211,7 +220,7 @@ async function generateInvoicePDF(
         clientEmail: sheetData.clientEmail,
         clientPhone: sheetData.clientPhone,
         eventDate: sheetData.eventDate,
-        options: { isInvoice: true, invoiceNumber },
+        options: { isInvoice: true, invoiceNumber, issuedDate: sheetData.issuedDate },
       }),
     });
 

@@ -58,7 +58,7 @@
 ### Step 4: Get Template ID
 1. Copy the URL: `https://docs.google.com/spreadsheets/d/XXXXXX/edit`
 2. The ID is the `XXXXXX` part
-3. Add to your `.env.local`:
+3. Add to your `.env`:
    ```
    GOOGLE_FULLSYSTEM_QUOTE_TEMPLATE_ID=XXXXXX
    GOOGLE_BACKLINE_QUOTE_TEMPLATE_ID=XXXXXX
@@ -108,7 +108,7 @@
 ### Step 4: Get Template ID
 1. Copy the URL: `https://docs.google.com/spreadsheets/d/XXXXXX/edit`
 2. The ID is the `XXXXXX` part
-3. Add to your `.env.local`:
+3. Add to your `.env`:
    ```
    GOOGLE_FULLSYSTEM_JOBSHEET_TEMPLATE_ID=XXXXXX
    GOOGLE_BACKLINE_JOBSHEET_TEMPLATE_ID=XXXXXX

@@ -35,6 +35,30 @@ function extractId(input: string): string {
   return input.split('?')[0];
 }
 
+/**
+ * Convert Excel serial date to formatted date string
+ * Excel serial dates count days since 1900-01-01 (with a bug for 1900 leap year)
+ */
+function excelSerialToDate(serial: string | number): string {
+  const num = typeof serial === 'string' ? parseFloat(serial) : serial;
+
+  // If it's not a valid number or already looks like a date string, return as-is
+  if (isNaN(num) || num < 1000 || num > 100000) {
+    return String(serial);
+  }
+
+  // Excel epoch is 1900-01-01, but Excel has a bug treating 1900 as leap year
+  // So we subtract 2 days (1 for the bug, 1 because Excel starts at 1 not 0)
+  const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+  const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
+
+  return date.toLocaleDateString('en-NZ', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
 function getOAuth2Client() {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REFRESH_TOKEN) {
     return null;
@@ -65,6 +89,14 @@ export interface QuoteData {
 }
 
 export interface LineItem {
+  gearName: string;      // Equipment name (for VLOOKUP)
+  quantity: number;      // Qty
+  days: number;          // Rental days
+  // Note: unitRate, day2Rate, lineTotal are calculated by sheet formulas
+}
+
+// Legacy format for backward compatibility
+export interface LegacyLineItem {
   description: string;
   cost: number;
   quantity?: number;
@@ -77,6 +109,11 @@ export interface CreateQuoteSheetResult {
 
 /**
  * Copy a template spreadsheet and populate it with quote data
+ *
+ * NEW STRUCTURE (2024):
+ * - Data tab: Key-value pairs for metadata
+ * - LineItems tab: A=Gear Name, B=Qty, C=Days, D-F=Formulas (auto-calc from Master Sheet)
+ * - Totals tab: Formulas for subtotal/gst/total
  */
 export async function createQuoteSheet(
   folderType: FolderType,
@@ -113,38 +150,38 @@ export async function createQuoteSheet(
     const spreadsheetId = copyResponse.data.id!;
     console.log(`Created quote sheet: ${spreadsheetId}`);
 
-    // 2. Populate the Data tab with quote info
+    // 2. Populate the Data tab with quote info (B column only - A has keys)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: 'Data!A1:B10',
+      range: 'Data!B1:B9',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [
-          ['quote_number', quoteData.quoteNumber],
-          ['issued_date', quoteData.issuedDate],
-          ['client_name', quoteData.clientName],
-          ['client_email', quoteData.clientEmail],
-          ['client_phone', quoteData.clientPhone],
-          ['client_address', quoteData.clientAddress || 'N/A'],
-          ['event_name', quoteData.eventName],
-          ['event_date', quoteData.eventDate],
-          ['event_location', quoteData.eventLocation],
+          [quoteData.quoteNumber],
+          [quoteData.issuedDate],
+          [quoteData.clientName],
+          [quoteData.clientEmail],
+          [quoteData.clientPhone],
+          [quoteData.clientAddress || ''],
+          [quoteData.eventName],
+          [quoteData.eventDate],
+          [quoteData.eventLocation],
         ],
       },
     });
 
-    // 3. Populate line items on LineItems tab
+    // 3. Populate line items on LineItems tab (Gear Name, Qty, Days only)
+    // Columns D-F have formulas that auto-calculate pricing from Master Sheet
     if (lineItems.length > 0) {
       const lineItemValues = lineItems.map(item => [
-        item.quantity || 1,
-        item.cost,
-        '', // Rate column (for tech time)
-        item.description,
+        item.gearName,      // A: Gear Name (triggers VLOOKUP for pricing)
+        item.quantity,      // B: Qty
+        item.days,          // C: Days
       ]);
 
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: 'LineItems!A2:D' + (1 + lineItems.length),
+        range: 'LineItems!A2:C' + (1 + lineItems.length),
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: lineItemValues,
@@ -181,7 +218,13 @@ export interface QuoteSheetData {
   eventName: string;
   eventDate: string;
   eventLocation: string;
-  lineItems: { quantity: number; cost: number; rate: string; description: string }[];
+  lineItems: {
+    gearName: string;
+    quantity: number;
+    days: number;
+    unitRate: number;
+    lineTotal: number;
+  }[];
   subtotal: number;
   gst: number;
   total: number;
@@ -189,6 +232,11 @@ export interface QuoteSheetData {
 
 /**
  * Read data from a quote Google Sheet (for PDF generation)
+ *
+ * NEW STRUCTURE (2024):
+ * - Data tab: A=key, B=value
+ * - LineItems tab: A=Gear Name, B=Qty, C=Days, D=Unit Rate, E=Day2+ Rate, F=Line Total
+ * - Totals tab: A=key (subtotal, gst, total), B=value (formulas)
  */
 export async function readQuoteSheetData(
   spreadsheetId: string
@@ -202,7 +250,7 @@ export async function readQuoteSheetData(
 
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
 
-    // Read Data tab
+    // Read Data tab (key-value pairs)
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: 'Data!A1:B20',
@@ -216,41 +264,51 @@ export async function readQuoteSheetData(
       }
     }
 
-    // Read LineItems tab
+    // Read LineItems tab (A=Gear Name, B=Qty, C=Days, D=Unit Rate, E=Day2+ Rate, F=Line Total)
     const lineItemsResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'LineItems!A2:D100',
+      range: 'LineItems!A2:F100',
     });
 
     const lineItemRows = lineItemsResponse.data.values || [];
     const lineItems = lineItemRows
-      .filter(row => row[0] || row[1] || row[3]) // Has quantity, cost, or description
+      .filter(row => row[0]) // Has gear name
       .map(row => ({
-        quantity: Number(row[0]) || 1,
-        cost: Number(row[1]) || 0,
-        rate: String(row[2] || ''),
-        description: String(row[3] || ''),
+        gearName: String(row[0] || ''),
+        quantity: Number(row[1]) || 1,
+        days: Number(row[2]) || 1,
+        unitRate: Number(row[3]) || 0,
+        lineTotal: Number(row[5]) || 0, // Column F (index 5)
       }));
 
-    // Calculate totals from line items
-    const subtotal = lineItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0);
-    const gst = subtotal * 0.15;
-    const total = subtotal + gst;
+    // Read Totals tab (subtotal, gst, total are in B column)
+    const totalsResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Totals!A1:B4',
+    });
+
+    const totalsRows = totalsResponse.data.values || [];
+    const totalsMap: Record<string, number> = {};
+    for (const row of totalsRows) {
+      if (row[0] && row[1] !== undefined) {
+        totalsMap[row[0]] = Number(row[1]) || 0;
+      }
+    }
 
     return {
       quoteNumber: dataMap['quote_number'] || '',
-      issuedDate: dataMap['issued_date'] || '',
+      issuedDate: excelSerialToDate(dataMap['issued_date'] || ''),
       clientName: dataMap['client_name'] || '',
       clientEmail: dataMap['client_email'] || '',
       clientPhone: dataMap['client_phone'] || '',
       clientAddress: dataMap['client_address'] || '',
       eventName: dataMap['event_name'] || '',
-      eventDate: dataMap['event_date'] || '',
+      eventDate: excelSerialToDate(dataMap['event_date'] || ''),
       eventLocation: dataMap['event_location'] || '',
       lineItems,
-      subtotal,
-      gst,
-      total,
+      subtotal: totalsMap['subtotal'] || 0,
+      gst: totalsMap['gst'] || 0,
+      total: totalsMap['total'] || 0,
     };
   } catch (error) {
     console.error('Error reading quote sheet:', error);
@@ -318,6 +376,9 @@ export function getSheetEditUrl(spreadsheetId: string): string {
 
 /**
  * Update line items in an existing quote sheet
+ *
+ * NEW STRUCTURE: Updates LineItems tab with Gear Name, Qty, Days
+ * (pricing formulas auto-calculate from columns D-F)
  */
 export async function updateQuoteLineItems(
   spreadsheetId: string,
@@ -332,22 +393,23 @@ export async function updateQuoteLineItems(
 
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
 
-    // Clear existing line items first (rows 15-50, adjust range as needed)
+    // Clear existing line items (rows 2-51 to preserve header and formulas structure)
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
-      range: 'Quote!A15:B50',
+      range: 'LineItems!A2:C51',
     });
 
-    // Write new line items
+    // Write new line items (Gear Name, Qty, Days only)
     if (lineItems.length > 0) {
       const lineItemValues = lineItems.map(item => [
-        item.description,
-        item.cost,
+        item.gearName,
+        item.quantity,
+        item.days,
       ]);
 
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: 'Quote!A15:B' + (14 + lineItems.length),
+        range: 'LineItems!A2:C' + (1 + lineItems.length),
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: lineItemValues,
@@ -362,22 +424,50 @@ export async function updateQuoteLineItems(
   }
 }
 
+export interface JobSheetEventData {
+  quoteNumber: string;
+  eventName: string;
+  eventDate: string;
+  eventTime?: string;
+  location: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  loadInTime?: string;
+  soundCheckTime?: string;
+  doorsTime?: string;
+  setTime?: string;
+  finishTime?: string;
+  packDownTime?: string;
+}
+
+export interface JobSheetEquipment {
+  gearName: string;
+  quantity: number;
+  notes?: string;
+}
+
+export interface JobSheetCrew {
+  role: string;
+  name?: string;
+  phone?: string;
+  rate?: number;
+  hours?: number;
+}
+
 /**
  * Create a job sheet from template
+ *
+ * NEW STRUCTURE (2024):
+ * - Event Data tab: Key-value pairs (B column only - A has keys)
+ * - Equipment tab: A=Gear Name, B=Qty, C=Notes
+ * - Crew tab: A=Role, B=Name, C=Phone, D=Rate, E=Hours, F=Pay (formula)
  */
 export async function createJobSheet(
   folderType: FolderType,
-  eventData: {
-    quoteNumber: string;
-    eventName: string;
-    eventDate: string;
-    eventTime: string;
-    location: string;
-    clientName: string;
-    clientEmail: string;
-    clientPhone: string;
-  },
-  equipment: Array<{ item: string; quantity: number; notes?: string }>
+  eventData: JobSheetEventData,
+  equipment: JobSheetEquipment[],
+  crew?: JobSheetCrew[]
 ): Promise<CreateQuoteSheetResult | null> {
   try {
     const oauth2Client = getOAuth2Client();
@@ -409,29 +499,35 @@ export async function createJobSheet(
     const spreadsheetId = copyResponse.data.id!;
     console.log(`Created job sheet: ${spreadsheetId}`);
 
-    // 2. Populate event data
+    // 2. Populate Event Data tab (B column only - A has keys)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: 'Event Data!A1:B10',
+      range: "'Event Data'!B1:B14",
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [
-          ['quote_number', eventData.quoteNumber],
-          ['event_name', eventData.eventName],
-          ['event_date', eventData.eventDate],
-          ['event_time', eventData.eventTime],
-          ['location', eventData.location],
-          ['client_name', eventData.clientName],
-          ['client_email', eventData.clientEmail],
-          ['client_phone', eventData.clientPhone],
+          [eventData.quoteNumber],
+          [eventData.eventName],
+          [eventData.eventDate],
+          [eventData.eventTime || ''],
+          [eventData.location],
+          [eventData.clientName],
+          [eventData.clientEmail],
+          [eventData.clientPhone],
+          [eventData.loadInTime || ''],
+          [eventData.soundCheckTime || ''],
+          [eventData.doorsTime || ''],
+          [eventData.setTime || ''],
+          [eventData.finishTime || ''],
+          [eventData.packDownTime || ''],
         ],
       },
     });
 
-    // 3. Populate equipment list
+    // 3. Populate Equipment tab (Gear Name, Qty, Notes)
     if (equipment.length > 0) {
       const equipmentValues = equipment.map(item => [
-        item.item,
+        item.gearName,
         item.quantity,
         item.notes || '',
       ]);
@@ -446,7 +542,28 @@ export async function createJobSheet(
       });
     }
 
-    // 4. Share with anyone who has the link
+    // 4. Populate Crew tab if provided (Role, Name, Phone, Rate, Hours)
+    // Pay column (F) has formula that auto-calculates
+    if (crew && crew.length > 0) {
+      const crewValues = crew.map(member => [
+        member.role,
+        member.name || '',
+        member.phone || '',
+        member.rate || '',
+        member.hours || '',
+      ]);
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: 'Crew!A2:E' + (1 + crew.length),
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: crewValues,
+        },
+      });
+    }
+
+    // 5. Share with anyone who has the link
     await drive.permissions.create({
       fileId: spreadsheetId,
       requestBody: {
