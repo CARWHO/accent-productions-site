@@ -4,11 +4,15 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
 import { generateQuotePDF } from '@/lib/pdf-quote';
 import { QuoteOutput } from '@/lib/gemini-quote';
-import { generateSoundQuotePDF } from '@/lib/pdf-sound-quote';
-import { SoundQuoteOutput } from '@/lib/gemini-sound-quote';
+import { uploadQuoteToDrive, shareFileWithLink, FolderType } from '@/lib/google-drive';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
+
+function getInvoiceFolderType(bookingType: string | null): FolderType {
+  if (bookingType === 'backline') return 'backline';
+  return 'fullsystem'; // default for soundgear and other types
+}
 
 export async function POST(request: Request) {
   try {
@@ -24,16 +28,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Database not configured' }, { status: 500 });
     }
 
-    // Fetch booking
+    // Fetch booking with related inquiry (for original quote data)
     const { data: booking, error: fetchError } = await supabase
       .from('bookings')
-      .select('*')
+      .select('*, inquiries(quote_data)')
       .eq('id', bookingId)
       .single();
 
     if (fetchError || !booking) {
       return NextResponse.json({ success: false, message: 'Booking not found' }, { status: 404 });
     }
+
+    // Get the original quote data from the inquiry
+    const originalQuote = (booking.inquiries as { quote_data: QuoteOutput } | null)?.quote_data || booking.quote_json as QuoteOutput | null;
 
     // Generate invoice number (INV-YYYY-XXXX format)
     const year = new Date().getFullYear();
@@ -110,22 +117,35 @@ export async function POST(request: Request) {
         });
       };
 
-      // Generate invoice PDF using the same format as the original quote
-      let invoicePdfBuffer: Buffer | null = null;
+      // Generate invoice PDF and upload to Google Drive
+      // Use the EXACT same quote data that was originally generated
+      let invoiceDriveLink: string | null = null;
       try {
-        if (booking.booking_type === 'soundgear' && booking.quote_json) {
-          // Sound quote - use the stored quote data
-          const soundQuote = booking.quote_json as SoundQuoteOutput;
-          invoicePdfBuffer = await generateSoundQuotePDF(
-            soundQuote,
+        let invoicePdfBuffer: Buffer | null = null;
+
+        if (originalQuote) {
+          // Use the original quote data - just change "Quote" to "Invoice"
+          const quoteForInvoice: QuoteOutput = {
+            ...originalQuote,
+            // If there's an adjusted amount, update the totals
+            ...(adjustedAmount ? {
+              subtotal: adjustedAmount / 1.15,
+              gst: adjustedAmount - (adjustedAmount / 1.15),
+              total: adjustedAmount,
+            } : {}),
+          };
+
+          invoicePdfBuffer = await generateQuotePDF(
+            quoteForInvoice,
             booking.client_name,
             booking.client_email,
             booking.client_phone || '',
-            booking.organization || undefined,
+            booking.event_date,
             { isInvoice: true, invoiceNumber }
           );
         } else {
-          // Backline quote - build from details
+          // Fallback: build from details if no original quote found
+          console.warn('No original quote found, building invoice from details');
           const quoteData: QuoteOutput = {
             quoteNumber: booking.quote_number || invoiceNumber,
             title: booking.event_name || 'Event',
@@ -144,6 +164,16 @@ export async function POST(request: Request) {
             booking.event_date,
             { isInvoice: true, invoiceNumber }
           );
+        }
+
+        // Upload to Google Drive and get shareable link
+        if (invoicePdfBuffer) {
+          const folderType = getInvoiceFolderType(booking.booking_type);
+          const invoiceFilename = `Invoice-${invoiceNumber}.pdf`;
+          const fileId = await uploadQuoteToDrive(invoicePdfBuffer, invoiceFilename, folderType);
+          if (fileId) {
+            invoiceDriveLink = await shareFileWithLink(fileId);
+          }
         }
       } catch (pdfError) {
         console.error('Error generating invoice PDF:', pdfError);
@@ -182,7 +212,9 @@ export async function POST(request: Request) {
             <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: left;">
               <div style="font-size: 14px; color: #92400e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Deposit Required (${depositPercentValue}%)</div>
               <div style="font-size: 28px; font-weight: bold; color: #b45309;">$${depositAmount.toFixed(2)}</div>
-              <p style="margin: 10px 0 0 0; color: #92400e; font-size: 14px;">This deposit is required upfront to confirm your booking.</p>
+              <p style="margin: 10px 0 0 0; color: #92400e; font-size: 14px;">
+                Please pay the deposit to the bank account on the invoice, then click <strong>Approve Quote</strong> below to confirm your booking.
+              </p>
             </div>
             ` : ''}
 
@@ -193,7 +225,7 @@ export async function POST(request: Request) {
             </div>
             ` : ''}
 
-            <p style="text-align: left; margin-top: 25px;">Please approve this quote to confirm your booking:</p>
+            <p style="text-align: left; margin-top: 25px;">${depositAmount > 0 ? 'Once you\'ve paid the deposit, click below to confirm your booking:' : 'Click below to confirm your booking:'}</p>
 
             <div style="margin: 25px 0; text-align: left;">
               <a href="${approveUrl}"
@@ -203,10 +235,6 @@ export async function POST(request: Request) {
             </div>
 
             <p style="color: #666; font-size: 14px; text-align: left; margin-top: 30px;">
-              Payment details are on the attached invoice.
-            </p>
-
-            <p style="color: #666; font-size: 14px; text-align: left;">
               Questions? Reply to this email or call us on 027 602 3869.
             </p>
 
@@ -214,14 +242,9 @@ export async function POST(request: Request) {
             <p style="color: #999; font-size: 12px; text-align: left;">
               Accent Productions | Professional Sound & Lighting
             </p>
+            ${invoiceDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${invoiceDriveLink}" style="color: #94a3b8;">Invoice PDF</a></p>` : ''}
           </div>
         `,
-        ...(invoicePdfBuffer ? {
-          attachments: [{
-            filename: `Invoice-${invoiceNumber}.pdf`,
-            content: invoicePdfBuffer,
-          }],
-        } : {}),
       });
 
       console.log(`Sent invoice to client: ${booking.client_email}`);

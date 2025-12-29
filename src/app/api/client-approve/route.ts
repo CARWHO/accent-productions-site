@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { createCalendarEvent } from '@/lib/google-calendar';
+import { shareFileWithLink } from '@/lib/google-drive';
 import { randomUUID } from 'crypto';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -128,6 +129,61 @@ export async function GET(request: Request) {
       });
 
       console.log(`Notified business of client approval for booking ${booking.id}`);
+
+      // Send confirmation email to client with quote link
+      let quoteDriveLink: string | null = null;
+      if (booking.quote_drive_file_id) {
+        quoteDriveLink = await shareFileWithLink(booking.quote_drive_file_id);
+      }
+
+      await resend.emails.send({
+        from: 'Accent Productions <notifications@accent-productions.co.nz>',
+        to: [booking.client_email],
+        subject: `Booking Confirmed - ${booking.event_name || 'Your Event'}`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; text-align: left;">
+            <div style="margin-bottom: 24px;">
+              <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 100px; width: auto;" />
+            </div>
+
+            <h1 style="color: #16a34a; margin-bottom: 10px; text-align: left;">Booking Confirmed!</h1>
+
+            <p style="text-align: left;">Hi ${booking.client_name.split(' ')[0]},</p>
+            <p style="text-align: left;">Thanks for confirming your booking with us! We're excited to work with you.</p>
+
+            <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin: 25px 0; text-align: left;">
+              <div style="font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Your Event</div>
+              <div style="font-size: 24px; font-weight: bold; color: #15803d; margin-bottom: 15px;">${booking.event_name || 'Your Event'}</div>
+              <div style="border-top: 1px solid #bbf7d0; padding-top: 15px;">
+                <div style="margin-bottom: 5px;"><strong>Date:</strong> ${formatDate(booking.event_date)}</div>
+                <div style="margin-bottom: 5px;"><strong>Location:</strong> ${booking.location || 'TBC'}</div>
+                <div><strong>Quote:</strong> #${booking.quote_number}</div>
+              </div>
+            </div>
+
+            <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
+              <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #374151;">What happens next?</h3>
+              <ul style="margin: 0; padding-left: 20px; color: #4b5563;">
+                <li style="margin-bottom: 8px;">We'll assign our crew to your event</li>
+                <li style="margin-bottom: 8px;">You'll receive a job sheet with all the details closer to the date</li>
+                <li>Our team will be in touch if we need any more information</li>
+              </ul>
+            </div>
+
+            <p style="color: #666; font-size: 14px; text-align: left; margin-top: 30px;">
+              Questions? Reply to this email or call us on 027 602 3869.
+            </p>
+
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
+            <p style="color: #999; font-size: 12px; text-align: left;">
+              Accent Productions | Professional Sound & Lighting
+            </p>
+            ${quoteDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${quoteDriveLink}" style="color: #94a3b8;">Quote PDF</a></p>` : ''}
+          </div>
+        `,
+      });
+
+      console.log(`Sent confirmation email to client: ${booking.client_email}`);
     }
 
     // Redirect client to success page

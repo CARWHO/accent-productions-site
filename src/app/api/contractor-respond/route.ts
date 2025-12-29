@@ -256,14 +256,17 @@ export async function GET(request: Request) {
           clientEmail: booking.client_email,
         };
 
-        let jobSheetBuffer: Buffer | null = null;
+        let jobSheetDriveLink: string | null = null;
         const jobSheetFilename = `JobSheet-CONFIRMED-${booking.quote_number || 'Job'}-${contractor.name.split(' ')[0]}.pdf`;
         try {
-          jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
-          // Upload confirmed job sheet to Google Drive
+          const jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
+          // Upload confirmed job sheet to Google Drive and get shareable link
           if (jobSheetBuffer) {
             const folderType = getJobSheetFolderType(booking.booking_type);
-            await uploadJobSheetToDrive(jobSheetBuffer, jobSheetFilename, folderType);
+            const fileId = await uploadJobSheetToDrive(jobSheetBuffer, jobSheetFilename, folderType);
+            if (fileId) {
+              jobSheetDriveLink = await shareFileWithLink(fileId);
+            }
           }
         } catch (pdfError) {
           console.error('Error generating Job Sheet PDF:', pdfError);
@@ -320,14 +323,9 @@ export async function GET(request: Request) {
               </div>
 
               <p style="color: #6b7280; font-size: 14px;">Barrie will be in touch with more details. Thanks!</p>
+              ${jobSheetDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${jobSheetDriveLink}" style="color: #94a3b8;">Job Sheet</a></p>` : ''}
             </div>
           `,
-          ...(jobSheetBuffer ? {
-            attachments: [{
-              filename: jobSheetFilename,
-              content: jobSheetBuffer,
-            }],
-          } : {}),
         });
       }
 

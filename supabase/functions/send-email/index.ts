@@ -124,7 +124,11 @@ async function sendEmail(options: { to: string[]; subject: string; html: string 
 // EMAIL HTML BUILDERS
 // ============================================
 
-function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, approvalToken: string): string {
+function getDriveViewLink(fileId: string): string {
+  return `https://drive.google.com/file/d/${fileId}/view`;
+}
+
+function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, approvalToken: string, quoteFileId: string | null): string {
   const equipmentList = formData.equipment.map((item) => `${item.name}: ${item.quantity}`).join("\n");
 
   return `
@@ -162,10 +166,11 @@ function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, 
         Review Quote
       </a>
     </div>
+    ${quoteFileId ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${getDriveViewLink(quoteFileId)}" style="color: #94a3b8;">Quote PDF</a></p>` : ""}
   `;
 }
 
-function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutput, approvalToken: string): string {
+function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutput, approvalToken: string, quoteFileId: string | null, jobSheetFileId: string | null): string {
   const contentReqs: string[] = [];
   if (formData.playbackFromDevice) contentReqs.push("Playback from device");
   if (formData.hasLiveMusic) contentReqs.push("Live music");
@@ -263,6 +268,11 @@ function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutp
         Review Quote
       </a>
     </div>
+    <p style="font-size: 11px; color: #94a3b8;">
+      ${quoteFileId ? `<a href="${getDriveViewLink(quoteFileId)}" style="color: #94a3b8;">Quote PDF</a>` : ""}
+      ${quoteFileId && jobSheetFileId ? " · " : ""}
+      ${jobSheetFileId ? `<a href="${getDriveViewLink(jobSheetFileId)}" style="color: #94a3b8;">Job Sheet</a>` : ""}
+    </p>
   `;
 }
 
@@ -291,10 +301,14 @@ serve(async (req) => {
 
     if (!quote) throw new Error("No quote_data found");
 
+    // Get Drive file IDs for links
+    const quoteFileId = inquiry.drive_file_id || null;
+    const jobSheetFileId = inquiry.job_sheet_drive_file_id || null;
+
     // Build email HTML
     const emailHtml = isBackline
-      ? buildBacklineEmailHtml(formData, quote, inquiry.approval_token)
-      : buildFullSystemEmailHtml(formData as FullSystemFormData, quote, inquiry.approval_token);
+      ? buildBacklineEmailHtml(formData, quote, inquiry.approval_token, quoteFileId)
+      : buildFullSystemEmailHtml(formData as FullSystemFormData, quote, inquiry.approval_token, quoteFileId, jobSheetFileId);
 
     console.log(`[send-email] Sending email...`);
     const emailTag = isBackline ? "+dryhire@" : "+fullevent@";

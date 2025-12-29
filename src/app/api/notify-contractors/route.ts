@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
 import { generateJobSheetPDF, JobSheetInput } from '@/lib/pdf-job-sheet';
-import { uploadJobSheetToDrive, FolderType } from '@/lib/google-drive';
+import { uploadJobSheetToDrive, shareFileWithLink, FolderType } from '@/lib/google-drive';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -167,14 +167,17 @@ export async function POST(request: Request) {
             clientEmail: booking.client_email,
           };
 
-          let jobSheetBuffer: Buffer | null = null;
+          let jobSheetDriveLink: string | null = null;
           const jobSheetFilename = `JobSheet-${booking.quote_number || 'Job'}-${contractor.name.split(' ')[0]}.pdf`;
           try {
-            jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
-            // Upload to Google Drive
+            const jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
+            // Upload to Google Drive and get shareable link
             if (jobSheetBuffer) {
               const folderType = getJobSheetFolderType(booking.booking_type);
-              await uploadJobSheetToDrive(jobSheetBuffer, jobSheetFilename, folderType);
+              const fileId = await uploadJobSheetToDrive(jobSheetBuffer, jobSheetFilename, folderType);
+              if (fileId) {
+                jobSheetDriveLink = await shareFileWithLink(fileId);
+              }
             }
           } catch (pdfError) {
             console.error('Error generating Job Sheet PDF:', pdfError);
@@ -282,14 +285,9 @@ export async function POST(request: Request) {
                 <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
                   Please respond ASAP so we can finalize the booking.
                 </p>
+                ${jobSheetDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${jobSheetDriveLink}" style="color: #94a3b8;">Job Sheet</a></p>` : ''}
               </div>
             `,
-            ...(jobSheetBuffer ? {
-              attachments: [{
-                filename: jobSheetFilename,
-                content: jobSheetBuffer,
-              }],
-            } : {}),
           });
 
           console.log(`Sent job notification to ${contractor.email}`);
