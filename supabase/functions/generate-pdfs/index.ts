@@ -160,7 +160,35 @@ async function uploadToDrive(pdfBuffer: Uint8Array, filename: string, folderId: 
   }
   const data = await response.json();
   console.log(`Uploaded ${filename} to Drive (ID: ${data.id})`);
+
+  // Set "anyone with link can view" permission for email links
+  await setDriveFilePublic(data.id, accessToken);
+
   return data.id;
+}
+
+async function setDriveFilePublic(fileId: string, accessToken: string): Promise<void> {
+  try {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        role: "reader",
+        type: "anyone",
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Failed to set file permission:", await response.text());
+    } else {
+      console.log(`Set public permission for file ${fileId}`);
+    }
+  } catch (error) {
+    console.error("Error setting file permission:", error);
+  }
 }
 
 // ============================================
