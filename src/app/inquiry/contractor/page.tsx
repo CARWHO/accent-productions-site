@@ -214,7 +214,7 @@ export default function ContractorInquiryPage() {
                     <textarea
                       value={formData.eventDescription}
                       onChange={(e) => updateField('eventDescription', e.target.value)}
-                      className={`${inputStyles} resize-y min-h-[222px] ${showValidation && !formData.eventDescription ? 'border-red-500' : ''}`}
+                      className={`${inputStyles} resize-none min-h-[180px] ${showValidation && !formData.eventDescription ? 'border-red-500' : ''}`}
                       placeholder="Tell us about your event - what type of event is it? (e.g., wedding, corporate function, live band, DJ night, conference). How many guests are expected? What kind of audio setup do you need? Any specific requirements or challenges we should know about?"
                     />
                     {showValidation && !formData.eventDescription && (

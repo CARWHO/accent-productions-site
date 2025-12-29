@@ -333,7 +333,7 @@ function ReviewQuoteContent() {
 
   return (
     <PageCard stretch>
-      <div className="flex flex-col h-full overflow-y-auto">
+      <div className="flex flex-col h-full">
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
           <div>

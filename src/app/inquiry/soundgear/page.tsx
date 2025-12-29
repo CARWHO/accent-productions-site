@@ -499,7 +499,7 @@ function InquiryForm() {
   const totalSteps = formData.package === 'extra_large' ? 2 : (formData.package === 'small' ? 5 : 6);
 
   return (
-    <PageCard>
+    <PageCard stretch={step === 5 && (formData.package === 'medium' || formData.package === 'large')}>
       {/* Parsing Loading Overlay */}
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
@@ -572,7 +572,7 @@ function InquiryForm() {
             ))}
           </div>
 
-          <div className="flex gap-4 pt-5 flex-shrink-0">
+          <div className="flex gap-4 pt-4 flex-shrink-0">
             <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold">Back</a>
           </div>
         </div>
