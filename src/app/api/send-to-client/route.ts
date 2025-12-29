@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { generateQuotePDF } from '@/lib/pdf-quote';
 import { QuoteOutput } from '@/lib/gemini-quote';
 import { uploadQuoteToDrive, shareFileWithLink, FolderType } from '@/lib/google-drive';
+import { exportSheetAsPdf } from '@/lib/google-sheets';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -118,16 +119,27 @@ export async function POST(request: Request) {
       };
 
       // Generate invoice PDF and upload to Google Drive
-      // Use the EXACT same quote data that was originally generated
+      // Prefer exporting from Google Sheet if available
       let invoiceDriveLink: string | null = null;
       try {
         let invoicePdfBuffer: Buffer | null = null;
 
-        if (originalQuote) {
-          // Use the original quote data - just change "Quote" to "Invoice"
+        // Try to export from Google Sheet first (this has the edited data)
+        if (booking.quote_sheet_id) {
+          console.log(`Exporting invoice PDF from Google Sheet: ${booking.quote_sheet_id}`);
+          invoicePdfBuffer = await exportSheetAsPdf(booking.quote_sheet_id);
+          if (invoicePdfBuffer) {
+            console.log('Successfully exported PDF from Google Sheet');
+          } else {
+            console.warn('Failed to export from Google Sheet, falling back to PDF generation');
+          }
+        }
+
+        // Fallback: generate PDF from quote data if sheet export failed or no sheet
+        if (!invoicePdfBuffer && originalQuote) {
+          console.log('Generating invoice PDF from quote data');
           const quoteForInvoice: QuoteOutput = {
             ...originalQuote,
-            // If there's an adjusted amount, update the totals
             ...(adjustedAmount ? {
               subtotal: adjustedAmount / 1.15,
               gst: adjustedAmount - (adjustedAmount / 1.15),
@@ -143,9 +155,9 @@ export async function POST(request: Request) {
             booking.event_date,
             { isInvoice: true, invoiceNumber }
           );
-        } else {
-          // Fallback: build from details if no original quote found
-          console.warn('No original quote found, building invoice from details');
+        } else if (!invoicePdfBuffer) {
+          // Last resort: build from details
+          console.warn('No quote sheet or original quote found, building invoice from details');
           const quoteData: QuoteOutput = {
             quoteNumber: booking.quote_number || invoiceNumber,
             title: booking.event_name || 'Event',
@@ -173,7 +185,12 @@ export async function POST(request: Request) {
           const fileId = await uploadQuoteToDrive(invoicePdfBuffer, invoiceFilename, folderType);
           if (fileId) {
             invoiceDriveLink = await shareFileWithLink(fileId);
+            console.log(`Invoice uploaded to Drive: ${invoiceDriveLink}`);
+          } else {
+            console.error('Failed to upload invoice PDF to Drive');
           }
+        } else {
+          console.error('No invoice PDF buffer generated');
         }
       } catch (pdfError) {
         console.error('Error generating invoice PDF:', pdfError);
@@ -238,11 +255,19 @@ export async function POST(request: Request) {
               Questions? Reply to this email or call us on 027 602 3869.
             </p>
 
+            ${invoiceDriveLink ? `
+            <div style="margin: 25px 0; text-align: left;">
+              <a href="${invoiceDriveLink}"
+                 style="display: inline-block; background: #374151; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                View Invoice PDF
+              </a>
+            </div>
+            ` : ''}
+
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
             <p style="color: #999; font-size: 12px; text-align: left;">
               Accent Productions | Professional Sound & Lighting
             </p>
-            ${invoiceDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${invoiceDriveLink}" style="color: #94a3b8;">Invoice PDF</a></p>` : ''}
           </div>
         `,
       });
