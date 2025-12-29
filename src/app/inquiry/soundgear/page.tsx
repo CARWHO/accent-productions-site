@@ -329,9 +329,20 @@ function InquiryForm() {
     setAutofilledFields(filled);
   };
 
-  // Handle continue from tech rider step
-  const handleTechRiderContinue = async () => {
-    if (hasTechRider && techRiderFile) {
+  // Handle continue from tech rider step - no loading here, just proceed
+  const handleTechRiderContinue = () => {
+    // Go to next step (Venue for medium/large, Contact for small)
+    if (formData.package === 'small') {
+      goToStep(3); // Contact Info
+    } else {
+      goToStep(3); // Venue & Logistics
+    }
+  };
+
+  // Check and apply tech rider parsing when entering Event Basics
+  const handleEventBasicsEntry = async () => {
+    // If we have a tech rider file and haven't applied it yet
+    if (techRiderFile && !parsedTechRider) {
       setIsParsing(true);
       try {
         let result = backgroundParsedResult;
@@ -341,7 +352,7 @@ function InquiryForm() {
           result = await parsingPromise;
         }
 
-        // If no background parsing was started (shouldn't happen), parse now as fallback
+        // If no background parsing was started, parse now as fallback
         if (!result && !parsingPromise) {
           const formDataObj = new FormData();
           formDataObj.append('file', techRiderFile);
@@ -361,17 +372,12 @@ function InquiryForm() {
           setParsedTechRider(result);
         }
       } catch (error) {
-        // Silently fail - user can fill in manually
         console.error('Tech rider parsing failed:', error);
       } finally {
         setIsParsing(false);
-        // Clear background parsing state
         setParsingPromise(null);
         setBackgroundParsedResult(null);
-        goToStep(3); // Proceed to Event Basics
       }
-    } else {
-      goToStep(3); // No tech rider, proceed normally
     }
   };
 
@@ -495,11 +501,14 @@ function InquiryForm() {
   }
 
   const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
-  // Total steps: extra_large = 2 (Package + Contact), others = 5 (Package + Tech Rider + Event Basics + Details + Contact for small, +Venue for medium/large)
-  const totalSteps = formData.package === 'extra_large' ? 2 : (formData.package === 'small' ? 5 : 6);
+  // Total steps shown in progress bar (excluding tech rider step which has no indicator):
+  // extra_large = no progress bar shown
+  // small = 2 (Contact + Event Details)
+  // medium/large = 4 (Venue + Contact + Event Details + Content)
+  const totalSteps = formData.package === 'small' ? 2 : 4;
 
   return (
-    <PageCard stretch={step === 5 && (formData.package === 'medium' || formData.package === 'large')}>
+    <PageCard stretch>
       {/* Parsing Loading Overlay */}
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
@@ -517,13 +526,13 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Progress - only show after package selection */}
-      {step > 1 && (
+      {/* Progress - show from step 3 onwards (not on tech rider step) */}
+      {step > 2 && formData.package !== 'extra_large' && (
         <div className="flex gap-2 mb-4">
           {[...Array(totalSteps)].map((_, i) => (
             <div
               key={i}
-              className={`h-2 flex-1 transition-colors duration-200 ${i + 1 <= (step - 1) ? 'bg-[#000000]' : 'bg-gray-200'}`}
+              className={`h-2 flex-1 transition-colors duration-200 ${i + 1 <= (step - 2) ? 'bg-[#000000]' : 'bg-gray-200'}`}
             />
           ))}
         </div>
@@ -542,7 +551,7 @@ function InquiryForm() {
 
       {/* Step 1: Package Selection */}
       {step === 1 && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col min-h-0 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col min-h-[350px] lg:min-h-[678px] ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
             {packages.map((pkg) => (
@@ -767,371 +776,8 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 3: Event Basics (for small/medium/large) */}
-      {step === 3 && formData.package !== 'extra_large' && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="flex-grow">
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Basics</h2>
-            <div className="grid gap-3 lg:gap-4">
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Type of Event *</label>
-              <select
-                value={formData.eventType || ''}
-                onChange={(e) => updateField('eventType', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.eventType ? 'border-red-500' : ''}`}
-              >
-                <option value="">Select event type...</option>
-                {eventTypes.map((type) => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-              {showValidation && !formData.eventType && (
-                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Name *</label>
-              <input
-                type="text"
-                value={formData.eventName || ''}
-                onChange={(e) => updateField('eventName', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.eventName ? 'border-red-500' : ''}`}
-                placeholder="e.g., Annual Awards Night"
-              />
-              {showValidation && !formData.eventName && (
-                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Organization (Optional)</label>
-              <input
-                type="text"
-                value={formData.organization || ''}
-                onChange={(e) => updateField('organization', e.target.value)}
-                className={inputStyles}
-                placeholder="Company or Group Name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
-              <input
-                type="date"
-                value={formData.eventDate || ''}
-                onChange={(e) => updateField('eventDate', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.eventDate ? 'border-red-500' : ''}`}
-              />
-              {showValidation && !formData.eventDate && (
-                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-              )}
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time *</label>
-                <TimeInput
-                  value={formData.eventStartTime || ''}
-                  onChange={(val) => updateField('eventStartTime', val)}
-                  placeholder="e.g., 6:00 PM"
-                  hasError={showValidation && !formData.eventStartTime}
-                  inputStyles={inputStyles}
-                />
-                {showValidation && !formData.eventStartTime && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time *</label>
-                <TimeInput
-                  value={formData.eventEndTime || ''}
-                  onChange={(val) => updateField('eventEndTime', val)}
-                  placeholder="e.g., 11:00 PM"
-                  hasError={showValidation && !formData.eventEndTime}
-                  inputStyles={inputStyles}
-                />
-                {showValidation && !formData.eventEndTime && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-            </div>
-          </div>
-          </div>
-
-          <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
-            <button
-              onClick={() => {
-                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
-                  setShowValidation(true);
-                } else {
-                  setShowValidation(false);
-                  goToStep(4);
-                }
-              }}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: Small Event Specifics */}
-      {step === 4 && formData.package === 'small' && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="flex-grow">
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Details</h2>
-            <div className="grid gap-3">
-            <div className="border border-gray-200 rounded-md p-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.playbackFromDevice || false}
-                  onChange={(e) => updateField('playbackFromDevice', e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                />
-                <div>
-                  <span className="font-semibold text-gray-900 block">Playback from Device</span>
-                  <span className="text-sm text-gray-600">Playing music from iPhone/Laptop/iPod through speakers</span>
-                </div>
-              </label>
-            </div>
-
-            <div className="border border-gray-200 rounded-md p-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.hasLiveMusic || false}
-                  onChange={(e) => updateField('hasLiveMusic', e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                />
-                <div>
-                  <span className="font-semibold text-gray-900 block">Live Music</span>
-                  <span className="text-sm text-gray-600">Will there be any live music at your event?</span>
-                </div>
-              </label>
-            </div>
-
-            <div className="border border-gray-200 rounded-md p-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.needsMic || false}
-                  onChange={(e) => updateField('needsMic', e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                />
-                <div>
-                  <span className="font-semibold text-gray-900 block">Microphone Required</span>
-                  <span className="text-sm text-gray-600">Do you need a microphone for speeches or announcements?</span>
-                </div>
-              </label>
-            </div>
-
-            <div className="border border-gray-200 rounded-md p-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.hasDJ || false}
-                  onChange={(e) => updateField('hasDJ', e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                />
-                <div>
-                  <span className="font-semibold text-gray-900 block">DJ Present</span>
-                  <span className="text-sm text-gray-600">Will you have a DJ at your event?</span>
-                </div>
-              </label>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Information</label>
-              <textarea
-                value={formData.additionalInfo || ''}
-                onChange={(e) => updateField('additionalInfo', e.target.value)}
-                rows={4}
-                className={`${inputStyles} resize-none`}
-                placeholder="Any other details we should know..."
-              />
-            </div>
-          </div>
-          </div>
-
-          <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
-            <button
-              onClick={() => goToStep(5)}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: Medium/Large Event Configuration */}
-      {step === 4 && (formData.package === 'medium' || formData.package === 'large') && (
-        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="flex-grow">
-            {/* Show simplified version if tech rider uploaded */}
-            {techRiderFile ? (
-              <>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-green-100 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">Tech Rider Uploaded</h2>
-                    <p className="text-sm text-gray-600">{techRiderFile.name}</p>
-                  </div>
-                </div>
-                <p className="text-gray-600 mb-4">
-                  We&apos;ll extract band requirements from your tech rider. Just a few more questions:
-                </p>
-                <div className="grid gap-3">
-                  {/* DJ Section - still relevant even with tech rider */}
-                  <div className="border border-gray-200 rounded-md p-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.hasDJ || false}
-                        onChange={(e) => updateField('hasDJ', e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                      />
-                      <div>
-                        <span className="font-semibold text-gray-900 inline-flex items-center">
-                          DJ Setup
-                          <AutofillBadge field="hasDJ" />
-                        </span>
-                        <span className="text-sm text-gray-600 block">Will there also be a DJ at your event?</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Speeches Section - still relevant even with tech rider */}
-                  <div className="border border-gray-200 rounded-md p-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.hasSpeeches || false}
-                        onChange={(e) => updateField('hasSpeeches', e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                      />
-                      <div>
-                        <span className="font-semibold text-gray-900 block">Speeches/Presentations</span>
-                        <span className="text-sm text-gray-600">Will there be speeches or presentations?</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Anything else we should know?
-                      <AutofillBadge field="additionalInfo" />
-                    </label>
-                    <textarea
-                      value={formData.additionalInfo || ''}
-                      onChange={(e) => updateField('additionalInfo', e.target.value)}
-                      rows={10}
-                      className={`${inputStyles} resize-none`}
-                      placeholder="Multiple bands, special requirements, etc..."
-                    />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Content & Setup</h2>
-                <div className="grid gap-3">
-                  {/* Band Section */}
-                  <div className="border border-gray-200 rounded-md p-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.hasBand || false}
-                        onChange={(e) => updateField('hasBand', e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                      />
-                      <div>
-                        <span className="font-semibold text-gray-900 inline-flex items-center">
-                          Live Band(s)
-                          <AutofillBadge field="hasBand" />
-                        </span>
-                        <span className="text-sm text-gray-600 block">Will there be live band(s) performing?</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* DJ Section */}
-                  <div className="border border-gray-200 rounded-md p-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.hasDJ || false}
-                        onChange={(e) => updateField('hasDJ', e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                      />
-                      <div>
-                        <span className="font-semibold text-gray-900 inline-flex items-center">
-                          DJ Setup
-                          <AutofillBadge field="hasDJ" />
-                        </span>
-                        <span className="text-sm text-gray-600 block">Will you have a DJ at your event?</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Speeches Section */}
-                  <div className="border border-gray-200 rounded-md p-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.hasSpeeches || false}
-                        onChange={(e) => updateField('hasSpeeches', e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
-                      />
-                      <div>
-                        <span className="font-semibold text-gray-900 block">Speeches/Presentations</span>
-                        <span className="text-sm text-gray-600">Will there be speeches or presentations?</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Additional Information
-                      <AutofillBadge field="additionalInfo" />
-                    </label>
-                    <textarea
-                      value={formData.additionalInfo || ''}
-                      onChange={(e) => updateField('additionalInfo', e.target.value)}
-                      rows={4}
-                      className={`${inputStyles} resize-none`}
-                      placeholder="Band names, number of performers, any other details..."
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
-            <button
-              onClick={() => goToStep(5)}
-              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 5: Venue & Logistics (only for medium/large) */}
-      {step === 5 && (formData.package === 'medium' || formData.package === 'large') && (
+      {/* Step 3: Venue & Logistics (medium/large) */}
+      {step === 3 && (formData.package === 'medium' || formData.package === 'large') && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Venue & Logistics</h2>
@@ -1260,7 +906,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(4)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
               onClick={() => {
                 const isOutdoor = formData.indoorOutdoor === 'Outdoor';
@@ -1268,7 +914,7 @@ function InquiryForm() {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
-                  goToStep(6);
+                  goToStep(4);
                 }
               }}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
@@ -1279,8 +925,8 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Step 5: Contact Information (Small) or Step 6 (Medium/Large) */}
-      {((step === 5 && formData.package === 'small') || (step === 6 && (formData.package === 'medium' || formData.package === 'large'))) && (
+      {/* Step 3: Contact Info (small packages only) */}
+      {step === 3 && formData.package === 'small' && (
         <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
@@ -1327,30 +973,467 @@ function InquiryForm() {
                 )}
               </div>
             </div>
+          </div>
+          </div>
+
+          <div className="flex gap-4 mt-auto pt-5">
+            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button
+              onClick={() => {
+                if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
+                  setShowValidation(true);
+                } else {
+                  setShowValidation(false);
+                  goToStep(4);
+                  handleEventBasicsEntry(); // Check tech rider parsing
+                }
+              }}
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Contact Info (medium/large) */}
+      {step === 4 && (formData.package === 'medium' || formData.package === 'large') && (
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
+            <div className="grid gap-3 lg:gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name *</label>
+              <input
+                type="text"
+                value={formData.contactName || ''}
+                onChange={(e) => updateField('contactName', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.contactName ? 'border-red-500' : ''}`}
+                placeholder="John Smith"
+              />
+              {showValidation && !formData.contactName && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                <input
+                  type="email"
+                  value={formData.contactEmail || ''}
+                  onChange={(e) => updateField('contactEmail', e.target.value)}
+                  className={`${inputStyles} ${showValidation && !formData.contactEmail ? 'border-red-500' : ''}`}
+                  placeholder="john@example.com"
+                />
+                {showValidation && !formData.contactEmail && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
+                <input
+                  type="tel"
+                  value={formData.contactPhone || ''}
+                  onChange={(e) => updateField('contactPhone', e.target.value)}
+                  className={`${inputStyles} ${showValidation && !formData.contactPhone ? 'border-red-500' : ''}`}
+                  placeholder="+64 21 123 4567"
+                />
+                {showValidation && !formData.contactPhone && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <div className="flex gap-4 mt-auto pt-5">
+            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button
+              onClick={() => {
+                if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
+                  setShowValidation(true);
+                } else {
+                  setShowValidation(false);
+                  goToStep(5);
+                  handleEventBasicsEntry(); // Check tech rider parsing
+                }
+              }}
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Event Basics + Details (small packages - FINAL STEP) */}
+      {step === 4 && formData.package === 'small' && (
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Details</h2>
+            <div className="grid gap-3 lg:gap-4">
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Details</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Type of Event *</label>
+              <select
+                value={formData.eventType || ''}
+                onChange={(e) => updateField('eventType', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.eventType ? 'border-red-500' : ''}`}
+              >
+                <option value="">Select event type...</option>
+                {eventTypes.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+              {showValidation && !formData.eventType && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Name *</label>
+              <input
+                type="text"
+                value={formData.eventName || ''}
+                onChange={(e) => updateField('eventName', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.eventName ? 'border-red-500' : ''}`}
+                placeholder="e.g., Annual Awards Night"
+              />
+              {showValidation && !formData.eventName && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
+              <input
+                type="date"
+                value={formData.eventDate || ''}
+                onChange={(e) => updateField('eventDate', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.eventDate ? 'border-red-500' : ''}`}
+              />
+              {showValidation && !formData.eventDate && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time *</label>
+                <TimeInput
+                  value={formData.eventStartTime || ''}
+                  onChange={(val) => updateField('eventStartTime', val)}
+                  placeholder="e.g., 6:00 PM"
+                  hasError={showValidation && !formData.eventStartTime}
+                  inputStyles={inputStyles}
+                />
+                {showValidation && !formData.eventStartTime && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time *</label>
+                <TimeInput
+                  value={formData.eventEndTime || ''}
+                  onChange={(val) => updateField('eventEndTime', val)}
+                  placeholder="e.g., 11:00 PM"
+                  hasError={showValidation && !formData.eventEndTime}
+                  inputStyles={inputStyles}
+                />
+                {showValidation && !formData.eventEndTime && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
+            </div>
+
+            {/* Content options */}
+            <div className="border border-gray-200 rounded-md p-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.playbackFromDevice || false}
+                  onChange={(e) => updateField('playbackFromDevice', e.target.checked)}
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                />
+                <div>
+                  <span className="font-semibold text-gray-900 block">Playback from Device</span>
+                  <span className="text-sm text-gray-600">Playing music from iPhone/Laptop/iPod through speakers</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="border border-gray-200 rounded-md p-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.hasLiveMusic || false}
+                  onChange={(e) => updateField('hasLiveMusic', e.target.checked)}
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                />
+                <div>
+                  <span className="font-semibold text-gray-900 block">Live Music</span>
+                  <span className="text-sm text-gray-600">Will there be any live music at your event?</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="border border-gray-200 rounded-md p-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.needsMic || false}
+                  onChange={(e) => updateField('needsMic', e.target.checked)}
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                />
+                <div>
+                  <span className="font-semibold text-gray-900 block">Microphone Required</span>
+                  <span className="text-sm text-gray-600">Do you need a microphone for speeches or announcements?</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="border border-gray-200 rounded-md p-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.hasDJ || false}
+                  onChange={(e) => updateField('hasDJ', e.target.checked)}
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                />
+                <div>
+                  <span className="font-semibold text-gray-900 block">DJ Present</span>
+                  <span className="text-sm text-gray-600">Will you have a DJ at your event?</span>
+                </div>
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Information</label>
               <textarea
-                value={formData.details || ''}
-                onChange={(e) => updateField('details', e.target.value)}
-                rows={4}
+                value={formData.additionalInfo || ''}
+                onChange={(e) => updateField('additionalInfo', e.target.value)}
+                rows={3}
                 className={`${inputStyles} resize-none`}
-                placeholder="Any other information you'd like to share..."
+                placeholder="Any other details we should know..."
               />
             </div>
           </div>
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button
-              onClick={() => goToStep(formData.package === 'small' ? 4 : 5)}
-              className="px-5 py-2.5 text-gray-700 font-bold"
-            >
-              Back
-            </button>
+            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
             <button
               onClick={() => {
-                if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
+                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
+                  setShowValidation(true);
+                } else {
+                  setShowValidation(false);
+                  handleSubmit();
+                }
+              }}
+              disabled={isSubmitting}
+              className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Sending...
+                </span>
+              ) : 'Get Quote'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5: Event Basics + Content (medium/large - FINAL STEP) */}
+      {step === 5 && (formData.package === 'medium' || formData.package === 'large') && (
+        <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex-grow overflow-y-auto">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Event Details</h2>
+            <div className="grid gap-3 lg:gap-4">
+
+            {/* Event Type */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Type of Event *
+                <AutofillBadge field="eventType" />
+              </label>
+              <select
+                value={formData.eventType || ''}
+                onChange={(e) => updateField('eventType', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.eventType ? 'border-red-500' : ''}`}
+              >
+                <option value="">Select event type...</option>
+                {eventTypes.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+              {showValidation && !formData.eventType && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+            </div>
+
+            {/* Event Name */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Event Name *
+                <AutofillBadge field="eventName" />
+              </label>
+              <input
+                type="text"
+                value={formData.eventName || ''}
+                onChange={(e) => updateField('eventName', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.eventName ? 'border-red-500' : ''}`}
+                placeholder="e.g., Annual Awards Night"
+              />
+              {showValidation && !formData.eventName && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+            </div>
+
+            {/* Organization */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Organization (Optional)
+                <AutofillBadge field="organization" />
+              </label>
+              <input
+                type="text"
+                value={formData.organization || ''}
+                onChange={(e) => updateField('organization', e.target.value)}
+                className={inputStyles}
+                placeholder="e.g., Company name"
+              />
+            </div>
+
+            {/* Event Date */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Date *</label>
+              <input
+                type="date"
+                value={formData.eventDate || ''}
+                onChange={(e) => updateField('eventDate', e.target.value)}
+                className={`${inputStyles} ${showValidation && !formData.eventDate ? 'border-red-500' : ''}`}
+              />
+              {showValidation && !formData.eventDate && (
+                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+            </div>
+
+            {/* Event Times */}
+            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time *</label>
+                <TimeInput
+                  value={formData.eventStartTime || ''}
+                  onChange={(val) => updateField('eventStartTime', val)}
+                  placeholder="e.g., 6:00 PM"
+                  hasError={showValidation && !formData.eventStartTime}
+                  inputStyles={inputStyles}
+                />
+                {showValidation && !formData.eventStartTime && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time *</label>
+                <TimeInput
+                  value={formData.eventEndTime || ''}
+                  onChange={(val) => updateField('eventEndTime', val)}
+                  placeholder="e.g., 11:00 PM"
+                  hasError={showValidation && !formData.eventEndTime}
+                  inputStyles={inputStyles}
+                />
+                {showValidation && !formData.eventEndTime && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+                )}
+              </div>
+            </div>
+
+            {/* Content options - simplified if tech rider uploaded */}
+            <div className="border-t border-gray-200 pt-4 mt-2">
+              <p className="text-sm font-semibold text-gray-700 mb-3">Content & Setup</p>
+
+              {/* Band Section - hide if tech rider (we'll get it from there) */}
+              {!techRiderFile && (
+                <div className="border border-gray-200 rounded-md p-3 mb-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.hasBand || false}
+                      onChange={(e) => updateField('hasBand', e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                    />
+                    <div>
+                      <span className="font-semibold text-gray-900 inline-flex items-center">
+                        Live Band(s)
+                        <AutofillBadge field="hasBand" />
+                      </span>
+                      <span className="text-sm text-gray-600 block">Will there be live band(s) performing?</span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* DJ Section */}
+              <div className="border border-gray-200 rounded-md p-3 mb-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.hasDJ || false}
+                    onChange={(e) => updateField('hasDJ', e.target.checked)}
+                    className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                  />
+                  <div>
+                    <span className="font-semibold text-gray-900 inline-flex items-center">
+                      DJ Setup
+                      <AutofillBadge field="hasDJ" />
+                    </span>
+                    <span className="text-sm text-gray-600 block">Will you have a DJ at your event?</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Speeches Section */}
+              <div className="border border-gray-200 rounded-md p-3 mb-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.hasSpeeches || false}
+                    onChange={(e) => updateField('hasSpeeches', e.target.checked)}
+                    className="mt-1 h-5 w-5 rounded border-gray-300 text-[#000000] focus:ring-[#000000]"
+                  />
+                  <div>
+                    <span className="font-semibold text-gray-900 block">Speeches/Presentations</span>
+                    <span className="text-sm text-gray-600">Will there be speeches or presentations?</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Additional Information */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Additional Information
+                <AutofillBadge field="additionalInfo" />
+              </label>
+              <textarea
+                value={formData.additionalInfo || ''}
+                onChange={(e) => updateField('additionalInfo', e.target.value)}
+                rows={4}
+                className={`${inputStyles} resize-none`}
+                placeholder={techRiderFile ? "Multiple bands, special requirements, etc..." : "Band names, number of performers, any other details..."}
+              />
+            </div>
+          </div>
+          </div>
+
+          <div className="flex gap-4 mt-auto pt-5">
+            <button onClick={() => goToStep(4)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button
+              onClick={() => {
+                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
