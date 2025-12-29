@@ -1,0 +1,36 @@
+A,B,C,D,E
+Barrie Hutton trading as,,,,
+Accent Entertainment,,,,
+Production Company,,,,
+,,,,
+23 Moxham Ave,,,,
+Hataitai Wellington 6021,,,,
+Tel 027 602 3869,,,,
+Email hello@accent-productions.co.nz,,,,
+,,,,
+=CONCATENATE("Quote No: ",Data!B1),,"=CONCATENATE(""Issued: "",Data!B2)",,
+,,,,
+=Data!B3,,,,
+=Data!B6,,,,
+=Data!B4,,,,
+=Data!B5,,,,
+,,,,
+Quote valid for 28 days,,,,
+,,,,
+Description,,,,Cost
+=CONCATENATE("Sound System Hire @ ",Data!B9," (",Data!B8,")"),,,,
+=Data!B7,,,,
+,,,,
+FOH System,,,,"=LineItems!B1"
+=CONCATENATE("Monitors (",LineItems!A2,"x)"),,,,"=LineItems!B2"
+=CONCATENATE("Microphones (",LineItems!A3,"x)"),,,,"=LineItems!B3"
+Console,,,,"=LineItems!B4"
+Cables & Accessories,,,,"=LineItems!B5"
+Vehicle,,,,"=LineItems!B6"
+=CONCATENATE("Tech Time (",LineItems!A7," hrs @ $",LineItems!C7,"/hr)"),,,,"=LineItems!B7"
+,,,,
+,,,Subtotal,"=SUM(E24:E30)"
+,,,,
+,,,GST (15%),"=E32*0.15"
+,,,,
+,,,Total,"=E32+E34"

@@ -20,6 +20,10 @@ const GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_BACKLI
 const GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID");
 const GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID");
 const GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID");
+// Google Sheets template IDs (optional - if set, will generate editable sheets)
+const GOOGLE_FULLSYSTEM_QUOTE_TEMPLATE_ID = Deno.env.get("GOOGLE_FULLSYSTEM_QUOTE_TEMPLATE_ID");
+const GOOGLE_BACKLINE_QUOTE_TEMPLATE_ID = Deno.env.get("GOOGLE_BACKLINE_QUOTE_TEMPLATE_ID");
+const GOOGLE_SOUNDTECH_QUOTE_TEMPLATE_ID = Deno.env.get("GOOGLE_SOUNDTECH_QUOTE_TEMPLATE_ID");
 const SITE_URL = Deno.env.get("NEXT_PUBLIC_SITE_URL") || "https://accent-productions.co.nz";
 const EDGE_FUNCTION_SECRET = Deno.env.get("EDGE_FUNCTION_SECRET") || "default-secret-change-me";
 
@@ -292,6 +296,68 @@ async function generateAndUploadJobSheetPDF(
 }
 
 // ============================================
+// GOOGLE SHEETS GENERATION
+// ============================================
+
+interface SheetResult {
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+}
+
+async function generateQuoteSheet(
+  quote: QuoteOutput,
+  clientName: string,
+  clientEmail: string,
+  clientPhone: string,
+  eventDate: string,
+  folderType: "backline" | "fullsystem",
+  options?: { organization?: string; packageName?: string; eventName?: string; location?: string }
+): Promise<SheetResult | null> {
+  try {
+    // Check if sheet templates are configured
+    const templateId = folderType === "backline"
+      ? GOOGLE_BACKLINE_QUOTE_TEMPLATE_ID
+      : GOOGLE_FULLSYSTEM_QUOTE_TEMPLATE_ID;
+
+    if (!templateId) {
+      console.log(`[generate-pdfs] Sheet template not configured for ${folderType}, skipping sheet generation`);
+      return null;
+    }
+
+    console.log(`[generate-pdfs] Generating Quote Sheet for ${folderType}...`);
+    const response = await fetch(`${SITE_URL}/api/generate-quote-sheet`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${EDGE_FUNCTION_SECRET}`
+      },
+      body: JSON.stringify({
+        quote,
+        clientName,
+        clientEmail,
+        clientPhone,
+        eventDate,
+        folderType,
+        options
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Quote Sheet generation failed:", errorText);
+      return null;
+    }
+
+    const result = await response.json();
+    console.log(`[generate-pdfs] Created Quote Sheet: ${result.spreadsheetId}`);
+    return result;
+  } catch (error) {
+    console.error("Quote Sheet error:", error);
+    return null;
+  }
+}
+
+// ============================================
 // MAIN HANDLER
 // ============================================
 
@@ -323,16 +389,34 @@ serve(async (req) => {
     const eventDate = isBackline ? `${formData.startDate} - ${formData.endDate}` : (formData as FullSystemFormData).eventDate || "TBC";
     const quoteFolderId = isBackline ? GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID;
 
+    // Build quote options for full system inquiries
+    const quoteOptions = !isBackline ? {
+      organization: (formData as FullSystemFormData).organization || undefined,
+      packageName: (formData as FullSystemFormData).package || undefined,
+      eventName: (formData as FullSystemFormData).eventName || undefined,
+      location: (formData as FullSystemFormData).location || undefined,
+    } : undefined;
+
+    // Generate Google Sheet (editable version) if template is configured
+    let quoteSheetId: string | null = null;
+    let quoteSheetUrl: string | null = null;
+    const sheetResult = await generateQuoteSheet(
+      quote,
+      formData.contactName,
+      formData.contactEmail,
+      formData.contactPhone,
+      eventDate,
+      isBackline ? "backline" : "fullsystem",
+      quoteOptions
+    );
+    if (sheetResult) {
+      quoteSheetId = sheetResult.spreadsheetId;
+      quoteSheetUrl = sheetResult.spreadsheetUrl;
+    }
+
     // Generate and upload Quote PDF (then release memory)
     let quoteDriveFileId: string | null = null;
     if (quoteFolderId) {
-      // Build quote options for full system inquiries
-      const quoteOptions = !isBackline ? {
-        organization: (formData as FullSystemFormData).organization || undefined,
-        packageName: (formData as FullSystemFormData).package || undefined,
-        eventName: (formData as FullSystemFormData).eventName || undefined,
-      } : undefined;
-
       quoteDriveFileId = await generateAndUploadQuotePDF(
         quote,
         formData.contactName,
@@ -395,16 +479,20 @@ serve(async (req) => {
       jobSheetDriveFileId = await generateAndUploadJobSheetPDF(jobSheetInput, jobSheetFolderId, accessToken);
     }
 
-    // Update inquiry with Drive file IDs only (no base64)
+    // Update inquiry with Drive file IDs and Sheet IDs
     const updateData: Record<string, unknown> = { status: "pdfs_ready" };
     if (quoteDriveFileId) updateData.drive_file_id = quoteDriveFileId;
     if (jobSheetDriveFileId) updateData.job_sheet_drive_file_id = jobSheetDriveFileId;
+    if (quoteSheetId) updateData.quote_sheet_id = quoteSheetId;
 
     await supabase.from("inquiries").update(updateData).eq("id", inquiry_id);
 
     // Also update booking record
-    if (quoteDriveFileId) {
-      await supabase.from("bookings").update({ quote_drive_file_id: quoteDriveFileId }).eq("inquiry_id", inquiry_id);
+    const bookingUpdate: Record<string, unknown> = {};
+    if (quoteDriveFileId) bookingUpdate.quote_drive_file_id = quoteDriveFileId;
+    if (quoteSheetId) bookingUpdate.quote_sheet_id = quoteSheetId;
+    if (Object.keys(bookingUpdate).length > 0) {
+      await supabase.from("bookings").update(bookingUpdate).eq("inquiry_id", inquiry_id);
     }
 
     console.log(`[generate-pdfs] Done, status -> pdfs_ready`);
@@ -412,8 +500,11 @@ serve(async (req) => {
       success: true,
       quoteDriveFileId,
       jobSheetDriveFileId,
+      quoteSheetId,
+      quoteSheetUrl,
       hasPdf: !!quoteDriveFileId,
-      hasJobSheet: !!jobSheetDriveFileId
+      hasJobSheet: !!jobSheetDriveFileId,
+      hasSheet: !!quoteSheetId
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("[generate-pdfs] Error:", error);

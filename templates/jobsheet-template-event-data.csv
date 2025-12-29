@@ -1,0 +1,15 @@
+Key,Value
+quote_number,2025-XXXX
+event_name,Event Name
+event_date,01 Jan 2025
+event_time,18:00
+location,Venue Address
+client_name,Client Name
+client_email,client@example.com
+client_phone,027 XXX XXXX
+load_in_time,14:00
+sound_check_time,16:00
+doors_time,17:30
+set_time,18:00
+finish_time,23:00
+pack_down_time,23:30
