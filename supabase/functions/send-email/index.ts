@@ -1,9 +1,11 @@
 // Supabase Edge Function: send-email
 // Step 3 of 3: Sends email with PDF attachments
 // Triggered by database webhook when status = 'pdfs_ready'
+// PDFs are fetched from Google Drive using stored file IDs
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 // ============================================
 // ENVIRONMENT & CONFIG
@@ -14,6 +16,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const BUSINESS_EMAIL = Deno.env.get("BUSINESS_EMAIL") || "hello@accent-productions.co.nz";
 const SITE_URL = Deno.env.get("NEXT_PUBLIC_SITE_URL") || "https://accent-productions.co.nz";
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
+const GOOGLE_REFRESH_TOKEN = Deno.env.get("GOOGLE_REFRESH_TOKEN");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,6 +104,56 @@ interface QuoteOutput {
 
 function isBacklineInquiry(formData: FormData): formData is BacklineFormData {
   return (formData as BacklineFormData).type === "backline";
+}
+
+// ============================================
+// GOOGLE DRIVE - Download files
+// ============================================
+
+async function getDriveAccessToken(): Promise<string | null> {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
+    console.warn("Google Drive not configured");
+    return null;
+  }
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      refresh_token: GOOGLE_REFRESH_TOKEN,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("Failed to refresh Drive token:", await response.text());
+    return null;
+  }
+  return (await response.json()).access_token;
+}
+
+async function downloadFromDrive(fileId: string, accessToken: string): Promise<string | null> {
+  try {
+    console.log(`[send-email] Downloading file ${fileId} from Drive...`);
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      console.error("Failed to download from Drive:", await response.text());
+      return null;
+    }
+
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    const base64 = base64Encode(buffer);
+    console.log(`[send-email] Downloaded ${fileId} (${buffer.length} bytes)`);
+    return base64;
+  } catch (error) {
+    console.error("Drive download error:", error);
+    return null;
+  }
 }
 
 // ============================================
@@ -300,24 +355,36 @@ serve(async (req) => {
 
     if (!quote) throw new Error("No quote_data found");
 
-    const hasPdf = !!inquiry.quote_pdf_base64;
-    const hasJobSheet = !!inquiry.job_sheet_pdf_base64;
+    // Get Drive access token for downloading PDFs
+    const accessToken = await getDriveAccessToken();
+
+    // Download PDFs from Google Drive (one at a time to save memory)
+    const attachments: { filename: string; content: string }[] = [];
+
+    if (inquiry.drive_file_id && accessToken) {
+      const quoteBase64 = await downloadFromDrive(inquiry.drive_file_id, accessToken);
+      if (quoteBase64) {
+        attachments.push({ filename: `Quote-${quote.quoteNumber}.pdf`, content: quoteBase64 });
+      }
+    }
+
+    if (inquiry.job_sheet_drive_file_id && accessToken) {
+      const jobSheetBase64 = await downloadFromDrive(inquiry.job_sheet_drive_file_id, accessToken);
+      if (jobSheetBase64) {
+        attachments.push({ filename: `JobSheet-${quote.quoteNumber}.pdf`, content: jobSheetBase64 });
+      }
+    }
+
+    const hasPdf = attachments.some(a => a.filename.startsWith("Quote-"));
+    const hasJobSheet = attachments.some(a => a.filename.startsWith("JobSheet-"));
 
     // Build email HTML
     const emailHtml = isBackline
       ? buildBacklineEmailHtml(formData, quote, inquiry.approval_token, hasPdf)
       : buildFullSystemEmailHtml(formData as FullSystemFormData, quote, inquiry.approval_token, hasPdf, hasJobSheet);
 
-    // Build attachments
-    const attachments: { filename: string; content: string }[] = [];
-    if (inquiry.quote_pdf_base64) {
-      attachments.push({ filename: `Quote-${quote.quoteNumber}.pdf`, content: inquiry.quote_pdf_base64 });
-    }
-    if (inquiry.job_sheet_pdf_base64) {
-      attachments.push({ filename: `JobSheet-${quote.quoteNumber}.pdf`, content: inquiry.job_sheet_pdf_base64 });
-    }
-
     // Send email
+    console.log(`[send-email] Sending email with ${attachments.length} attachments...`);
     const emailTag = isBackline ? "+dryhire@" : "+fullevent@";
     await sendEmail({
       to: [BUSINESS_EMAIL.replace("@", emailTag)],
@@ -330,7 +397,7 @@ serve(async (req) => {
     await supabase.from("inquiries").update({ status: "quoted" }).eq("id", inquiry_id);
 
     console.log(`[send-email] Email sent, status -> quoted`);
-    return new Response(JSON.stringify({ success: true, emailSent: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, emailSent: true, attachmentCount: attachments.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("[send-email] Error:", error);
     return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -1,10 +1,11 @@
 // Supabase Edge Function: generate-pdfs
 // Step 2 of 3: Generates PDFs and uploads to Google Drive
 // Triggered by database webhook when status = 'quote_generated'
+// PDFs are stored in Drive only - fetched from Drive when emailing
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as base64Standard } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 // ============================================
 // ENVIRONMENT & CONFIG
@@ -16,7 +17,9 @@ const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
 const GOOGLE_REFRESH_TOKEN = Deno.env.get("GOOGLE_REFRESH_TOKEN");
 const GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID");
+const GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID");
 const GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID");
+const GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID");
 const SITE_URL = Deno.env.get("NEXT_PUBLIC_SITE_URL") || "https://accent-productions.co.nz";
 const EDGE_FUNCTION_SECRET = Deno.env.get("EDGE_FUNCTION_SECRET") || "default-secret-change-me";
 
@@ -138,13 +141,10 @@ async function getDriveAccessToken(): Promise<string | null> {
   return (await response.json()).access_token;
 }
 
-async function uploadToDrive(pdfBuffer: Uint8Array, filename: string, folderId: string): Promise<string | null> {
-  const accessToken = await getDriveAccessToken();
-  if (!accessToken) return null;
-
+async function uploadToDrive(pdfBuffer: Uint8Array, filename: string, folderId: string, accessToken: string): Promise<string | null> {
   const boundary = "-------314159265358979323846";
   const metadata = JSON.stringify({ name: filename, parents: [folderId] });
-  const pdfBase64 = base64Standard(pdfBuffer);
+  const pdfBase64 = base64Encode(pdfBuffer);
 
   const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n${pdfBase64}\r\n--${boundary}--`;
 
@@ -164,11 +164,20 @@ async function uploadToDrive(pdfBuffer: Uint8Array, filename: string, folderId: 
 }
 
 // ============================================
-// PDF GENERATION
+// PDF GENERATION & UPLOAD (one at a time to save memory)
 // ============================================
 
-async function generateQuotePDF(quote: QuoteOutput, clientName: string, clientEmail: string, clientPhone: string, eventDate: string): Promise<Uint8Array | null> {
+async function generateAndUploadQuotePDF(
+  quote: QuoteOutput,
+  clientName: string,
+  clientEmail: string,
+  clientPhone: string,
+  eventDate: string,
+  folderId: string,
+  accessToken: string
+): Promise<string | null> {
   try {
+    console.log("[generate-pdfs] Generating Quote PDF...");
     const response = await fetch(`${SITE_URL}/api/generate-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EDGE_FUNCTION_SECRET}` },
@@ -178,15 +187,25 @@ async function generateQuotePDF(quote: QuoteOutput, clientName: string, clientEm
       console.error("Quote PDF failed:", await response.text());
       return null;
     }
-    return new Uint8Array(await response.arrayBuffer());
+    const pdfBuffer = new Uint8Array(await response.arrayBuffer());
+
+    console.log("[generate-pdfs] Uploading Quote PDF to Drive...");
+    const driveId = await uploadToDrive(pdfBuffer, `Quote-${quote.quoteNumber}.pdf`, folderId, accessToken);
+    // Buffer will be garbage collected after this function returns
+    return driveId;
   } catch (error) {
     console.error("Quote PDF error:", error);
     return null;
   }
 }
 
-async function generateJobSheetPDF(input: JobSheetInput): Promise<Uint8Array | null> {
+async function generateAndUploadJobSheetPDF(
+  input: JobSheetInput,
+  folderId: string,
+  accessToken: string
+): Promise<string | null> {
   try {
+    console.log("[generate-pdfs] Generating Job Sheet PDF...");
     const response = await fetch(`${SITE_URL}/api/generate-job-sheet`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EDGE_FUNCTION_SECRET}` },
@@ -196,7 +215,12 @@ async function generateJobSheetPDF(input: JobSheetInput): Promise<Uint8Array | n
       console.error("Job Sheet PDF failed:", await response.text());
       return null;
     }
-    return new Uint8Array(await response.arrayBuffer());
+    const pdfBuffer = new Uint8Array(await response.arrayBuffer());
+
+    console.log("[generate-pdfs] Uploading Job Sheet PDF to Drive...");
+    const driveId = await uploadToDrive(pdfBuffer, `JobSheet-${input.quoteNumber}.pdf`, folderId, accessToken);
+    // Buffer will be garbage collected after this function returns
+    return driveId;
   } catch (error) {
     console.error("Job Sheet PDF error:", error);
     return null;
@@ -228,15 +252,31 @@ serve(async (req) => {
 
     if (!quote) throw new Error("No quote_data found");
 
+    // Get Drive access token once
+    const accessToken = await getDriveAccessToken();
+    if (!accessToken) throw new Error("Failed to get Drive access token");
+
     const eventDate = isBackline ? `${formData.startDate} - ${formData.endDate}` : (formData as FullSystemFormData).eventDate || "TBC";
+    const quoteFolderId = isBackline ? GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID;
 
-    // Generate Quote PDF
-    console.log("[generate-pdfs] Generating Quote PDF...");
-    const pdfBuffer = await generateQuotePDF(quote, formData.contactName, formData.contactEmail, formData.contactPhone, eventDate);
+    // Generate and upload Quote PDF (then release memory)
+    let quoteDriveFileId: string | null = null;
+    if (quoteFolderId) {
+      quoteDriveFileId = await generateAndUploadQuotePDF(
+        quote,
+        formData.contactName,
+        formData.contactEmail,
+        formData.contactPhone,
+        eventDate,
+        quoteFolderId,
+        accessToken
+      );
+    }
 
-    // Generate Job Sheet PDF (fullsystem only)
-    let jobSheetBuffer: Uint8Array | null = null;
-    if (!isBackline) {
+    // Generate and upload Job Sheet PDF (fullsystem only)
+    let jobSheetDriveFileId: string | null = null;
+    const jobSheetFolderId = isBackline ? GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID;
+    if (!isBackline && jobSheetFolderId) {
       const fsData = formData as FullSystemFormData;
       const contentReqs: string[] = [];
       if (fsData.playbackFromDevice) contentReqs.push("Playback from device");
@@ -272,32 +312,29 @@ serve(async (req) => {
         clientEmail: fsData.contactEmail,
       };
 
-      console.log("[generate-pdfs] Generating Job Sheet PDF...");
-      jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
+      jobSheetDriveFileId = await generateAndUploadJobSheetPDF(jobSheetInput, jobSheetFolderId, accessToken);
     }
 
-    // Upload to Google Drive
-    let driveFileId: string | null = null;
-    const driveFolderId = isBackline ? GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID;
-    if (pdfBuffer && driveFolderId) {
-      console.log("[generate-pdfs] Uploading to Drive...");
-      driveFileId = await uploadToDrive(pdfBuffer, `Quote-${quote.quoteNumber}.pdf`, driveFolderId);
-    }
-
-    // Save PDFs as base64 and update status
+    // Update inquiry with Drive file IDs only (no base64)
     const updateData: Record<string, unknown> = { status: "pdfs_ready" };
-    if (pdfBuffer) updateData.quote_pdf_base64 = base64Standard(pdfBuffer);
-    if (jobSheetBuffer) updateData.job_sheet_pdf_base64 = base64Standard(jobSheetBuffer);
-    if (driveFileId) updateData.drive_file_id = driveFileId;
+    if (quoteDriveFileId) updateData.drive_file_id = quoteDriveFileId;
+    if (jobSheetDriveFileId) updateData.job_sheet_drive_file_id = jobSheetDriveFileId;
 
     await supabase.from("inquiries").update(updateData).eq("id", inquiry_id);
 
-    if (driveFileId) {
-      await supabase.from("bookings").update({ quote_drive_file_id: driveFileId }).eq("inquiry_id", inquiry_id);
+    // Also update booking record
+    if (quoteDriveFileId) {
+      await supabase.from("bookings").update({ quote_drive_file_id: quoteDriveFileId }).eq("inquiry_id", inquiry_id);
     }
 
     console.log(`[generate-pdfs] Done, status -> pdfs_ready`);
-    return new Response(JSON.stringify({ success: true, driveFileId, hasPdf: !!pdfBuffer, hasJobSheet: !!jobSheetBuffer }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({
+      success: true,
+      quoteDriveFileId,
+      jobSheetDriveFileId,
+      hasPdf: !!quoteDriveFileId,
+      hasJobSheet: !!jobSheetDriveFileId
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("[generate-pdfs] Error:", error);
     return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
