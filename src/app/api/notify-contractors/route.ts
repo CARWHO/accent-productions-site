@@ -28,10 +28,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Database not configured' }, { status: 500 });
     }
 
-    // Validate booking and token
+    // Validate booking and token - include inquiry for original form data
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .select('*')
+      .select('*, inquiries(form_data_json)')
       .eq('id', bookingId)
       .single();
 
@@ -55,8 +55,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No assignments to notify' }, { status: 400 });
     }
 
-    // Fetch equipment notes from hire_items for the Job Sheet PDF
-    const details = booking.details_json as Record<string, unknown> | null;
+    // Use original form data from inquiry, fallback to booking.details_json
+    const originalFormData = (booking.inquiries as { form_data_json: Record<string, unknown> } | null)?.form_data_json;
+    const details = originalFormData || (booking.details_json as Record<string, unknown> | null);
     let equipmentWithNotes: Array<{ name: string; quantity: number; notes?: string | null }> = [];
     if (details?.equipment && Array.isArray(details.equipment)) {
       const equipmentNames = (details.equipment as Array<{ name: string }>).map(e => e.name);

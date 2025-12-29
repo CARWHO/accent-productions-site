@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       eventName: body.eventName,
       eventDate: body.eventDate,
       eventTime: body.eventTime || null,
+      eventEndTime: body.eventEndTime || null,
       location: body.location || 'TBC',
       quoteNumber: body.quoteNumber,
 
@@ -57,6 +58,14 @@ export async function POST(request: Request) {
       indoorOutdoor: body.indoorOutdoor || null,
       contentRequirements: body.contentRequirements || [],
       additionalNotes: body.additionalNotes || null,
+
+      // Venue details
+      venueContact: body.venueContact || null,
+      hasStage: body.hasStage || false,
+      stageDetails: body.stageDetails || null,
+      powerAccess: body.powerAccess || null,
+      wetWeatherPlan: body.wetWeatherPlan || null,
+      needsGenerator: body.needsGenerator || false,
 
       // Client
       clientName: body.clientName,

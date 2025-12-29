@@ -129,150 +129,79 @@ function getDriveViewLink(fileId: string): string {
 }
 
 function buildBacklineEmailHtml(formData: BacklineFormData, quote: QuoteOutput, approvalToken: string, quoteFileId: string | null): string {
-  const equipmentList = formData.equipment.map((item) => `${item.name}: ${item.quantity}`).join("\n");
+  // Count total items
+  const totalItems = formData.equipment.reduce((sum, item) => sum + item.quantity, 0);
 
   return `
-    <h1>New Backline Hire Inquiry</h1>
-    ${quote.quoteNumber ? `<p><strong>Quote Number:</strong> ${quote.quoteNumber}</p>` : ""}
-    <hr />
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px;">
+      <h1 style="margin-bottom: 5px;">Backline Hire Request</h1>
+      <p style="color: #666; margin-top: 0;">Quote #${quote.quoteNumber}</p>
 
-    <h2>Equipment Requested</h2>
-    <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px;">${equipmentList || "No standard equipment selected"}</pre>
-    ${formData.otherEquipment ? `<p><strong>Other Equipment:</strong> ${formData.otherEquipment}</p>` : ""}
+      <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0 0 8px 0;"><strong>${formData.contactName}</strong></p>
+        <p style="margin: 0 0 8px 0; color: #4b5563;">${formData.contactEmail} · ${formData.contactPhone}</p>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 12px 0;" />
+        <p style="margin: 0 0 8px 0;"><strong>Dates:</strong> ${formData.startDate} → ${formData.endDate}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Items:</strong> ${totalItems} piece${totalItems !== 1 ? "s" : ""} of gear</p>
+        <p style="margin: 0;"><strong>Method:</strong> ${formData.deliveryMethod === "pickup" ? "Pickup" : "Delivery"}</p>
+      </div>
 
-    <hr />
+      <div style="margin: 25px 0;">
+        <a href="${SITE_URL}/review-quote?token=${approvalToken}"
+           style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+          Review Quote
+        </a>
+      </div>
 
-    <h2>Rental Details</h2>
-    <p><strong>Start Date:</strong> ${formData.startDate}</p>
-    <p><strong>End Date:</strong> ${formData.endDate}</p>
-    <p><strong>Method:</strong> ${formData.deliveryMethod === "pickup" ? "Pickup" : "Delivery"}</p>
-    ${formData.deliveryMethod === "delivery" ? `<p><strong>Delivery Address:</strong> ${formData.deliveryAddress}</p>` : ""}
-    ${formData.additionalNotes ? `<p><strong>Additional Notes:</strong> ${formData.additionalNotes}</p>` : ""}
-
-    <hr />
-
-    <h2>Contact Information</h2>
-    <p><strong>Name:</strong> ${formData.contactName}</p>
-    <p><strong>Email:</strong> ${formData.contactEmail}</p>
-    <p><strong>Phone:</strong> ${formData.contactPhone}</p>
-
-    <hr />
-    <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
-      <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
-        Review the quote and send to client for approval:
-      </p>
-      <a href="${SITE_URL}/review-quote?token=${approvalToken}"
-         style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-        Review Quote
-      </a>
+      ${quoteFileId ? `<p style="font-size: 12px; color: #94a3b8;">Full details in <a href="${getDriveViewLink(quoteFileId)}" style="color: #64748b;">Quote PDF</a></p>` : ""}
     </div>
-    ${quoteFileId ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${getDriveViewLink(quoteFileId)}" style="color: #94a3b8;">Quote PDF</a></p>` : ""}
   `;
 }
 
 function buildFullSystemEmailHtml(formData: FullSystemFormData, quote: QuoteOutput, approvalToken: string, quoteFileId: string | null, jobSheetFileId: string | null): string {
-  const contentReqs: string[] = [];
-  if (formData.playbackFromDevice) contentReqs.push("Playback from device");
-  if (formData.hasLiveMusic) contentReqs.push("Live music");
-  if (formData.needsMic) contentReqs.push("Microphone required");
-  if (formData.hasDJ) {
-    let djText = "DJ";
-    if (formData.needsDJTable) djText += " (table needed)";
-    if (formData.needsCDJs) djText += ` (CDJs: ${formData.cdjType || "standard"})`;
-    contentReqs.push(djText);
-  }
-  if (formData.hasBand) {
-    let bandText = "Live band";
-    if (formData.bandCount && formData.bandCount > 1) bandText += `s (${formData.bandCount})`;
-    if (formData.bandNames) bandText += `: ${formData.bandNames}`;
-    contentReqs.push(bandText);
-  }
-  if (formData.hasSpeeches) {
-    let speechText = "Speeches/presentations";
-    if (formData.needsWirelessMic) speechText += " (wireless mic)";
-    if (formData.needsLectern) speechText += " (lectern)";
-    contentReqs.push(speechText);
-  }
-  if (formData.needsAmbientMusic) contentReqs.push("Ambient music");
-
   const packageLabel = PACKAGE_LABELS[formData.package] || formData.package;
+  const eventTime = formData.eventTime || (formData.eventStartTime && formData.eventEndTime ? `${formData.eventStartTime} - ${formData.eventEndTime}` : null);
 
+  // Build unavailable gear warning (important to see at a glance)
   const unavailableGearHtml = quote.unavailableGear && quote.unavailableGear.length > 0
     ? `
-      <div style="background: #fef2f2; border: 2px solid #dc2626; padding: 16px; border-radius: 8px; margin: 20px 0;">
-        <h3 style="color: #dc2626; margin: 0 0 12px 0; font-size: 16px;">Gear Requiring Attention</h3>
-        <p style="color: #991b1b; font-size: 12px; margin: 0 0 10px 0;">These items may need to be hired externally or confirmed:</p>
-        <ul style="margin: 0; padding-left: 20px; color: #dc2626;">
-          ${quote.unavailableGear.map((item) => `<li>${item}</li>`).join("")}
-        </ul>
+      <div style="background: #fef2f2; border: 2px solid #dc2626; padding: 12px 16px; border-radius: 8px; margin: 15px 0;">
+        <p style="color: #dc2626; margin: 0; font-weight: bold;">Gear needs attention (${quote.unavailableGear.length} items)</p>
+        <p style="color: #991b1b; font-size: 12px; margin: 5px 0 0 0;">See Job Sheet for details</p>
       </div>
     `
     : "";
 
   return `
-    <h1>New Sound System Hire Inquiry</h1>
-    ${quote.quoteNumber ? `<p><strong>Quote Number:</strong> ${quote.quoteNumber}</p>` : ""}
-    <hr />
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px;">
+      <h1 style="margin-bottom: 5px;">Sound System Inquiry</h1>
+      <p style="color: #666; margin-top: 0;">Quote #${quote.quoteNumber}</p>
 
-    <h2>Package Selected</h2>
-    <p><strong>Package:</strong> ${packageLabel}</p>
+      <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0 0 8px 0;"><strong>${formData.contactName}</strong>${formData.organization ? ` · ${formData.organization}` : ""}</p>
+        <p style="margin: 0 0 8px 0; color: #4b5563;">${formData.contactEmail} · ${formData.contactPhone}</p>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 12px 0;" />
+        <p style="margin: 0 0 8px 0;"><strong>${formData.eventName || "Event"}</strong> · ${packageLabel}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${formData.eventDate}${eventTime ? ` at ${eventTime}` : ""}</p>
+        <p style="margin: 0;"><strong>Location:</strong> ${formData.location || "TBC"}</p>
+      </div>
 
-    <hr />
+      ${unavailableGearHtml}
 
-    <h2>Event Details</h2>
-    <p><strong>Event Type:</strong> ${formData.eventType || "N/A"}</p>
-    <p><strong>Event Name:</strong> ${formData.eventName || "N/A"}</p>
-    <p><strong>Organization:</strong> ${formData.organization || "N/A"}</p>
-    <p><strong>Date:</strong> ${formData.eventDate || "N/A"}</p>
-    <p><strong>Time:</strong> ${formData.eventTime || (formData.eventStartTime && formData.eventEndTime ? `${formData.eventStartTime} - ${formData.eventEndTime}` : "N/A")}</p>
-    <p><strong>Setup/Packout:</strong> ${formData.setupTime || "N/A"}</p>
-    <p><strong>Attendance:</strong> ${formData.attendance || "N/A"}</p>
+      <div style="margin: 25px 0;">
+        <a href="${SITE_URL}/review-quote?token=${approvalToken}"
+           style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+          Review Quote
+        </a>
+      </div>
 
-    <hr />
-
-    <h2>Content Requirements</h2>
-    <p>${contentReqs.length > 0 ? contentReqs.join(", ") : "No specific content requirements"}</p>
-    ${formData.additionalInfo ? `<p><strong>Additional Info:</strong> ${formData.additionalInfo}</p>` : ""}
-
-    <hr />
-
-    <h2>Venue Details</h2>
-    <p><strong>Location:</strong> ${formData.location || "N/A"}</p>
-    <p><strong>Venue Contact:</strong> ${formData.venueContact || "N/A"}</p>
-    <p><strong>Indoor/Outdoor:</strong> ${formData.indoorOutdoor || "N/A"}</p>
-    ${formData.indoorOutdoor === "Outdoor" ? `
-      <p><strong>Power Access:</strong> ${formData.powerAccess || "N/A"}</p>
-      <p><strong>Wet Weather Plan:</strong> ${formData.wetWeatherPlan || "N/A"}</p>
-      <p><strong>Generator Needed:</strong> ${formData.needsGenerator ? "Yes" : "No"}</p>
-    ` : ""}
-    <p><strong>Stage Available:</strong> ${formData.hasStage ? "Yes" : "No"}</p>
-    ${formData.stageDetails ? `<p><strong>Stage Details:</strong> ${formData.stageDetails}</p>` : ""}
-
-    <hr />
-
-    <h2>Contact Information</h2>
-    <p><strong>Name:</strong> ${formData.contactName}</p>
-    <p><strong>Email:</strong> ${formData.contactEmail}</p>
-    <p><strong>Phone:</strong> ${formData.contactPhone}</p>
-    ${formData.details ? `<p><strong>Additional Details:</strong> ${formData.details}</p>` : ""}
-
-    ${unavailableGearHtml}
-
-    <hr />
-    <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0284c7;">
-      <p style="margin: 0 0 15px 0; font-size: 14px; color: #0369a1;">
-        Review the quote and send to client for approval:
+      <p style="font-size: 12px; color: #94a3b8;">
+        Full details in
+        ${quoteFileId ? `<a href="${getDriveViewLink(quoteFileId)}" style="color: #64748b;">Quote PDF</a>` : ""}
+        ${quoteFileId && jobSheetFileId ? " and " : ""}
+        ${jobSheetFileId ? `<a href="${getDriveViewLink(jobSheetFileId)}" style="color: #64748b;">Job Sheet</a>` : ""}
       </p>
-      <a href="${SITE_URL}/review-quote?token=${approvalToken}"
-         style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-        Review Quote
-      </a>
     </div>
-    <p style="font-size: 11px; color: #94a3b8;">
-      ${quoteFileId ? `<a href="${getDriveViewLink(quoteFileId)}" style="color: #94a3b8;">Quote PDF</a>` : ""}
-      ${quoteFileId && jobSheetFileId ? " · " : ""}
-      ${jobSheetFileId ? `<a href="${getDriveViewLink(jobSheetFileId)}" style="color: #94a3b8;">Job Sheet</a>` : ""}
-    </p>
   `;
 }
 

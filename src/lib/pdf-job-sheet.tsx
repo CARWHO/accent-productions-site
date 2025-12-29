@@ -8,6 +8,7 @@ export interface JobSheetInput {
   eventName: string;
   eventDate: string;
   eventTime: string | null;
+  eventEndTime?: string | null;
   location: string;
   quoteNumber: string;
 
@@ -37,6 +38,14 @@ export interface JobSheetInput {
   indoorOutdoor: string | null;
   contentRequirements: string[];
   additionalNotes: string | null;
+
+  // Venue details
+  venueContact?: string | null;
+  hasStage?: boolean;
+  stageDetails?: string | null;
+  powerAccess?: string | null;
+  wetWeatherPlan?: string | null;
+  needsGenerator?: boolean;
 
   // Client
   clientName: string;
@@ -327,9 +336,14 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
         <View style={styles.eventBox}>
           <Text style={styles.eventName}>{input.eventName || 'Event'}</Text>
           <Text style={styles.eventDetail}>
-            DATE: {formatDate(input.eventDate)}{input.eventTime ? `, ${formatTime(input.eventTime)}` : ''}
+            DATE: {formatDate(input.eventDate)}
+            {input.eventTime ? `, ${formatTime(input.eventTime)}` : ''}
+            {input.eventEndTime ? ` - ${formatTime(input.eventEndTime)}` : ''}
           </Text>
           <Text style={styles.eventDetail}>LOCATION: {input.location || 'TBC'}</Text>
+          {input.venueContact && (
+            <Text style={styles.eventDetail}>VENUE CONTACT: {input.venueContact}</Text>
+          )}
           <Text style={styles.eventDetail}>QUOTE #: {input.quoteNumber}</Text>
         </View>
 
@@ -412,7 +426,7 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
         )}
 
         {/* Event Details Section */}
-        {(input.eventType || input.attendance || input.setupTime || input.indoorOutdoor || input.contentRequirements.length > 0) && (
+        {(input.eventType || input.attendance || input.setupTime || input.indoorOutdoor || input.contentRequirements.length > 0 || input.hasStage || input.powerAccess || input.wetWeatherPlan || input.needsGenerator) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Event Details</Text>
             <View style={styles.sectionContent}>
@@ -444,6 +458,32 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Content:</Text>
                   <Text style={styles.detailValue}>{input.contentRequirements.join(', ')}</Text>
+                </View>
+              )}
+              {(input.hasStage || input.stageDetails) && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Stage:</Text>
+                  <Text style={styles.detailValue}>
+                    {input.stageDetails || (input.hasStage ? 'Yes' : 'No')}
+                  </Text>
+                </View>
+              )}
+              {input.powerAccess && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Power Access:</Text>
+                  <Text style={styles.detailValue}>{input.powerAccess}</Text>
+                </View>
+              )}
+              {input.needsGenerator && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Generator:</Text>
+                  <Text style={styles.detailValue}>Required</Text>
+                </View>
+              )}
+              {input.wetWeatherPlan && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Wet Weather:</Text>
+                  <Text style={styles.detailValue}>{input.wetWeatherPlan}</Text>
                 </View>
               )}
             </View>

@@ -207,8 +207,19 @@ export async function GET(request: Request) {
           ? `$${hourlyRate}/hr × ${hours} hrs = $${totalPay.toFixed(0)}`
           : `$${totalPay.toFixed(0)}`;
 
-        // Generate Job Sheet PDF for confirmation email
-        const details = booking.details_json as Record<string, unknown> | null;
+        // Fetch original form data from inquiry for consistent job sheet
+        let originalFormData: Record<string, unknown> | null = null;
+        if (booking.inquiry_id) {
+          const { data: inquiry } = await supabase
+            .from('inquiries')
+            .select('form_data_json')
+            .eq('id', booking.inquiry_id)
+            .single();
+          originalFormData = inquiry?.form_data_json as Record<string, unknown> | null;
+        }
+
+        // Use original form data from inquiry, fallback to booking.details_json
+        const details = originalFormData || (booking.details_json as Record<string, unknown> | null);
         let equipmentWithNotes: Array<{ name: string; quantity: number; notes?: string | null }> = [];
 
         // Fetch equipment notes from hire_items

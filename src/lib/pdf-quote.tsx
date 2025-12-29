@@ -179,7 +179,13 @@ export async function generateQuotePDF(
   clientEmail: string,
   clientPhone: string,
   eventDate: string,
-  options?: { isInvoice?: boolean; invoiceNumber?: string }
+  options?: {
+    isInvoice?: boolean;
+    invoiceNumber?: string;
+    organization?: string;
+    packageName?: string;
+    eventName?: string;
+  }
 ): Promise<Buffer> {
   const today = formatDate();
   const logoBase64 = getLogoBase64();
@@ -217,8 +223,11 @@ export async function generateQuotePDF(
         {/* Client Info */}
         <View style={styles.clientBlock}>
           <Text>{clientName}</Text>
+          {options?.organization && <Text>{options.organization}</Text>}
           <Text>{clientEmail}</Text>
           <Text>{clientPhone}</Text>
+          {options?.eventName && <Text style={{ marginTop: 5, fontWeight: 'bold' }}>Event: {options.eventName}</Text>}
+          {options?.packageName && <Text>Package: {options.packageName}</Text>}
         </View>
 
         {/* Validity Note / Payment Note */}

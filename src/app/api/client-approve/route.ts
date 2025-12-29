@@ -97,6 +97,12 @@ export async function GET(request: Request) {
 
       const selectContractorsUrl = `${baseUrl}/select-contractors?token=${contractorSelectionToken}`;
 
+      // Get quote Drive link for both emails
+      let quoteDriveLink: string | null = null;
+      if (booking.quote_drive_file_id) {
+        quoteDriveLink = await shareFileWithLink(booking.quote_drive_file_id);
+      }
+
       await resend.emails.send({
         from: 'Accent Productions <notifications@accent-productions.co.nz>',
         to: [businessEmail],
@@ -125,16 +131,11 @@ export async function GET(request: Request) {
           <p style="color: #666; font-size: 14px;">
             A calendar event has been created and is awaiting contractor assignment.
           </p>
+          ${quoteDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${quoteDriveLink}" style="color: #94a3b8;">Quote PDF</a></p>` : ''}
         `,
       });
 
       console.log(`Notified business of client approval for booking ${booking.id}`);
-
-      // Send confirmation email to client with quote link
-      let quoteDriveLink: string | null = null;
-      if (booking.quote_drive_file_id) {
-        quoteDriveLink = await shareFileWithLink(booking.quote_drive_file_id);
-      }
 
       await resend.emails.send({
         from: 'Accent Productions <notifications@accent-productions.co.nz>',
@@ -161,10 +162,16 @@ export async function GET(request: Request) {
               </div>
             </div>
 
+            <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: left;">
+              <p style="margin: 0; color: #92400e; font-size: 14px;">
+                <strong>Important:</strong> We won't assign contractors to your event until we receive the deposit payment. Please ensure payment is made to secure your booking.
+              </p>
+            </div>
+
             <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
               <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #374151;">What happens next?</h3>
               <ul style="margin: 0; padding-left: 20px; color: #4b5563;">
-                <li style="margin-bottom: 8px;">We'll assign our crew to your event</li>
+                <li style="margin-bottom: 8px;">Once we receive your deposit, we'll assign our crew to your event</li>
                 <li style="margin-bottom: 8px;">You'll receive a job sheet with all the details closer to the date</li>
                 <li>Our team will be in touch if we need any more information</li>
               </ul>

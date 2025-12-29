@@ -43,14 +43,23 @@ interface BacklineFormData {
 
 interface FullSystemFormData {
   type?: "fullsystem";
+  package: string;
   eventName: string;
   eventDate: string;
   eventStartTime: string;
   eventEndTime: string;
   eventType: string;
+  organization: string;
   attendance?: number;
   location: string;
+  venueContact: string;
   indoorOutdoor: string;
+  hasStage: boolean;
+  stageDetails: string;
+  powerAccess: string;
+  wetWeatherPlan: string;
+  needsGenerator: boolean;
+  setupTime?: string;
   additionalInfo: string;
   playbackFromDevice: boolean;
   hasLiveMusic: boolean;
@@ -83,6 +92,7 @@ interface JobSheetInput {
   eventName: string;
   eventDate: string;
   eventTime: string | null;
+  eventEndTime?: string | null;
   location: string;
   quoteNumber: string;
   contractorName: string;
@@ -100,6 +110,13 @@ interface JobSheetInput {
   indoorOutdoor: string | null;
   contentRequirements: string[];
   additionalNotes: string | null;
+  // Venue details
+  venueContact?: string | null;
+  hasStage?: boolean;
+  stageDetails?: string | null;
+  powerAccess?: string | null;
+  wetWeatherPlan?: string | null;
+  needsGenerator?: boolean;
   clientName: string;
   clientPhone: string;
   clientEmail: string;
@@ -202,14 +219,15 @@ async function generateAndUploadQuotePDF(
   clientPhone: string,
   eventDate: string,
   folderId: string,
-  accessToken: string
+  accessToken: string,
+  options?: { organization?: string; packageName?: string; eventName?: string }
 ): Promise<string | null> {
   try {
     console.log("[generate-pdfs] Generating Quote PDF...");
     const response = await fetch(`${SITE_URL}/api/generate-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EDGE_FUNCTION_SECRET}` },
-      body: JSON.stringify({ quote, clientName, clientEmail, clientPhone, eventDate }),
+      body: JSON.stringify({ quote, clientName, clientEmail, clientPhone, eventDate, options }),
     });
     if (!response.ok) {
       console.error("Quote PDF failed:", await response.text());
@@ -290,6 +308,13 @@ serve(async (req) => {
     // Generate and upload Quote PDF (then release memory)
     let quoteDriveFileId: string | null = null;
     if (quoteFolderId) {
+      // Build quote options for full system inquiries
+      const quoteOptions = !isBackline ? {
+        organization: (formData as FullSystemFormData).organization || undefined,
+        packageName: (formData as FullSystemFormData).package || undefined,
+        eventName: (formData as FullSystemFormData).eventName || undefined,
+      } : undefined;
+
       quoteDriveFileId = await generateAndUploadQuotePDF(
         quote,
         formData.contactName,
@@ -297,7 +322,8 @@ serve(async (req) => {
         formData.contactPhone,
         eventDate,
         quoteFolderId,
-        accessToken
+        accessToken,
+        quoteOptions
       );
     }
 
@@ -317,7 +343,8 @@ serve(async (req) => {
       const jobSheetInput: JobSheetInput = {
         eventName: fsData.eventName || "Event",
         eventDate: fsData.eventDate || "TBC",
-        eventTime: fsData.eventStartTime && fsData.eventEndTime ? `${fsData.eventStartTime} - ${fsData.eventEndTime}` : null,
+        eventTime: fsData.eventStartTime || null,
+        eventEndTime: fsData.eventEndTime || null,
         location: fsData.location || "TBC",
         quoteNumber: quote.quoteNumber,
         contractorName: "TBC",
@@ -331,10 +358,17 @@ serve(async (req) => {
         unavailableGear: quote.unavailableGear || [],
         eventType: fsData.eventType || null,
         attendance: fsData.attendance ? String(fsData.attendance) : null,
-        setupTime: null,
+        setupTime: fsData.setupTime || null,
         indoorOutdoor: fsData.indoorOutdoor || null,
         contentRequirements: contentReqs,
         additionalNotes: fsData.additionalInfo || null,
+        // Venue details
+        venueContact: fsData.venueContact || null,
+        hasStage: fsData.hasStage || false,
+        stageDetails: fsData.stageDetails || null,
+        powerAccess: fsData.powerAccess || null,
+        wetWeatherPlan: fsData.wetWeatherPlan || null,
+        needsGenerator: fsData.needsGenerator || false,
         clientName: fsData.contactName,
         clientPhone: fsData.contactPhone,
         clientEmail: fsData.contactEmail,
