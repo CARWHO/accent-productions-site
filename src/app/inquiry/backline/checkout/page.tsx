@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/lib/cart-context';
 import PageCard from '@/components/ui/PageCard';
@@ -55,6 +55,13 @@ export default function CheckoutPage() {
       techRider: null,
     });
   };
+
+  // Listen for fill test data event from header
+  useEffect(() => {
+    const handleFillEvent = () => fillTestData();
+    window.addEventListener('fillTestData', handleFillEvent);
+    return () => window.removeEventListener('fillTestData', handleFillEvent);
+  }, []);
 
   const updateField = <K extends keyof CheckoutFormData>(field: K, value: CheckoutFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -163,17 +170,6 @@ export default function CheckoutPage() {
                 />
               ))}
             </div>
-
-            {/* Dev Fill Button */}
-            {process.env.NODE_ENV === 'development' && (
-              <button
-                type="button"
-                onClick={fillTestData}
-                className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300"
-              >
-                Fill Test Data
-              </button>
-            )}
 
             {/* Step 1: Review Cart */}
             {step === 1 && (

@@ -27,8 +27,8 @@ const serviceTypes = [
 
 export default function InquiryPage() {
   return (
-    <PageCard stretch>
-      <div className="flex flex-col h-full min-h-[350px] lg:min-h-[720px]">
+    <PageCard>
+      <div className="flex flex-col h-full">
         <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Get a Quote</h1>
         <p className="text-gray-600 mb-6 font-medium">Select the type of service you need</p>
 
@@ -56,7 +56,7 @@ export default function InquiryPage() {
         </div>
 
         <div className="flex gap-4 pt-5">
-          <Link href="/" className="px-5 py-2.5 text-gray-700 font-bold">Back</Link>
+          <Link href="/" className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</Link>
         </div>
       </div>
     </PageCard>

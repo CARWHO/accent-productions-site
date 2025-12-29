@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageCard from '@/components/ui/PageCard';
 
 interface ContractorFormData {
@@ -16,8 +16,6 @@ interface ContractorFormData {
 
 export default function ContractorInquiryPage() {
   const [step, setStep] = useState(1);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
@@ -48,6 +46,13 @@ export default function ContractorInquiryPage() {
     });
   };
 
+  // Listen for fill test data event from header
+  useEffect(() => {
+    const handleFillEvent = () => fillTestData();
+    window.addEventListener('fillTestData', handleFillEvent);
+    return () => window.removeEventListener('fillTestData', handleFillEvent);
+  }, []);
+
   const updateField = <K extends keyof ContractorFormData>(field: K, value: ContractorFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (showValidation) {
@@ -56,19 +61,9 @@ export default function ContractorInquiryPage() {
   };
 
   const goToStep = (newStep: number) => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setIsVisible(false);
     setShowValidation(false);
-
-    setTimeout(() => {
-      setStep(newStep);
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      setTimeout(() => {
-        setIsVisible(true);
-        setIsTransitioning(false);
-      }, 50);
-    }, 100);
+    setStep(newStep);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   async function handleSubmit() {
@@ -80,12 +75,8 @@ export default function ContractorInquiryPage() {
         body: JSON.stringify(formData),
       });
       if (response.ok) {
-        setIsVisible(false);
-        setTimeout(() => {
-          setSubmitted(true);
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          setIsVisible(true);
-        }, 100);
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'instant' });
       }
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -100,7 +91,7 @@ export default function ContractorInquiryPage() {
   if (submitted) {
     return (
       <PageCard centered>
-        <div className={`flex flex-col items-center text-center transition-opacity duration-100 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex flex-col items-center text-center">
           <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -133,20 +124,9 @@ export default function ContractorInquiryPage() {
             ))}
           </div>
 
-          {/* Dev Fill Button */}
-          {process.env.NODE_ENV === 'development' && (
-            <button
-              type="button"
-              onClick={fillTestData}
-              className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300"
-            >
-              Fill Test Data
-            </button>
-          )}
-
           {/* Step 1: Event Details */}
           {step === 1 && (
-            <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex-grow flex flex-col">
               <div className="flex-grow flex flex-col">
                 <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Sound Technician Request</h2>
                 <p className="text-gray-600 mb-4 font-medium">Tell us about your event and we&apos;ll provide a professional sound tech.</p>
@@ -208,13 +188,13 @@ export default function ContractorInquiryPage() {
                     )}
                   </div>
 
-                  <div className="flex-grow flex flex-col min-120px">
+                  <div className="flex-grow flex flex-col">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Describe Your Event *</label>
                     <p className="text-sm text-gray-500 mb-2">Help us understand your event so we can match you with the right sound technician.</p>
                     <textarea
                       value={formData.eventDescription}
                       onChange={(e) => updateField('eventDescription', e.target.value)}
-                      className={`${inputStyles} resize-none min-h-[180px] ${showValidation && !formData.eventDescription ? 'border-red-500' : ''}`}
+                      className={`${inputStyles} resize-none min-h-[50px] ${showValidation && !formData.eventDescription ? 'border-red-500' : ''}`}
                       placeholder="Tell us about your event - what type of event is it? (e.g., wedding, corporate function, live band, DJ night, conference). How many guests are expected? What kind of audio setup do you need? Any specific requirements or challenges we should know about?"
                     />
                     {showValidation && !formData.eventDescription && (
@@ -225,7 +205,7 @@ export default function ContractorInquiryPage() {
               </div>
 
               <div className="flex gap-4 mt-auto pt-5">
-                <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold">Back</a>
+                <a href="/inquiry" className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</a>
                 <button
                   onClick={() => {
                     if (!formData.eventDate || !formData.startTime || !formData.endTime || !formData.location || !formData.eventDescription) {
@@ -244,7 +224,7 @@ export default function ContractorInquiryPage() {
 
           {/* Step 2: Contact Information */}
           {step === 2 && (
-            <div className={`transition-opacity duration-100 flex-grow flex flex-col ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex-grow flex flex-col">
               <div className="flex-grow">
                 <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
 
@@ -295,7 +275,7 @@ export default function ContractorInquiryPage() {
               </div>
 
               <div className="flex gap-4 mt-auto pt-5">
-                <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+                <button onClick={() => goToStep(1)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
                 <button
                   onClick={() => {
                     if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {

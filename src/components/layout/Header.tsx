@@ -3,9 +3,19 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const isDev = process.env.NODE_ENV === 'development';
+
+  const dispatchFillEvent = () => {
+    window.dispatchEvent(new CustomEvent('fillTestData'));
+  };
+
+  // Show fill button on inquiry pages in dev mode
+  const showFillButton = isDev && pathname?.startsWith('/inquiry');
 
   return (
     <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
@@ -21,6 +31,16 @@ export function Header() {
               className="h-12 w-auto"
             />
           </Link>
+
+          {/* Dev Fill Button */}
+          {showFillButton && (
+            <button
+              onClick={dispatchFillEvent}
+              className="px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300 font-medium"
+            >
+              Fill Test Data
+            </button>
+          )}
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">

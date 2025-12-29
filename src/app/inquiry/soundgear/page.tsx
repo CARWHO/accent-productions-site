@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import PageCard from '@/components/ui/PageCard';
@@ -421,6 +421,13 @@ function InquiryForm() {
     setStep(3); // Go to step 3 (Event Basics) after filling
   };
 
+  // Listen for fill test data event from header
+  useEffect(() => {
+    const handleFillEvent = () => fillTestData();
+    window.addEventListener('fillTestData', handleFillEvent);
+    return () => window.removeEventListener('fillTestData', handleFillEvent);
+  }, []);
+
   const updateField = (field: keyof PackageFormData, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear validation when user updates a field
@@ -491,7 +498,7 @@ function InquiryForm() {
   const totalSteps = formData.package === 'small' ? 2 : 4;
 
   return (
-    <PageCard stretch={step === 1 || step === 3}>
+    <PageCard stretch={step === 3}>
       {/* Parsing Loading Overlay */}
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
@@ -521,20 +528,9 @@ function InquiryForm() {
         </div>
       )}
 
-      {/* Dev Fill Button */}
-      {process.env.NODE_ENV === 'development' && step === 1 && (
-        <button
-          type="button"
-          onClick={fillTestData}
-          className="mb-4 px-3 py-1 text-xs bg-yellow-100 text-yellow-800 rounded border border-yellow-300"
-        >
-          Fill Test Data (Medium Package)
-        </button>
-      )}
-
       {/* Step 1: Package Selection */}
       {step === 1 && (
-        <div className={`flex-grow flex flex-col min-h-[350px] lg:min-h-[678px]`}>
+        <div className="flex-grow flex flex-col">
           <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Select Your Package</h2>
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
             {packages.map((pkg) => (
@@ -565,102 +561,102 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 pt-4 flex-shrink-0">
-            <a href="/inquiry" className="px-5 py-2.5 text-gray-700 font-bold">Back</a>
+            <a href="/inquiry" className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</a>
           </div>
         </div>
       )}
 
       {/* Step 2: Tech Rider (for small/medium/large - NOT extra_large) */}
       {step === 2 && formData.package !== 'extra_large' && (
-        <div className={`flex-grow flex flex-col`}>
-          <div className="flex-grow">
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Do you have a tech rider?</h2>
+        <div className="flex-grow flex flex-col">
+          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Do you have a tech rider?</h2>
+          <div className="flex-1">
             <p className="text-gray-600 mb-6 font-medium">
-              A tech rider contains technical requirements from your band or performers. If you have one, we can automatically extract the requirements.
-            </p>
+            A tech rider contains technical requirements from your band or performers. If you have one, we can automatically extract the requirements.
+          </p>
 
-            {/* Yes/No Toggle */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <button
-                type="button"
-                onClick={() => setHasTechRider(true)}
-                className={`py-3 text-center rounded-md border-2 transition-all font-bold ${
-                  hasTechRider
-                    ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
-                    : 'border-gray-200 text-gray-600'
-                }`}
-              >
-                Yes, I have one
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setHasTechRider(false);
-                  setTechRiderFile(null);
-                }}
-                className={`py-3 text-center rounded-md border-2 transition-all font-bold ${
-                  !hasTechRider
-                    ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
-                    : 'border-gray-200 text-gray-600'
-                }`}
-              >
-                No, I don&apos;t
-              </button>
-            </div>
-
-            {/* File Upload (only if Yes) */}
-            {hasTechRider && (
-              <div className="border-2 border-dashed border-gray-300 rounded-md p-6 bg-gray-50">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-black rounded-md flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">Upload your tech rider</p>
-                  <p className="text-xs text-gray-500 mb-4">PDF, DOC, or DOCX (max 10MB)</p>
-                  <div className="flex justify-center">
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      onChange={(e) => handleTechRiderUpload(e.target.files?.[0] || null)}
-                      className="text-transparent file:mr-3 file:py-2 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white cursor-pointer w-[100px]"
-                    />
-                  </div>
-                </div>
-                {techRiderFile && (
-                  <div className="flex items-center justify-between mt-4 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                    <p className="text-sm text-green-700 font-medium flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {techRiderFile.name}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleTechRiderUpload(null)}
-                      className="text-gray-500"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!hasTechRider && (
-              <div className="bg-stone-50 border border-stone-200 rounded-md p-4">
-                <p className="text-sm text-gray-600">
-                  No problem! We&apos;ll ask you about your audio requirements in the next steps.
-                </p>
-              </div>
-            )}
+          {/* Yes/No Toggle */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <button
+              type="button"
+              onClick={() => setHasTechRider(true)}
+              className={`py-3 text-center rounded-md border-2 transition-all font-bold ${
+                hasTechRider
+                  ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
+                  : 'border-gray-200 text-gray-600'
+              }`}
+            >
+              Yes, I have one
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setHasTechRider(false);
+                setTechRiderFile(null);
+              }}
+              className={`py-3 text-center rounded-md border-2 transition-all font-bold ${
+                !hasTechRider
+                  ? 'border-[#000000] bg-[#000000]/5 text-[#000000]'
+                  : 'border-gray-200 text-gray-600'
+              }`}
+            >
+              No, I don&apos;t
+            </button>
           </div>
 
-          <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+          {/* File Upload (only if Yes) */}
+          {hasTechRider && (
+            <div className="border-2 border-dashed border-gray-300 rounded-md p-6 bg-gray-50">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-black rounded-md flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-gray-900 mb-1">Upload your tech rider</p>
+                <p className="text-xs text-gray-500 mb-4">PDF, DOC, or DOCX (max 10MB)</p>
+                <div className="flex justify-center">
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => handleTechRiderUpload(e.target.files?.[0] || null)}
+                    className="text-transparent file:mr-3 file:py-2 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white cursor-pointer w-[100px]"
+                  />
+                </div>
+              </div>
+              {techRiderFile && (
+                <div className="flex items-center justify-between mt-4 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                  <p className="text-sm text-green-700 font-medium flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {techRiderFile.name}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleTechRiderUpload(null)}
+                    className="text-gray-500"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!hasTechRider && (
+            <div className="bg-stone-50 border border-stone-200 rounded-md p-4">
+              <p className="text-sm text-gray-600">
+                No problem! We&apos;ll ask you about your audio requirements in the next steps.
+              </p>
+            </div>
+          )}
+          </div>
+
+          <div className="flex gap-4 pt-4 flex-shrink-0">
+            <button onClick={() => goToStep(1)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={handleTechRiderContinue}
               className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000]"
@@ -735,7 +731,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(1)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(1)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
                 if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -889,7 +885,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(2)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
                 const isOutdoor = formData.indoorOutdoor === 'Outdoor';
@@ -960,7 +956,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(2)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(2)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
                 if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -1031,7 +1027,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(3)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
                 if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -1205,7 +1201,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(3)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(3)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
                 if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
@@ -1337,7 +1333,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(4)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(4)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
                 if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
@@ -1436,7 +1432,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(5)} className="px-5 py-2.5 text-gray-700 font-bold">Back</button>
+            <button onClick={() => goToStep(5)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => handleSubmit()}
               disabled={isSubmitting}

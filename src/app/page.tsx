@@ -178,7 +178,7 @@ export default function Home() {
               <a
                 href="#services"
                 onClick={handleScrollToServices}
-                className="bg-white/10 backdrop-blur-sm text-white px-8 py-3 rounded-md font-bold transition-colors border border-white/40 cursor-pointer"
+                className="bg-[#FFFFFF] text-black px-8 py-3 rounded-md font-bold border border-[#000000]"
               >
                 View Services
               </a>
