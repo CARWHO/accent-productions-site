@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { generateQuotePDF } from '@/lib/pdf-quote';
 import { QuoteOutput } from '@/lib/gemini-quote';
 import { uploadQuoteToDrive, shareFileWithLink, FolderType } from '@/lib/google-drive';
-import { exportSheetAsPdf } from '@/lib/google-sheets';
+import { readQuoteSheetData } from '@/lib/google-sheets';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -124,14 +124,38 @@ export async function POST(request: Request) {
       try {
         let invoicePdfBuffer: Buffer | null = null;
 
-        // Try to export from Google Sheet first (this has the edited data)
+        // Try to read from Google Sheet first (this has the edited data)
         if (booking.quote_sheet_id) {
-          console.log(`Exporting invoice PDF from Google Sheet: ${booking.quote_sheet_id}`);
-          invoicePdfBuffer = await exportSheetAsPdf(booking.quote_sheet_id);
-          if (invoicePdfBuffer) {
-            console.log('Successfully exported PDF from Google Sheet');
+          console.log(`Reading invoice data from Google Sheet: ${booking.quote_sheet_id}`);
+          const sheetData = await readQuoteSheetData(booking.quote_sheet_id);
+          if (sheetData) {
+            console.log('Successfully read data from Google Sheet, generating formatted PDF');
+            // Convert sheet data to QuoteOutput format
+            const quoteFromSheet: QuoteOutput = {
+              quoteNumber: sheetData.quoteNumber,
+              title: sheetData.eventName,
+              description: sheetData.eventLocation,
+              lineItems: sheetData.lineItems.map(item => ({
+                description: item.quantity > 1 || item.days > 1
+                  ? `${item.gearName} (${item.quantity}x, ${item.days} day${item.days > 1 ? 's' : ''})`
+                  : item.gearName,
+                amount: item.lineTotal,
+              })),
+              subtotal: sheetData.subtotal,
+              gst: sheetData.gst,
+              total: sheetData.total,
+              rentalDays: 1,
+            };
+            invoicePdfBuffer = await generateQuotePDF(
+              quoteFromSheet,
+              sheetData.clientName,
+              sheetData.clientEmail,
+              sheetData.clientPhone || '',
+              sheetData.eventDate,
+              { isInvoice: true, invoiceNumber, issuedDate: sheetData.issuedDate }
+            );
           } else {
-            console.warn('Failed to export from Google Sheet, falling back to PDF generation');
+            console.warn('Failed to read from Google Sheet, falling back to original quote data');
           }
         }
 

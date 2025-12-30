@@ -27,7 +27,9 @@
       "mcp__github-server__list_commits",
       "Bash(git add:*)",
       "Bash(git checkout:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node scripts/add-missing-equipment.js:*)",
+      "Bash(node scripts/sync-equipment-sheet.js:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
