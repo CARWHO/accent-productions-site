@@ -18,25 +18,23 @@ function formatDate(dateStr: string): string {
  * NEW FORMAT (2024):
  * - LineItems use gear names from Master Equipment Sheet
  * - Pricing is auto-calculated via VLOOKUP formulas
- * - Required: gearName, quantity, days
+ * - Uses suggestedGear (priority) or lineItems for equipment list
  *
  * Expected body format:
  * {
  *   quote: {
  *     quoteNumber: string,
  *     title?: string,
- *     lineItems: Array<{
- *       gearName: string,      // Must match Master Sheet equipment names
- *       quantity: number,
- *       days?: number          // Defaults to 1
- *     }>
+ *     suggestedGear?: Array<{ item: string, quantity: number }>,  // Full system - actual gear names
+ *     lineItems?: Array<{ description: string, amount: number }>, // Backline - fallback
  *   },
  *   clientName: string,
  *   clientEmail: string,
  *   clientPhone?: string,
  *   eventDate: string,
  *   options?: { eventName?: string, location?: string },
- *   folderType?: 'fullsystem' | 'backline' | 'soundtech'
+ *   folderType?: 'fullsystem' | 'backline' | 'soundtech',
+ *   rentalDays?: number
  * }
  */
 export async function POST(request: Request) {
@@ -74,7 +72,19 @@ export async function POST(request: Request) {
     const defaultDays = rentalDays || 1;
     let lineItems: LineItem[] = [];
 
-    if (Array.isArray(quote.lineItems)) {
+    // Priority 1: Use suggestedGear (AI-generated equipment list with actual gear names)
+    // This is the primary source for full system quotes - has exact equipment names
+    if (Array.isArray(quote.suggestedGear) && quote.suggestedGear.length > 0) {
+      lineItems = quote.suggestedGear
+        .filter((item: Record<string, unknown>) => item.item || item.gearName)
+        .map((item: Record<string, unknown>) => ({
+          gearName: String(item.item || item.gearName || ''),
+          quantity: Number(item.quantity || item.qty || 1),
+          days: Number(item.days || defaultDays),
+        }));
+    }
+    // Priority 2: Fall back to lineItems array (backline quotes)
+    else if (Array.isArray(quote.lineItems)) {
       lineItems = quote.lineItems
         .filter((item: Record<string, unknown>) => item.gearName || item.item || item.description)
         .map((item: Record<string, unknown>) => ({
