@@ -335,7 +335,7 @@ function formatPackageSize(pkg: PackageType): string {
   return sizes[pkg];
 }
 
-// Fetch available equipment from both audio_equipment and hire_items tables
+// Fetch available equipment from consolidated equipment table
 async function fetchAudioEquipment(): Promise<AudioEquipmentItem[]> {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
@@ -343,33 +343,19 @@ async function fetchAudioEquipment(): Promise<AudioEquipmentItem[]> {
     return [];
   }
 
-  // Fetch from audio_equipment table
-  const { data: audioData, error: audioError } = await supabase
-    .from('audio_equipment')
+  // Fetch from consolidated equipment table
+  const { data, error } = await supabase
+    .from('equipment')
     .select('id, category, name, notes, hire_rate_per_day, stock_quantity')
     .eq('available', true)
     .order('category')
     .order('name');
 
-  if (audioError) {
-    console.error('Error fetching audio equipment:', audioError);
+  if (error) {
+    console.error('Error fetching equipment:', error);
   }
 
-  // Fetch from hire_items table
-  const { data: hireData, error: hireError } = await supabase
-    .from('hire_items')
-    .select('id, category, name, notes, hire_rate_per_day, stock_quantity')
-    .eq('available', true)
-    .order('category')
-    .order('name');
-
-  if (hireError) {
-    console.error('Error fetching hire items:', hireError);
-  }
-
-  // Combine both sources
-  const combined = [...(audioData || []), ...(hireData || [])];
-  return combined;
+  return data || [];
 }
 
 // Generic items that don't need inventory matching (always assumed available)

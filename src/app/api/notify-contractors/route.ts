@@ -61,15 +61,15 @@ export async function POST(request: Request) {
     let equipmentWithNotes: Array<{ name: string; quantity: number; notes?: string | null }> = [];
     if (details?.equipment && Array.isArray(details.equipment)) {
       const equipmentNames = (details.equipment as Array<{ name: string }>).map(e => e.name);
-      const { data: hireItems } = await supabase
-        .from('hire_items')
+      const { data: equipmentItems } = await supabase
+        .from('equipment')
         .select('name, notes')
         .in('name', equipmentNames);
 
       equipmentWithNotes = (details.equipment as Array<{ name: string; quantity: number }>).map(item => ({
         name: item.name,
         quantity: item.quantity,
-        notes: hireItems?.find(h => h.name === item.name)?.notes || null,
+        notes: equipmentItems?.find(e => e.name === item.name)?.notes || null,
       }));
     }
 
