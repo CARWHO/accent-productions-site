@@ -30,7 +30,10 @@
       "Bash(find:*)",
       "Bash(node scripts/add-missing-equipment.js:*)",
       "Bash(node scripts/sync-equipment-sheet.js:*)",
-      "Bash(node scripts/create-google-templates.js:*)"
+      "Bash(node scripts/create-google-templates.js:*)",
+      "Bash(git -C \"C:\\\\workspace\\\\Repo\\\\accent-productions-site\" log --oneline -15)",
+      "Bash(git -C \"C:\\\\workspace\\\\Repo\\\\accent-productions-site\" diff src/app/api/audio-equipment/route.ts)",
+      "Bash(git commit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

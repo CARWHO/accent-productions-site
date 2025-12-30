@@ -323,27 +323,17 @@ interface AudioEquipmentItem {
 }
 
 async function fetchAudioEquipment(supabase: ReturnType<typeof createClient>): Promise<AudioEquipmentItem[]> {
-  // Fetch from audio_equipment table
-  const { data: audioData, error: audioError } = await supabase
-    .from("audio_equipment")
+  // Fetch from consolidated equipment table
+  const { data, error } = await supabase
+    .from("equipment")
     .select("id, category, name, notes, hire_rate_per_day, stock_quantity")
     .eq("available", true)
     .order("category")
     .order("name");
 
-  if (audioError) console.error("Error fetching audio equipment:", audioError);
+  if (error) console.error("Error fetching equipment:", error);
 
-  // Fetch from hire_items table
-  const { data: hireData, error: hireError } = await supabase
-    .from("hire_items")
-    .select("id, category, name, notes, hire_rate_per_day, stock_quantity")
-    .eq("available", true)
-    .order("category")
-    .order("name");
-
-  if (hireError) console.error("Error fetching hire items:", hireError);
-
-  return [...(audioData || []), ...(hireData || [])];
+  return data || [];
 }
 
 function formatInventoryForPrompt(inventory: AudioEquipmentItem[]): string {
@@ -434,7 +424,7 @@ async function generateBacklineQuote(formData: BacklineFormData, supabase: Retur
   const rentalDays = calculateRentalDays(formData.startDate, formData.endDate);
 
   const equipmentNames = formData.equipment.map((e) => e.name);
-  const { data: dbItems } = await supabase.from("hire_items").select("name, hire_rate_per_day").in("name", equipmentNames);
+  const { data: dbItems } = await supabase.from("equipment").select("name, hire_rate_per_day").eq("type", "backline").in("name", equipmentNames);
 
   const lineItems: { description: string; amount: number }[] = [];
   let equipmentSubtotal = 0;

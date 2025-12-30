@@ -1,6 +1,6 @@
 // Run with: node scripts/sync-equipment-sheet.js
 // Syncs equipment data from Supabase to Master Equipment Google Sheet
-// This should be run whenever equipment/pricing changes
+// This populates the sheet with current data including the Type column
 
 require('dotenv').config({ path: '.env' });
 const { google } = require('googleapis');
@@ -27,43 +27,22 @@ const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_EQUIPMENT_SHEET_ID;
 async function fetchEquipmentFromSupabase() {
   console.log('Fetching equipment from Supabase...');
 
-  // Fetch from audio_equipment
-  const { data: audioEquipment, error: audioError } = await supabase
-    .from('audio_equipment')
-    .select('category, name, hire_rate_per_day, stock_quantity, notes')
+  // Fetch from consolidated equipment table
+  const { data: equipment, error } = await supabase
+    .from('equipment')
+    .select('category, name, hire_rate_per_day, stock_quantity, notes, type')
     .eq('available', true)
+    .order('type')
     .order('category')
     .order('name');
 
-  if (audioError) {
-    console.error('Error fetching audio_equipment:', audioError);
+  if (error) {
+    console.error('Error fetching equipment:', error);
     return [];
   }
 
-  // Fetch from hire_items
-  const { data: hireItems, error: hireError } = await supabase
-    .from('hire_items')
-    .select('category, name, hire_rate_per_day, stock_quantity, notes')
-    .eq('available', true)
-    .order('category')
-    .order('name');
-
-  if (hireError) {
-    console.error('Error fetching hire_items:', hireError);
-    return audioEquipment || [];
-  }
-
-  // Combine and dedupe by name
-  const allItems = [...(audioEquipment || []), ...(hireItems || [])];
-  const seen = new Set();
-  const deduped = allItems.filter(item => {
-    if (seen.has(item.name)) return false;
-    seen.add(item.name);
-    return true;
-  });
-
-  console.log(`  Found ${deduped.length} unique equipment items`);
-  return deduped;
+  console.log(`  Found ${equipment.length} equipment items`);
+  return equipment;
 }
 
 async function createMasterSheet() {
@@ -80,13 +59,13 @@ async function createMasterSheet() {
 
   const spreadsheetId = spreadsheet.data.spreadsheetId;
 
-  // Set header row
+  // Set header row (including Type column)
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: 'Equipment!A1:E1',
+    range: 'Equipment!A1:F1',
     valueInputOption: 'RAW',
     requestBody: {
-      values: [['Category', 'Name', 'Daily Rate', 'Stock', 'Notes']],
+      values: [['Category', 'Name', 'Daily Rate', 'Stock', 'Notes', 'Type']],
     },
   });
 
@@ -145,10 +124,20 @@ async function createMasterSheet() {
 async function syncEquipmentToSheet(spreadsheetId, equipment) {
   console.log(`Syncing ${equipment.length} items to Master Sheet...`);
 
+  // First, update header to include Type column
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: 'Equipment!A1:F1',
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [['Category', 'Name', 'Daily Rate', 'Stock', 'Notes', 'Type']],
+    },
+  });
+
   // Clear existing data (except header)
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: 'Equipment!A2:E1000',
+    range: 'Equipment!A2:F1000',
   });
 
   if (equipment.length === 0) {
@@ -156,19 +145,20 @@ async function syncEquipmentToSheet(spreadsheetId, equipment) {
     return;
   }
 
-  // Prepare data rows
+  // Prepare data rows (including type column)
   const rows = equipment.map(item => [
     item.category || '',
     item.name || '',
     item.hire_rate_per_day || 0,
     item.stock_quantity || 0,
     item.notes || '',
+    item.type || 'audio',
   ]);
 
   // Write data
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `Equipment!A2:E${rows.length + 1}`,
+    range: `Equipment!A2:F${rows.length + 1}`,
     valueInputOption: 'RAW',
     requestBody: { values: rows },
   });
@@ -194,7 +184,16 @@ async function syncEquipmentToSheet(spreadsheetId, equipment) {
     },
   });
 
-  console.log(`  Synced ${rows.length} items`);
+  // Count by type
+  const typeCounts = equipment.reduce((acc, item) => {
+    acc[item.type] = (acc[item.type] || 0) + 1;
+    return acc;
+  }, {});
+
+  console.log(`  Synced ${rows.length} items:`);
+  Object.entries(typeCounts).forEach(([type, count]) => {
+    console.log(`    - ${type}: ${count}`);
+  });
 }
 
 async function main() {
