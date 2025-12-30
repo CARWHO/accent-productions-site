@@ -40,6 +40,7 @@ async function createQuoteTemplate(folderType) {
         { properties: { title: 'Data', index: 0 } },
         { properties: { title: 'LineItems', index: 1 } },
         { properties: { title: 'Totals', index: 2 } },
+        { properties: { title: 'Lookup', index: 3, hidden: true } },
       ],
     },
   });
@@ -48,6 +49,7 @@ async function createQuoteTemplate(folderType) {
   const dataSheetId = spreadsheet.data.sheets[0].properties.sheetId;
   const lineItemsSheetId = spreadsheet.data.sheets[1].properties.sheetId;
   const totalsSheetId = spreadsheet.data.sheets[2].properties.sheetId;
+  const lookupSheetId = spreadsheet.data.sheets[3].properties.sheetId;
 
   // ============================================
   // DATA TAB - Metadata (empty values)
@@ -122,6 +124,18 @@ async function createQuoteTemplate(folderType) {
   });
 
   // ============================================
+  // LOOKUP TAB - Equipment names for dropdown
+  // ============================================
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: 'Lookup!A1',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[`=IMPORTRANGE("${MASTER_SHEET_ID}","Equipment!B2:B500")`]],
+    },
+  });
+
+  // ============================================
   // FORMATTING
   // ============================================
   await sheets.spreadsheets.batchUpdate({
@@ -170,6 +184,26 @@ async function createQuoteTemplate(folderType) {
             range: { sheetId: lineItemsSheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 },
             properties: { pixelSize: 250 },
             fields: 'pixelSize',
+          },
+        },
+        // LineItems - data validation dropdown for Gear Name column
+        {
+          setDataValidation: {
+            range: {
+              sheetId: lineItemsSheetId,
+              startRowIndex: 1,
+              endRowIndex: 51,
+              startColumnIndex: 0,
+              endColumnIndex: 1,
+            },
+            rule: {
+              condition: {
+                type: 'ONE_OF_RANGE',
+                values: [{ userEnteredValue: '=Lookup!$A:$A' }],
+              },
+              showCustomUi: true,
+              strict: false,
+            },
           },
         },
         // Totals - bold labels
@@ -420,9 +454,11 @@ async function main() {
   console.log('='.repeat(60));
 
   console.log('\nIMPORTANT: After creating templates, you need to:');
-  console.log('1. Open each template in Google Sheets');
-  console.log('2. Click "Allow access" for the IMPORTRANGE formula to work');
-  console.log('   (The first cell using IMPORTRANGE will show #REF! until authorized)');
+  console.log('1. Open each QUOTE template in Google Sheets');
+  console.log('2. Go to the hidden "Lookup" sheet (unhide it temporarily)');
+  console.log('3. Click cell A1 and click "Allow access" for IMPORTRANGE');
+  console.log('4. Also authorize the IMPORTRANGE in LineItems column D');
+  console.log('   (Both will show #REF! until authorized)');
 }
 
 main().catch(console.error);
