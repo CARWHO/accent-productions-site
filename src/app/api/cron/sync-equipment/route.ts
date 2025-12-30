@@ -86,9 +86,8 @@ export async function GET(request: Request) {
     // Delete items NOT in sheet (full sync)
     const { error: deleteError, count: deleteCount } = await supabase
       .from('equipment')
-      .delete()
-      .not('name', 'in', `(${sheetNames.map(n => `"${n.replace(/"/g, '\\"')}"`).join(',')})`)
-      .select('*', { count: 'exact', head: true });
+      .delete({ count: 'exact' })
+      .not('name', 'in', `(${sheetNames.map(n => `"${n.replace(/"/g, '\\"')}"`).join(',')})`);
 
     if (deleteError) {
       console.error('Error deleting removed items:', deleteError);

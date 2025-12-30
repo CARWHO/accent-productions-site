@@ -213,39 +213,44 @@ function formatTime(time?: string): string {
 // ============================================
 
 const EQUIPMENT_RULES = `
+## CRITICAL: USE EXACT NAMES FROM INVENTORY
+You MUST use the EXACT equipment names from the AVAILABLE INVENTORY list below.
+Do NOT add brand prefixes, model suffixes, or modify names in any way.
+If an item isn't in inventory, don't include it.
+
 ## BASE PACKAGES
 
 ### Small Package (10-50 people)
-- 2x EV8 (ZLX 8P G2) or 2x EV10 (ELX200)
+- 2x small/8" powered speakers (from Speakers category)
 - 2x speaker stands
-- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
-- 1x SM58 microphone + stand
+- 1x small mixer (from Mixers category)
+- 1x handheld microphone + stand
 - Supporting cabling
 - 30 min setup time
 
 ### Medium Package (50-200 people)
-- 2x EV12 (EKX12) - main FOH
-- 2x EV8 (ZLX 8P G2) - delay speakers
+- 2x medium/12" powered speakers - main FOH
+- 2x small/8" powered speakers - delays
 - 4x speaker stands
-- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
-- 1x SM58 microphone + stand
+- 1x small mixer
+- 1x handheld microphone + stand
 - Supporting cabling
 - 1 hour setup time
 
 ### Large Package (200-1000 people)
-- 4x EV12 (EKX12)
-- 2x EV8 (ZLX 8P G2)
+- 4x medium/12" powered speakers
+- 2x small/8" powered speakers
 - 6x speaker stands
-- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
-- 1x SM58 microphone + stand
+- 1x small mixer
+- 1x handheld microphone + stand
 - Supporting cabling
 - 2 hours setup time
 
 ## CONDITIONAL ADD-ONS
 
 ### Bluetooth Playback Only
-- Use Behringer Flow 8
-- EV8 (ZLX 8P G2)
+- Use smallest mixer available
+- Small powered speakers
 - +15 min tech time
 
 ### DJ / Loud Dance Music (IMPORTANT - WHEN TO ADD SUBS)
@@ -256,42 +261,40 @@ Apply this rule when ANY of these are true:
 - Tech rider mentions DJ equipment or heavy bass music
 
 When triggered:
-- ADD: 2x Sub (EV EKX18) - REQUIRED for proper bass response
+- ADD: 2x subwoofers (from Subs category) - REQUIRED for proper bass response
 - ADD: 2x sub poles (these REPLACE 2 speaker stands - mains sit on subs)
-- DO NOT include separate speaker stands for the mains when subs are used
+- DO NOT include separate speaker stands for mains when subs are used
 - +15 min tech time
 
 ### Professional DJ
-- ADD: Booth speaker - EV10 (ELX200) or EV12 (EKX12)
+- ADD: 1x booth monitor speaker
 
 ### Live Band (CRITICAL - READ CAREFULLY)
 When there is a live band:
 
 SPEAKERS:
-- ADD: 2x Sub (EV EKX18) - REQUIRED for any band with drums/bass
-- Mains: Use EV EKX12 or EV ELX200-12P (NOT QSC)
-- Delays: Only if venue is long/deep - for audience coverage, NOT for speeches
+- ADD: 2x subwoofers - REQUIRED for any band with drums/bass
+- Mains: Use 12" powered speakers from inventory
+- Delays: Only if venue is long/deep - for audience coverage
 
 MONITORS (assign by STAGE POSITION, not mix count):
 - 6 monitor mixes does NOT mean 6 wedges
 - Typically: 1 wedge per vocal mic, 1-2 for drums
 - Horn sections/brass can SHARE wedges (2-3 players per wedge)
-- Use EV ELX200-12P or EV EKX12 for monitors (NOT QSC K12)
+- Use powered speakers from inventory as monitors
 - Example: 11-piece brass band = 3-4 wedges, not 6
 
 MICROPHONES (must be included in quote):
 - Count ALL inputs from tech rider
-- Vocal mics: SM58 or Beta58a
-- Instrument mics: SM57, E906, etc.
-- Drum mics: Beta52A/D112 for kick, E604/SM57 for toms/snare
+- Use microphones from inventory that match the application
 - Include microphone stands for each mic
 
 CONSOLE & STAGE BOX:
-- UPGRADE: X32 Compact or X32 Rack (for 16+ channels)
-- ADD: Digital stage box S16 (for clean stage runs)
+- UPGRADE to digital console (for 16+ channels)
+- ADD digital stage box (for clean stage runs)
 
 ### Wireless Microphone
-- ADD: Shure SM58 BLX wireless
+- ADD wireless microphone system from inventory
 
 ## TECH TIME CALCULATION (IMPORTANT)
 Tech time = Event Duration + Setup Time + Load Time + Unload Time + Pack-out Time
@@ -550,8 +553,8 @@ Return a JSON object with this EXACT structure:
     "<etc - 5-8 concise execution notes>"
   ],
   "suggestedGear": [
-    { "item": "EV ELX200-15P", "quantity": 2, "notes": "FOH L/R" },
-    { "item": "SM58", "quantity": 4, "notes": "Vocals" }
+    { "item": "<exact name from inventory>", "quantity": 2, "notes": "FOH L/R" },
+    { "item": "<exact name from inventory>", "quantity": 4, "notes": "Vocals" }
   ],
   "unavailableGear": []
 }

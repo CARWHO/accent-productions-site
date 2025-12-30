@@ -211,39 +211,44 @@ function formatTime(time?: string): string {
 
 // Equipment selection rules for quote generation
 const EQUIPMENT_RULES = `
+## CRITICAL: USE EXACT NAMES FROM INVENTORY
+You MUST use the EXACT equipment names from the AVAILABLE INVENTORY list below.
+Do NOT add brand prefixes, model suffixes, or modify names in any way.
+If an item isn't in inventory, don't include it.
+
 ## BASE PACKAGES
 
 ### Small Package (10-50 people)
-- 2x EV8 (ZLX 8P G2) or 2x EV10 (ELX200)
+- 2x small/8" powered speakers (from Speakers category)
 - 2x speaker stands
-- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
-- 1x SM58 microphone + stand
+- 1x small mixer (from Mixers category)
+- 1x handheld microphone + stand
 - Supporting cabling
 - 30 min setup time
 
 ### Medium Package (50-200 people)
-- 2x EV12 (EKX12) - main FOH
-- 2x EV8 (ZLX 8P G2) - delay speakers
+- 2x medium/12" powered speakers - main FOH
+- 2x small/8" powered speakers - delays
 - 4x speaker stands
-- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
-- 1x SM58 microphone + stand
+- 1x small mixer
+- 1x handheld microphone + stand
 - Supporting cabling
 - 1 hour setup time
 
 ### Large Package (200-1000 people)
-- 4x EV12 (EKX12)
-- 2x EV8 (ZLX 8P G2)
+- 4x medium/12" powered speakers
+- 2x small/8" powered speakers
 - 6x speaker stands
-- Small console (Alto 802, Mackie 12ProFX, or Behringer Flow 8)
-- 1x SM58 microphone + stand
+- 1x small mixer
+- 1x handheld microphone + stand
 - Supporting cabling
 - 2 hours setup time
 
 ## CONDITIONAL ADD-ONS
 
 ### Bluetooth Playback Only
-- Use Behringer Flow 8
-- EV8 (ZLX 8P G2)
+- Use smallest mixer available
+- Small powered speakers
 - +15 min tech time
 
 ### DJ / Loud Dance Music (IMPORTANT - WHEN TO ADD SUBS)
@@ -254,42 +259,40 @@ Apply this rule when ANY of these are true:
 - Tech rider mentions DJ equipment or heavy bass music
 
 When triggered:
-- ADD: 2x Sub (EV EKX18) - REQUIRED for proper bass response
+- ADD: 2x subwoofers (from Subs category) - REQUIRED for proper bass response
 - ADD: 2x sub poles (these REPLACE 2 speaker stands - mains sit on subs)
-- DO NOT include separate speaker stands for the mains when subs are used
+- DO NOT include separate speaker stands for mains when subs are used
 - +15 min tech time
 
 ### Professional DJ
-- ADD: Booth speaker - EV10 (ELX200) or EV12 (EKX12)
+- ADD: 1x booth monitor speaker
 
 ### Live Band (CRITICAL - READ CAREFULLY)
 When there is a live band:
 
 SPEAKERS:
-- ADD: 2x Sub (EV EKX18) - REQUIRED for any band with drums/bass
-- Mains: Use EV EKX12 or EV ELX200-12P (NOT QSC)
-- Delays: Only if venue is long/deep - for audience coverage, NOT for speeches
+- ADD: 2x subwoofers - REQUIRED for any band with drums/bass
+- Mains: Use 12" powered speakers from inventory
+- Delays: Only if venue is long/deep - for audience coverage
 
 MONITORS (assign by STAGE POSITION, not mix count):
 - 6 monitor mixes does NOT mean 6 wedges
 - Typically: 1 wedge per vocal mic, 1-2 for drums
 - Horn sections/brass can SHARE wedges (2-3 players per wedge)
-- Use EV ELX200-12P or EV EKX12 for monitors (NOT QSC K12)
+- Use powered speakers from inventory as monitors
 - Example: 11-piece brass band = 3-4 wedges, not 6
 
 MICROPHONES (must be included in quote):
 - Count ALL inputs from tech rider
-- Vocal mics: SM58 or Beta58a
-- Instrument mics: SM57, E906, etc.
-- Drum mics: Beta52A/D112 for kick, E604/SM57 for toms/snare
+- Use microphones from inventory that match the application
 - Include microphone stands for each mic
 
 CONSOLE & STAGE BOX:
-- UPGRADE: X32 Compact or X32 Rack (for 16+ channels)
-- ADD: Digital stage box S16 (for clean stage runs)
+- UPGRADE to digital console (for 16+ channels)
+- ADD digital stage box (for clean stage runs)
 
 ### Wireless Microphone
-- ADD: Shure SM58 BLX wireless
+- ADD wireless microphone system from inventory
 
 ## TECH TIME CALCULATION (IMPORTANT)
 Tech time = Event Duration + Setup Time + Load Time + Unload Time + Pack-out Time
@@ -608,9 +611,9 @@ Return a JSON object with this EXACT structure:
     "<etc - 5-8 concise execution notes>"
   ],
   "suggestedGear": [
-    { "item": "EV ELX200-15P", "quantity": 2, "notes": "FOH L/R" },
-    { "item": "SM58", "quantity": 4, "notes": "Vocals" },
-    { "item": "etc", "quantity": 1 }
+    { "item": "<exact name from inventory>", "quantity": 2, "notes": "FOH L/R" },
+    { "item": "<exact name from inventory>", "quantity": 4, "notes": "Vocals" },
+    { "item": "<etc>", "quantity": 1 }
   ]
 }
 
@@ -625,7 +628,7 @@ Return a JSON object with this EXACT structure:
    - Load/Unload: 1 hour total (0.5 + 0.5)
    - Pack-out: ${input.package === 'small' ? 0.5 : input.package === 'medium' ? 0.5 : input.package === 'large' ? 1 : 1.5} hours
    - TOTAL = ${calculateEventDuration(input.eventStartTime, input.eventEndTime) + (input.package === 'small' ? 0.5 : input.package === 'medium' ? 1 : input.package === 'large' ? 2 : 3) + 1 + (input.package === 'small' ? 0.5 : input.package === 'medium' ? 0.5 : input.package === 'large' ? 1 : 1.5)} hours
-6. For bands: ALWAYS include subs (EV EKX18), microphones, and stage box
+6. For bands: ALWAYS include subs (from Subs category), microphones, and stage box
 
 ## PRICING GUIDELINES
 Calculate prices by summing hire rates from the inventory for each category:
@@ -649,7 +652,7 @@ Concise instructions for the sound tech:
 
 ## SUGGESTED GEAR
 - Follow EQUIPMENT SELECTION RULES to determine what gear is needed
-- Match items to AVAILABLE INVENTORY (use exact names like "EV ELX200-15P")
+- Match items to AVAILABLE INVENTORY (use exact names from the inventory list)
 - Include: Speakers (FOH, delays, monitors), Subs if DJ, Console, Microphones, DI boxes, Stage box if band
 - Stands and cables are assumed
 
@@ -740,108 +743,126 @@ function generateFallbackQuote(
   let micCount = 0;
 
   if (isSmall) {
-    // FOH speakers
-    const foh = findInInventory('ZLX') || findInInventory('ELX200-12P');
-    const fohName = foh?.name || 'EV ZLX-12P';
-    const fohRate = foh?.rate || 50;
-    suggestedGear.push({ item: fohName, quantity: 2, notes: 'FOH' });
-    fohCost = fohRate * 2;
+    // FOH speakers - only add if found in inventory
+    const foh = findInInventory('ZLX') || findInInventory('ELX') || findInInventory('Speaker');
+    if (foh) {
+      suggestedGear.push({ item: foh.name, quantity: 2, notes: 'FOH' });
+      fohCost = foh.rate * 2;
+    }
 
     // Console
-    const mixer = findInInventory('Flow 8') || findInInventory('Compact Mixer');
-    const mixerName = mixer?.name || 'Behringer Flow 8';
-    consoleCost = mixer?.rate || 30;
-    suggestedGear.push({ item: mixerName, quantity: 1, notes: 'Mixer' });
+    const mixer = findInInventory('Flow') || findInInventory('Mixer') || findInInventory('Console');
+    if (mixer) {
+      consoleCost = mixer.rate;
+      suggestedGear.push({ item: mixer.name, quantity: 1, notes: 'Mixer' });
+    }
 
     // Mic if needed
     if (input.needsMic || input.hasSpeeches) {
-      const mic = findInInventory('SM58 BLX') || findInInventory('Wireless');
-      const micName = mic?.name || 'Shure SM58 BLX Wireless';
-      micCost = mic?.rate || 50;
-      micCount = 1;
-      suggestedGear.push({ item: micName, quantity: 1, notes: 'Speeches' });
+      const mic = findInInventory('Wireless') || findInInventory('SM58');
+      if (mic) {
+        micCost = mic.rate;
+        micCount = 1;
+        suggestedGear.push({ item: mic.name, quantity: 1, notes: 'Speeches' });
+      }
     }
   } else if (isMedium) {
     // FOH speakers
-    const foh = findInInventory('EKX12') || findInInventory('ELX200-15P');
-    const fohName = foh?.name || 'EV EKX12';
-    const fohRate = foh?.rate || 80;
-    suggestedGear.push({ item: fohName, quantity: 2, notes: 'FOH' });
-    fohCost = fohRate * 2;
+    const foh = findInInventory('EKX') || findInInventory('ELX') || findInInventory('Speaker');
+    if (foh) {
+      suggestedGear.push({ item: foh.name, quantity: 2, notes: 'FOH' });
+      fohCost = foh.rate * 2;
+    }
 
     // Monitors
-    const monitor = findInInventory('ELX200-12P') || findInInventory('EKX12');
-    const monitorName = monitor?.name || 'EV ELX200-12P';
-    const monitorRate = monitor?.rate || 60;
-    suggestedGear.push({ item: monitorName, quantity: monitorCount, notes: 'Monitors' });
-    monitorCost = monitorRate * monitorCount;
+    const monitor = findInInventory('ELX') || findInInventory('Monitor') || findInInventory('Wedge');
+    if (monitor) {
+      suggestedGear.push({ item: monitor.name, quantity: monitorCount, notes: 'Monitors' });
+      monitorCost = monitor.rate * monitorCount;
+    }
 
     // Console
-    const console = findInInventory('X32 Rack') || findInInventory('X32');
-    const consoleName = console?.name || 'Behringer X32 Rack';
-    consoleCost = console?.rate || 100;
-    suggestedGear.push({ item: consoleName, quantity: 1, notes: 'Console' });
+    const consoleItem = findInInventory('X32') || findInInventory('Console') || findInInventory('Mixer');
+    if (consoleItem) {
+      consoleCost = consoleItem.rate;
+      suggestedGear.push({ item: consoleItem.name, quantity: 1, notes: 'Console' });
+    }
 
     // Mics
-    const sm58 = findInInventory('SM58');
-    const sm58Name = sm58?.name || 'Shure SM58';
-    const sm58Rate = sm58?.rate || 15;
+    const sm58 = findInInventory('SM58') || findInInventory('Vocal');
     micCount = input.hasBand ? 6 : 2;
-    suggestedGear.push({ item: sm58Name, quantity: micCount, notes: 'Vocals' });
-    micCost = sm58Rate * micCount;
+    if (sm58) {
+      suggestedGear.push({ item: sm58.name, quantity: micCount, notes: 'Vocals' });
+      micCost = sm58.rate * micCount;
+    }
 
-    suggestedGear.push({ item: 'DI Box', quantity: 4 });
+    // DI Box
+    const di = findInInventory('DI');
+    if (di) {
+      suggestedGear.push({ item: di.name, quantity: 4 });
+    }
   } else {
     // Large package - FOH speakers
-    const foh = findInInventory('EKX15') || findInInventory('ETX-15P');
-    const fohName = foh?.name || 'EV EKX15';
-    const fohRate = foh?.rate || 100;
-    suggestedGear.push({ item: fohName, quantity: 4, notes: 'FOH' });
-    fohCost = fohRate * 4;
+    const foh = findInInventory('EKX') || findInInventory('ETX') || findInInventory('Speaker');
+    if (foh) {
+      suggestedGear.push({ item: foh.name, quantity: 4, notes: 'FOH' });
+      fohCost = foh.rate * 4;
+    }
 
     // Subs
-    const subs = findInInventory('EKX18') || findInInventory('ELX200-18SP');
-    const subName = subs?.name || 'EV EKX18';
-    const subRate = subs?.rate || 120;
-    suggestedGear.push({ item: subName, quantity: 2, notes: 'Subs' });
-    fohCost += subRate * 2;
+    const subs = findInInventory('Sub') || findInInventory('18');
+    if (subs) {
+      suggestedGear.push({ item: subs.name, quantity: 2, notes: 'Subs' });
+      fohCost += subs.rate * 2;
+    }
 
     // Monitors
-    const monitor = findInInventory('ELX200-12P') || findInInventory('EKX12');
-    const monitorName = monitor?.name || 'EV ELX200-12P';
-    const monitorRate = monitor?.rate || 60;
-    suggestedGear.push({ item: monitorName, quantity: monitorCount, notes: 'Monitors' });
-    monitorCost = monitorRate * monitorCount;
+    const monitor = findInInventory('ELX') || findInInventory('Monitor') || findInInventory('Wedge');
+    if (monitor) {
+      suggestedGear.push({ item: monitor.name, quantity: monitorCount, notes: 'Monitors' });
+      monitorCost = monitor.rate * monitorCount;
+    }
 
     // Console
-    const console = findInInventory('X32 Compact') || findInInventory('CL1');
-    const consoleName = console?.name || 'Behringer X32 Compact';
-    consoleCost = console?.rate || 150;
-    suggestedGear.push({ item: consoleName, quantity: 1, notes: 'Console' });
+    const consoleItem = findInInventory('X32') || findInInventory('Console');
+    if (consoleItem) {
+      consoleCost = consoleItem.rate;
+      suggestedGear.push({ item: consoleItem.name, quantity: 1, notes: 'Console' });
+    }
 
     // Stage box
-    const stageBox = findInInventory('S16') || findInInventory('Rio');
+    const stageBox = findInInventory('S16') || findInInventory('Stage Box') || findInInventory('Rio');
     if (stageBox) {
       suggestedGear.push({ item: stageBox.name, quantity: 1, notes: 'Stage Box' });
       consoleCost += stageBox.rate;
     }
 
     // Mics - look up each type from database
-    const sm58 = findInInventory('SM58');
-    const sm57 = findInInventory('SM57');
-    const beta52 = findInInventory('Beta52') || findInInventory('D112');
+    const sm58 = findInInventory('SM58') || findInInventory('Vocal');
+    const sm57 = findInInventory('SM57') || findInInventory('Instrument');
+    const kickMic = findInInventory('Beta52') || findInInventory('D112') || findInInventory('Kick');
 
-    const sm58Name = sm58?.name || 'Shure SM58';
-    const sm57Name = sm57?.name || 'Shure SM57';
-    const kickMicName = beta52?.name || 'AKG D112';
+    if (sm58) {
+      suggestedGear.push({ item: sm58.name, quantity: 6, notes: 'Vocals' });
+      micCost += sm58.rate * 6;
+      micCount += 6;
+    }
+    if (sm57) {
+      suggestedGear.push({ item: sm57.name, quantity: 4, notes: 'Instruments' });
+      micCost += sm57.rate * 4;
+      micCount += 4;
+    }
+    if (kickMic) {
+      suggestedGear.push({ item: kickMic.name, quantity: 1, notes: 'Kick' });
+      micCost += kickMic.rate;
+      micCount += 1;
+    }
 
-    suggestedGear.push({ item: sm58Name, quantity: 6, notes: 'Vocals' });
-    suggestedGear.push({ item: sm57Name, quantity: 4, notes: 'Instruments' });
-    suggestedGear.push({ item: kickMicName, quantity: 1, notes: 'Kick' });
-    suggestedGear.push({ item: 'DI Box', quantity: 6 });
-
-    micCount = 11;
-    micCost = (sm58?.rate || 15) * 6 + (sm57?.rate || 15) * 4 + (beta52?.rate || 25) * 1;
+    // DI Box
+    const di = findInInventory('DI');
+    if (di) {
+      suggestedGear.push({ item: di.name, quantity: 6 });
+    }
   }
 
   const lineItems: QuoteLineItems = {
