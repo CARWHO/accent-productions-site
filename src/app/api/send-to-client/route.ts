@@ -2,18 +2,9 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
-import { generateQuotePDF } from '@/lib/pdf-quote';
-import { QuoteOutput } from '@/lib/gemini-quote';
-import { uploadQuoteToDrive, shareFileWithLink, FolderType } from '@/lib/google-drive';
-import { readQuoteSheetData } from '@/lib/google-sheets';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
-
-function getInvoiceFolderType(bookingType: string | null): FolderType {
-  if (bookingType === 'backline') return 'backline';
-  return 'fullsystem'; // default for soundgear and other types
-}
 
 export async function POST(request: Request) {
   try {
@@ -40,9 +31,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Booking not found' }, { status: 404 });
     }
 
-    // Get the original quote data from the inquiry
-    const originalQuote = (booking.inquiries as { quote_data: QuoteOutput } | null)?.quote_data || booking.quote_json as QuoteOutput | null;
-
     // Generate invoice number (INV-YYYY-XXXX format)
     const year = new Date().getFullYear();
     const invoiceNumber = `INV-${year}-${booking.quote_number?.split('-')[1] || randomUUID().slice(0, 4).toUpperCase()}`;
@@ -51,32 +39,11 @@ export async function POST(request: Request) {
     const clientApprovalToken = randomUUID();
 
     // Calculate totals - adjustedAmount overrides the stored quote_total
-    const details = booking.details_json as Record<string, unknown> | null;
     const finalAmount = adjustedAmount || booking.quote_total || 0;
-    const subtotal = finalAmount / 1.15; // Remove GST to get subtotal
-    const gst = finalAmount - subtotal;
 
     // Calculate deposit amount from percentage (default 50%)
     const depositPercentValue = depositPercent ?? 50;
     const depositAmount = (finalAmount * depositPercentValue) / 100;
-
-    // Build line items from details
-    const lineItems: Array<{ description: string; amount: number }> = [];
-    if (details?.equipment && Array.isArray(details.equipment)) {
-      for (const item of details.equipment as Array<{ name: string; quantity: number; price?: number }>) {
-        lineItems.push({
-          description: `${item.quantity}x ${item.name}`,
-          amount: (item.price || 0) * item.quantity,
-        });
-      }
-    }
-    // If no line items, add a generic one
-    if (lineItems.length === 0) {
-      lineItems.push({
-        description: booking.booking_type || 'Equipment Hire & Services',
-        amount: subtotal,
-      });
-    }
 
     // Create or update client_approvals record
     const { error: approvalError } = await supabase
@@ -118,106 +85,35 @@ export async function POST(request: Request) {
         });
       };
 
-      // Generate invoice PDF and upload to Google Drive
-      // Prefer exporting from Google Sheet if available
+      // Generate invoice PDF via edge function
       let invoiceDriveLink: string | null = null;
-      try {
-        let invoicePdfBuffer: Buffer | null = null;
+      if (booking.quote_sheet_id) {
+        try {
+          const edgeFunctionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-pdfs`;
+          const response = await fetch(edgeFunctionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({
+              booking_id: bookingId,
+              pdfType: 'invoice',
+            }),
+          });
 
-        // Try to read from Google Sheet first (this has the edited data)
-        if (booking.quote_sheet_id) {
-          console.log(`Reading invoice data from Google Sheet: ${booking.quote_sheet_id}`);
-          const sheetData = await readQuoteSheetData(booking.quote_sheet_id);
-          if (sheetData) {
-            console.log('Successfully read data from Google Sheet, generating formatted PDF');
-            // Convert sheet data to QuoteOutput format
-            const quoteFromSheet: QuoteOutput = {
-              quoteNumber: sheetData.quoteNumber,
-              title: sheetData.eventName,
-              description: sheetData.eventLocation,
-              lineItems: sheetData.lineItems.map(item => ({
-                description: item.quantity > 1 || item.days > 1
-                  ? `${item.gearName} (${item.quantity}x, ${item.days} day${item.days > 1 ? 's' : ''})`
-                  : item.gearName,
-                amount: item.lineTotal,
-              })),
-              subtotal: sheetData.subtotal,
-              gst: sheetData.gst,
-              total: sheetData.total,
-              rentalDays: 1,
-            };
-            invoicePdfBuffer = await generateQuotePDF(
-              quoteFromSheet,
-              sheetData.clientName,
-              sheetData.clientEmail,
-              sheetData.clientPhone || '',
-              sheetData.eventDate,
-              { isInvoice: true, invoiceNumber, issuedDate: sheetData.issuedDate }
-            );
+          if (response.ok) {
+            const result = await response.json();
+            invoiceDriveLink = result.driveLink;
+            console.log(`Invoice PDF generated via edge function: ${invoiceDriveLink}`);
           } else {
-            console.warn('Failed to read from Google Sheet, falling back to original quote data');
+            console.error('Edge function failed:', await response.text());
           }
+        } catch (pdfError) {
+          console.error('Error calling generate-pdfs edge function:', pdfError);
         }
-
-        // Fallback: generate PDF from quote data if sheet export failed or no sheet
-        if (!invoicePdfBuffer && originalQuote) {
-          console.log('Generating invoice PDF from quote data');
-          const quoteForInvoice: QuoteOutput = {
-            ...originalQuote,
-            ...(adjustedAmount ? {
-              subtotal: adjustedAmount / 1.15,
-              gst: adjustedAmount - (adjustedAmount / 1.15),
-              total: adjustedAmount,
-            } : {}),
-          };
-
-          invoicePdfBuffer = await generateQuotePDF(
-            quoteForInvoice,
-            booking.client_name,
-            booking.client_email,
-            booking.client_phone || '',
-            booking.event_date,
-            { isInvoice: true, invoiceNumber }
-          );
-        } else if (!invoicePdfBuffer) {
-          // Last resort: build from details
-          console.warn('No quote sheet or original quote found, building invoice from details');
-          const quoteData: QuoteOutput = {
-            quoteNumber: booking.quote_number || invoiceNumber,
-            title: booking.event_name || 'Event',
-            description: booking.location || '',
-            lineItems: lineItems.map(item => ({ description: item.description, amount: item.amount })),
-            subtotal,
-            gst,
-            total: finalAmount,
-            rentalDays: 1,
-          };
-          invoicePdfBuffer = await generateQuotePDF(
-            quoteData,
-            booking.client_name,
-            booking.client_email,
-            booking.client_phone || '',
-            booking.event_date,
-            { isInvoice: true, invoiceNumber }
-          );
-        }
-
-        // Upload to Google Drive and get shareable link
-        if (invoicePdfBuffer) {
-          const folderType = getInvoiceFolderType(booking.booking_type);
-          const invoiceFilename = `Invoice-${invoiceNumber}.pdf`;
-          const fileId = await uploadQuoteToDrive(invoicePdfBuffer, invoiceFilename, folderType);
-          if (fileId) {
-            invoiceDriveLink = await shareFileWithLink(fileId);
-            console.log(`Invoice uploaded to Drive: ${invoiceDriveLink}`);
-          } else {
-            console.error('Failed to upload invoice PDF to Drive');
-          }
-        } else {
-          console.error('No invoice PDF buffer generated');
-        }
-      } catch (pdfError) {
-        console.error('Error generating invoice PDF:', pdfError);
+      } else {
+        console.error('No quote_sheet_id - cannot generate invoice PDF');
       }
 
       // Client approval URL
