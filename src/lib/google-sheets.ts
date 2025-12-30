@@ -268,6 +268,7 @@ export async function readQuoteSheetData(
     const lineItemsResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: 'LineItems!A2:F100',
+      valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
     const lineItemRows = lineItemsResponse.data.values || [];
@@ -285,6 +286,7 @@ export async function readQuoteSheetData(
     const totalsResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: 'Totals!A1:B4',
+      valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
     const totalsRows = totalsResponse.data.values || [];
