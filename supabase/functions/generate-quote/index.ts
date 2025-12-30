@@ -121,6 +121,7 @@ interface BacklineQuoteOutput {
   title: string;
   description: string;
   lineItems: { description: string; amount: number }[];
+  suggestedGear: { item: string; quantity: number; days: number }[];
   subtotal: number;
   gst: number;
   total: number;
@@ -479,7 +480,14 @@ DESCRIPTION: [2-3 sentence professional description]`;
     description = `${formData.equipment.length} items for ${rentalDays} day(s) hire.`;
   }
 
-  return { quoteNumber, title, description, lineItems, subtotal, gst, total: subtotal + gst, rentalDays };
+  // Build suggestedGear with clean equipment names for Google Sheet VLOOKUP
+  const suggestedGear = formData.equipment.map((item) => ({
+    item: item.name,
+    quantity: item.quantity,
+    days: rentalDays,
+  }));
+
+  return { quoteNumber, title, description, lineItems, suggestedGear, subtotal, gst, total: subtotal + gst, rentalDays };
 }
 
 async function generateFullSystemQuote(formData: FullSystemFormData, supabase: ReturnType<typeof createClient>): Promise<QuoteOutput> {
