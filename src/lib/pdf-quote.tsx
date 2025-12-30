@@ -139,6 +139,49 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTop: '1 solid #000',
   },
+  // New styles for grouped line items (invoice format)
+  titleRow: {
+    flexDirection: 'row',
+    borderBottom: '1 solid #ccc',
+  },
+  titleCell: {
+    flex: 1,
+    padding: 10,
+    paddingBottom: 8,
+  },
+  lineItemRow: {
+    flexDirection: 'row',
+    borderBottom: '1 solid #eee',
+  },
+  lineItemDescription: {
+    flex: 4,
+    padding: 8,
+    paddingLeft: 20,
+    borderRight: '1 solid #000',
+  },
+  lineItemCost: {
+    flex: 1,
+    padding: 8,
+    textAlign: 'right',
+  },
+  subtotalTableRow: {
+    flexDirection: 'row',
+    borderTop: '1 solid #000',
+    backgroundColor: '#f9f9f9',
+  },
+  subtotalTableLabel: {
+    flex: 4,
+    padding: 8,
+    borderRight: '1 solid #000',
+    textAlign: 'right',
+    fontWeight: 'bold',
+  },
+  subtotalTableValue: {
+    flex: 1,
+    padding: 8,
+    textAlign: 'right',
+    fontWeight: 'bold',
+  },
 });
 
 function formatCurrency(amount: number): string {
@@ -151,6 +194,81 @@ function formatDate(): string {
     month: 'long',
     year: 'numeric'
   });
+}
+
+// Categorize equipment items for grouped display
+function categorizeEquipment(lineItems: { description: string; amount: number }[]): { description: string; cost: number }[] {
+  const categories: Record<string, { items: string[]; total: number }> = {
+    'Speakers': { items: [], total: 0 },
+    'Subwoofers': { items: [], total: 0 },
+    'Monitors': { items: [], total: 0 },
+    'Microphones': { items: [], total: 0 },
+    'Console & Stage Box': { items: [], total: 0 },
+    'Accessories': { items: [], total: 0 },
+  };
+
+  for (const item of lineItems) {
+    const desc = item.description.toLowerCase();
+
+    if (desc.includes('sub') || desc.includes('18')) {
+      categories['Subwoofers'].items.push(item.description);
+      categories['Subwoofers'].total += item.amount;
+    } else if (desc.includes('monitor') || desc.includes('wedge')) {
+      categories['Monitors'].items.push(item.description);
+      categories['Monitors'].total += item.amount;
+    } else if (desc.includes('elx') || desc.includes('ekx') || desc.includes('zlx') || desc.includes('etx') || desc.includes('speaker') || desc.includes('-p') || desc.includes('12p') || desc.includes('15p')) {
+      categories['Speakers'].items.push(item.description);
+      categories['Speakers'].total += item.amount;
+    } else if (desc.includes('sm58') || desc.includes('sm57') || desc.includes('mic') || desc.includes('beta') || desc.includes('sennheiser') || desc.includes('akg') || desc.includes('d112') || desc.includes('e902') || desc.includes('ksm') || desc.includes('wireless')) {
+      categories['Microphones'].items.push(item.description);
+      categories['Microphones'].total += item.amount;
+    } else if (desc.includes('console') || desc.includes('x32') || desc.includes('mixer') || desc.includes('s16') || desc.includes('stage box') || desc.includes('rio') || desc.includes('dl16') || desc.includes('dl32')) {
+      categories['Console & Stage Box'].items.push(item.description);
+      categories['Console & Stage Box'].total += item.amount;
+    } else if (desc.includes('di') || desc.includes('cable') || desc.includes('stand') || desc.includes('snake') || desc.includes('power')) {
+      categories['Accessories'].items.push(item.description);
+      categories['Accessories'].total += item.amount;
+    } else {
+      // Default to accessories for unmatched items
+      categories['Accessories'].items.push(item.description);
+      categories['Accessories'].total += item.amount;
+    }
+  }
+
+  // Build result array with only non-zero categories
+  const result: { description: string; cost: number }[] = [];
+
+  // Combine Speakers and Subs into "FOH System" if both exist
+  const speakerTotal = categories['Speakers'].total + categories['Subwoofers'].total;
+  if (speakerTotal > 0) {
+    result.push({ description: 'FOH System', cost: speakerTotal });
+  }
+
+  if (categories['Monitors'].total > 0) {
+    const count = categories['Monitors'].items.length;
+    result.push({
+      description: count > 1 ? `Monitors (${count}x)` : 'Monitor',
+      cost: categories['Monitors'].total
+    });
+  }
+
+  if (categories['Microphones'].total > 0) {
+    const count = categories['Microphones'].items.length;
+    result.push({
+      description: count > 1 ? `Microphones (${count}x)` : 'Microphone',
+      cost: categories['Microphones'].total
+    });
+  }
+
+  if (categories['Console & Stage Box'].total > 0) {
+    result.push({ description: 'Console & Stage Box', cost: categories['Console & Stage Box'].total });
+  }
+
+  if (categories['Accessories'].total > 0) {
+    result.push({ description: 'Accessories', cost: categories['Accessories'].total });
+  }
+
+  return result;
 }
 
 // Get logo as base64 for embedding in PDF
@@ -242,40 +360,79 @@ export async function generateQuotePDF(
           {/* Table Header */}
           <View style={styles.tableHeader}>
             <View style={styles.tableHeaderLeft}>
-              <Text style={styles.tableHeaderText}></Text>
+              <Text style={styles.tableHeaderText}>{isInvoice ? 'Description' : ''}</Text>
             </View>
             <View style={styles.tableHeaderRight}>
               <Text style={styles.tableHeaderText}>Cost</Text>
             </View>
           </View>
 
-          {/* Table Body */}
-          <View style={styles.tableBody}>
-            <View style={styles.tableBodyLeft}>
-              <Text style={styles.quoteTitle}>
-                Backline Hire ({eventDate})
-              </Text>
-              {quote.description && (
-                <Text style={styles.quoteSubtitle}>{quote.description}</Text>
-              )}
-              {quote.lineItems.map((item, index) => (
-                <Text key={index} style={styles.lineItem}>
-                  {item.description} ${item.amount.toFixed(0)}
-                </Text>
+          {isInvoice ? (
+            /* Invoice: Grouped format like sound quotes */
+            <>
+              {/* Title Row */}
+              <View style={styles.titleRow}>
+                <View style={styles.titleCell}>
+                  <Text style={styles.quoteTitle}>
+                    Equipment Hire @ {quote.description || 'Event'} ({eventDate})
+                  </Text>
+                  {options?.eventName && (
+                    <Text style={styles.quoteSubtitle}>{options.eventName}</Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Grouped Line Items */}
+              {categorizeEquipment(quote.lineItems).map((item, index) => (
+                <View key={index} style={styles.lineItemRow}>
+                  <View style={styles.lineItemDescription}>
+                    <Text>{item.description}</Text>
+                  </View>
+                  <View style={styles.lineItemCost}>
+                    <Text>{formatCurrency(item.cost)}</Text>
+                  </View>
+                </View>
               ))}
-              {quote.rentalDays > 1 && (
-                <Text style={styles.lineItemNote}>
-                  Day 2+ @ 50% rate
+
+              {/* Subtotal Row */}
+              <View style={styles.subtotalTableRow}>
+                <View style={styles.subtotalTableLabel}>
+                  <Text>Subtotal</Text>
+                </View>
+                <View style={styles.subtotalTableValue}>
+                  <Text>{formatCurrency(quote.subtotal)}</Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            /* Quote: Original detailed format */
+            <View style={styles.tableBody}>
+              <View style={styles.tableBodyLeft}>
+                <Text style={styles.quoteTitle}>
+                  Backline Hire ({eventDate})
                 </Text>
-              )}
-              <Text style={[styles.lineItem, { marginTop: 10, fontWeight: 'bold' }]}>
-                Total ${quote.subtotal.toFixed(0)}+GST
-              </Text>
+                {quote.description && (
+                  <Text style={styles.quoteSubtitle}>{quote.description}</Text>
+                )}
+                {quote.lineItems.map((item, index) => (
+                  <Text key={index} style={styles.lineItem}>
+                    {item.description} ${item.amount.toFixed(0)}
+                  </Text>
+                ))}
+                {quote.rentalDays > 1 && (
+                  <Text style={styles.lineItemNote}>
+                    Day 2+ @ 50% rate
+                  </Text>
+                )}
+                <Text style={[styles.lineItem, { marginTop: 10, fontWeight: 'bold' }]}>
+                  Total ${quote.subtotal.toFixed(0)}+GST
+                </Text>
+              </View>
+              <View style={styles.tableBodyRight}>
+                <Text style={{ fontWeight: 'bold' }}>{formatCurrency(quote.subtotal)}</Text>
+              </View>
             </View>
-            <View style={styles.tableBodyRight}>
-              <Text style={{ fontWeight: 'bold' }}>{formatCurrency(quote.subtotal)}</Text>
-            </View>
-          </View>
+          )}
         </View>
 
         {/* Totals */}
