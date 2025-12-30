@@ -18,10 +18,10 @@ const serviceTypes = [
     image: '/images/soundgear-rental.png',
   },
   {
-    title: 'Contractor',
-    description: 'Hire a sound engineer, audio technician, or DJ for your event.',
-    href: '/inquiry/contractor',
-    image: '/images/soundtech-hire.png',
+    title: 'Lighting & Staging',
+    description: 'Stage setup, lighting rigs, and visual production for your event.',
+    href: '/inquiry/lighting',
+    image: '/images/soundtech-hire.png', // TODO: Replace with lighting image
   },
 ];
 
