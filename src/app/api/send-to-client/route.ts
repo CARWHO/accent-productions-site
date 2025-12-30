@@ -175,15 +175,6 @@ export async function POST(request: Request) {
               Questions? Reply to this email or call us on 027 602 3869.
             </p>
 
-            ${invoiceDriveLink ? `
-            <div style="margin: 25px 0; text-align: left;">
-              <a href="${invoiceDriveLink}"
-                 style="display: inline-block; background: #374151; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                View Invoice PDF
-              </a>
-            </div>
-            ` : ''}
-
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
             <p style="color: #999; font-size: 12px; text-align: left;">
               Accent Productions | Professional Sound & Lighting
