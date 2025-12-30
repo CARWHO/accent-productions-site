@@ -17,9 +17,10 @@ export async function GET(request: Request) {
     const category = searchParams.get('category');
 
     let query = supabase
-      .from('audio_equipment')
+      .from('equipment')
       .select('id, category, name, notes, hire_rate_per_day, stock_quantity')
-      .eq('available', true);
+      .eq('available', true)
+      .eq('type', 'audio');
 
     // Apply category filter if provided
     if (category) {
