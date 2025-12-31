@@ -259,6 +259,7 @@ async function createJobsheetTemplate(folderType) {
   // ============================================
   // EVENT DATA TAB - Metadata (empty values)
   // ============================================
+  // Rows 1-14: Basic event info
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: "'Event Data'!A1:B14",
@@ -280,6 +281,28 @@ async function createJobsheetTemplate(folderType) {
         ['finish_time', ''],
         ['pack_down_time', ''],
       ],
+    },
+  });
+
+  // Row 16: Suggested Gear section header + column labels
+  // Rows 17-31: Placeholder rows for gear items (Item | Qty | Notes)
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: "'Event Data'!A16:D16",
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [['SUGGESTED GEAR', 'Item', 'Qty', 'Notes']],
+    },
+  });
+
+  // Row 33: Execution Notes section header
+  // Rows 34-48: Placeholder rows for notes
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: "'Event Data'!A33",
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [['EXECUTION NOTES']],
     },
   });
 
@@ -330,12 +353,46 @@ async function createJobsheetTemplate(folderType) {
     spreadsheetId,
     requestBody: {
       requests: [
-        // Event Data - bold keys
+        // Event Data - bold keys (rows 1-14)
         {
           repeatCell: {
-            range: { sheetId: eventDataSheetId, startColumnIndex: 0, endColumnIndex: 1 },
+            range: { sheetId: eventDataSheetId, startRowIndex: 0, endRowIndex: 14, startColumnIndex: 0, endColumnIndex: 1 },
             cell: { userEnteredFormat: { textFormat: { bold: true } } },
             fields: 'userEnteredFormat.textFormat',
+          },
+        },
+        // Event Data - Suggested Gear header row (row 16) - bold with background
+        {
+          repeatCell: {
+            range: { sheetId: eventDataSheetId, startRowIndex: 15, endRowIndex: 16, startColumnIndex: 0, endColumnIndex: 4 },
+            cell: {
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.85, green: 0.92, blue: 0.83 }, // Light green
+              },
+            },
+            fields: 'userEnteredFormat.textFormat,userEnteredFormat.backgroundColor',
+          },
+        },
+        // Event Data - Execution Notes header row (row 33) - bold with background
+        {
+          repeatCell: {
+            range: { sheetId: eventDataSheetId, startRowIndex: 32, endRowIndex: 33, startColumnIndex: 0, endColumnIndex: 1 },
+            cell: {
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.85, green: 0.85, blue: 0.95 }, // Light blue
+              },
+            },
+            fields: 'userEnteredFormat.textFormat,userEnteredFormat.backgroundColor',
+          },
+        },
+        // Event Data - column B width for Item names
+        {
+          updateDimensionProperties: {
+            range: { sheetId: eventDataSheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 },
+            properties: { pixelSize: 200 },
+            fields: 'pixelSize',
           },
         },
         // Equipment - header formatting

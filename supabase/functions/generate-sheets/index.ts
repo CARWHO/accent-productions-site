@@ -150,6 +150,26 @@ async function generateQuoteSheet(
   }
 }
 
+interface JobsheetOptions {
+  eventEndTime?: string;
+  eventType?: string;
+  attendance?: number;
+  venueContact?: string;
+  indoorOutdoor?: string;
+  hasStage?: boolean;
+  stageDetails?: string;
+  powerAccess?: string;
+  wetWeatherPlan?: string;
+  needsGenerator?: boolean;
+  hasDJ?: boolean;
+  hasBand?: boolean;
+  hasLiveMusic?: boolean;
+  hasSpeeches?: boolean;
+  needsMic?: boolean;
+  playbackFromDevice?: boolean;
+  additionalInfo?: string;
+}
+
 async function generateJobsheetSheet(
   quoteNumber: string,
   eventName: string,
@@ -160,10 +180,23 @@ async function generateJobsheetSheet(
   clientEmail: string,
   clientPhone: string,
   equipment: { item: string; quantity: number; notes?: string }[],
-  folderType: "backline" | "fullsystem"
+  folderType: "backline" | "fullsystem",
+  options?: JobsheetOptions,
+  suggestedGear?: { item: string; quantity: number; notes?: string }[],
+  executionNotes?: string[]
 ): Promise<SheetResult | null> {
   try {
     console.log(`[generate-sheets] Creating Jobsheet Sheet for ${folderType}...`);
+
+    // Build content requirements from boolean flags
+    const contentRequirements: string[] = [];
+    if (options?.hasDJ) contentRequirements.push('DJ');
+    if (options?.hasBand) contentRequirements.push('Live Band');
+    if (options?.hasLiveMusic) contentRequirements.push('Live Music');
+    if (options?.hasSpeeches) contentRequirements.push('Speeches/Presentations');
+    if (options?.needsMic) contentRequirements.push('Microphone Required');
+    if (options?.playbackFromDevice) contentRequirements.push('Playback from Device');
+
     const response = await fetch(`${SITE_URL}/api/generate-jobsheet-sheet`, {
       method: "POST",
       headers: {
@@ -175,12 +208,30 @@ async function generateJobsheetSheet(
         eventName,
         eventDate,
         eventTime: eventTime || "TBC",
+        eventEndTime: options?.eventEndTime || null,
         location,
         clientName,
         clientEmail,
         clientPhone,
         equipment,
-        folderType
+        folderType,
+        // Event details
+        eventType: options?.eventType || null,
+        attendance: options?.attendance || null,
+        // Venue details
+        venueContact: options?.venueContact || null,
+        indoorOutdoor: options?.indoorOutdoor || null,
+        hasStage: options?.hasStage || false,
+        stageDetails: options?.stageDetails || null,
+        powerAccess: options?.powerAccess || null,
+        wetWeatherPlan: options?.wetWeatherPlan || null,
+        needsGenerator: options?.needsGenerator || false,
+        // Content requirements
+        contentRequirements,
+        additionalNotes: options?.additionalInfo || null,
+        // AI-generated content (stored as JSON in sheet for admin editing)
+        suggestedGear: suggestedGear || null,
+        executionNotes: executionNotes || null,
       }),
     });
 
@@ -283,6 +334,27 @@ serve(async (req) => {
       notes: item.notes || ""
     }));
 
+    // Build jobsheet options with venue/content details
+    const jobsheetOptions: JobsheetOptions | undefined = fsData ? {
+      eventEndTime: fsData.eventEndTime || undefined,
+      eventType: fsData.eventType || undefined,
+      attendance: fsData.attendance || undefined,
+      venueContact: fsData.venueContact || undefined,
+      indoorOutdoor: fsData.indoorOutdoor || undefined,
+      hasStage: fsData.hasStage || false,
+      stageDetails: fsData.stageDetails || undefined,
+      powerAccess: fsData.powerAccess || undefined,
+      wetWeatherPlan: fsData.wetWeatherPlan || undefined,
+      needsGenerator: fsData.needsGenerator || false,
+      hasDJ: fsData.hasDJ || false,
+      hasBand: fsData.hasBand || false,
+      hasLiveMusic: fsData.hasLiveMusic || false,
+      hasSpeeches: fsData.hasSpeeches || false,
+      needsMic: fsData.needsMic || false,
+      playbackFromDevice: fsData.playbackFromDevice || false,
+      additionalInfo: fsData.additionalInfo || undefined,
+    } : undefined;
+
     const jobsheetResult = await generateJobsheetSheet(
       quote.quoteNumber,
       fsData?.eventName || "Backline Hire",
@@ -293,7 +365,10 @@ serve(async (req) => {
       formData.contactEmail,
       formData.contactPhone,
       equipment,
-      isBackline ? "backline" : "fullsystem"
+      isBackline ? "backline" : "fullsystem",
+      jobsheetOptions,
+      quote.suggestedGear,
+      quote.executionNotes
     );
     if (jobsheetResult) {
       jobsheetSheetId = jobsheetResult.spreadsheetId;

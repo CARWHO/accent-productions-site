@@ -478,8 +478,8 @@ function InquiryForm() {
     return (
       <PageCard centered>
         <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-20 h-20 bg-green-100 rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
@@ -498,7 +498,7 @@ function InquiryForm() {
   const totalSteps = formData.package === 'small' ? 2 : 4;
 
   return (
-    <PageCard stretch={step === 3}>
+    <PageCard stretch>
       {/* Parsing Loading Overlay */}
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
@@ -508,7 +508,7 @@ function InquiryForm() {
         </div>
       )}
 
-      <div className="h-full flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Error Summary */}
         {showValidation && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">

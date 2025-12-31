@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
+import { readQuoteSheetData } from '@/lib/google-sheets';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -38,24 +39,49 @@ export async function POST(request: Request) {
     // Generate client approval token
     const clientApprovalToken = randomUUID();
 
-    // Calculate totals - adjustedAmount overrides the stored quote_total
-    const finalAmount = adjustedAmount || booking.quote_total || 0;
+    // Get the actual total from the Google Sheet (source of truth)
+    let finalAmount = adjustedAmount || booking.quote_total || 0;
+
+    if (booking.quote_sheet_id) {
+      try {
+        const sheetData = await readQuoteSheetData(booking.quote_sheet_id);
+        if (sheetData && sheetData.total > 0) {
+          finalAmount = sheetData.total;
+          console.log(`Read total from Google Sheet: $${finalAmount}`);
+        } else {
+          console.warn('Could not read total from sheet, using booking.quote_total');
+        }
+      } catch (sheetError) {
+        console.error('Error reading quote sheet:', sheetError);
+      }
+    }
 
     // Calculate deposit amount from percentage (default 50%)
     const depositPercentValue = depositPercent ?? 50;
     const depositAmount = (finalAmount * depositPercentValue) / 100;
 
-    // Create or update client_approvals record
+    // Check if this is a resend (existing record)
+    const { data: existingApproval } = await supabase
+      .from('client_approvals')
+      .select('resend_count')
+      .eq('booking_id', bookingId)
+      .single();
+
+    const isResend = !!existingApproval;
+    const resendCount = (existingApproval?.resend_count || 0) + (isResend ? 1 : 0);
+
+    // Create or update client_approvals record (new token invalidates old link)
     const { error: approvalError } = await supabase
       .from('client_approvals')
       .upsert({
         booking_id: bookingId,
         adjusted_quote_total: finalAmount,
         quote_notes: notes || null,
-        deposit_amount: depositAmount || null,
+        deposit_amount: depositAmount,
         client_approval_token: clientApprovalToken,
         sent_to_client_at: new Date().toISOString(),
         client_email: booking.client_email,
+        resend_count: resendCount,
       }, {
         onConflict: 'booking_id'
       });
@@ -122,18 +148,23 @@ export async function POST(request: Request) {
       await resend.emails.send({
         from: 'Accent Productions <notifications@accent-productions.co.nz>',
         to: [booking.client_email],
-        subject: `Invoice from Accent Productions - ${booking.event_name || 'Your Event'}`,
+        subject: isResend
+          ? `Updated Quote from Accent Productions - ${booking.event_name || 'Your Event'}`
+          : `Invoice from Accent Productions - ${booking.event_name || 'Your Event'}`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; text-align: left;">
             <div style="margin-bottom: 24px;">
               <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 100px; width: auto;" />
             </div>
 
-            <h1 style="color: #16a34a; margin-bottom: 10px; text-align: left;">Invoice Ready</h1>
-            <p style="color: #666; margin-top: 0; text-align: left;">Invoice #${invoiceNumber}</p>
+            <h1 style="color: #16a34a; margin-bottom: 10px; text-align: left;">${isResend ? 'Updated Quote' : 'Invoice Ready'}</h1>
+            <p style="color: #666; margin-top: 0; text-align: left;">${invoiceDriveLink ? `<a href="${invoiceDriveLink}" style="color: #2563eb;">Invoice #${invoiceNumber}</a>` : `Invoice #${invoiceNumber}`}</p>
 
             <p style="text-align: left;">Hi ${booking.client_name.split(' ')[0]},</p>
-            <p style="text-align: left;">Thanks for booking with us! Please review and approve your invoice to confirm the booking.</p>
+            <p style="text-align: left;">${isResend
+              ? 'We\'ve updated your quote based on your feedback. Please review the changes and approve when ready.'
+              : 'Thanks for booking with us! Please review and approve your invoice to confirm the booking.'
+            }</p>
 
             <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin: 25px 0; text-align: left;">
               <div style="font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Amount Due</div>
@@ -150,7 +181,7 @@ export async function POST(request: Request) {
               <div style="font-size: 14px; color: #92400e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Deposit Required (${depositPercentValue}%)</div>
               <div style="font-size: 28px; font-weight: bold; color: #b45309;">$${depositAmount.toFixed(2)}</div>
               <p style="margin: 10px 0 0 0; color: #92400e; font-size: 14px;">
-                Please pay the deposit to the bank account on the invoice, then click <strong>Approve Quote</strong> below to confirm your booking.
+                A ${depositPercentValue}% deposit is required to confirm your booking.
               </p>
             </div>
             ` : ''}
@@ -162,12 +193,12 @@ export async function POST(request: Request) {
             </div>
             ` : ''}
 
-            <p style="text-align: left; margin-top: 25px;">${depositAmount > 0 ? 'Once you\'ve paid the deposit, click below to confirm your booking:' : 'Click below to confirm your booking:'}</p>
+            <p style="text-align: left; margin-top: 25px;">${depositAmount > 0 ? 'Click below to approve and pay your deposit:' : 'Click below to confirm your booking:'}</p>
 
             <div style="margin: 25px 0; text-align: left;">
               <a href="${approveUrl}"
                  style="display: inline-block; background: #16a34a; color: #fff; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px;">
-                Approve Quote
+                ${depositAmount > 0 ? 'Approve & Pay Deposit' : 'Approve Quote'}
               </a>
             </div>
 

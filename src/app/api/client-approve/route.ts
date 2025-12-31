@@ -9,20 +9,34 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 const businessEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
 
+// GET: Redirect to approval page (from email link)
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
 
   if (!token) {
-    return NextResponse.redirect(`${baseUrl}/client-approval?error=missing_token`);
+    return NextResponse.redirect(`${baseUrl}/approve?error=missing_token`);
   }
 
-  const supabase = getSupabaseAdmin();
-  if (!supabase) {
-    return NextResponse.redirect(`${baseUrl}/client-approval?error=server_error`);
-  }
+  // Redirect to approval page where client chooses payment method
+  return NextResponse.redirect(`${baseUrl}/approve?token=${token}`);
+}
 
+// POST: Process approval with payment method
+export async function POST(request: Request) {
   try {
+    const body = await request.json();
+    const { token, skipPayment, paymentMethod } = body;
+
+    if (!token) {
+      return NextResponse.json({ success: false, message: 'Missing token' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json({ success: false, message: 'Database not configured' }, { status: 500 });
+    }
+
     // Find client approval by token
     const { data: approval, error: fetchError } = await supabase
       .from('client_approvals')
@@ -31,15 +45,28 @@ export async function GET(request: Request) {
       .single();
 
     if (fetchError || !approval) {
-      return NextResponse.redirect(`${baseUrl}/client-approval?error=invalid_token`);
+      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 404 });
     }
 
     // Check if already approved
     if (approval.client_approved_at) {
-      return NextResponse.redirect(`${baseUrl}/client-approval?error=already_approved`);
+      return NextResponse.json({ success: false, message: 'Already approved' }, { status: 400 });
     }
 
     const booking = approval.bookings;
+
+    // Determine payment status
+    let paymentStatus = 'pending';
+    let paidAt = null;
+
+    if (skipPayment) {
+      paymentStatus = 'skipped';
+    } else if (paymentMethod === 'bank_transfer') {
+      paymentStatus = 'awaiting_bank_transfer';
+    } else if (paymentMethod === 'poli') {
+      paymentStatus = 'paid';
+      paidAt = new Date().toISOString();
+    }
 
     // Generate contractor selection token for dad
     const contractorSelectionToken = randomUUID();
@@ -47,9 +74,13 @@ export async function GET(request: Request) {
     // Create Google Calendar event
     let calendarEventId: string | null = null;
     if (booking.event_date) {
+      const calendarTitle = paymentStatus === 'awaiting_bank_transfer'
+        ? `${booking.event_name || 'Event'} - AWAITING PAYMENT`
+        : `${booking.event_name || 'Event'} - AWAITING CONTRACTORS`;
+
       calendarEventId = await createCalendarEvent({
-        summary: `${booking.event_name || 'Event'} - AWAITING CONTRACTORS`,
-        description: `Quote: #${booking.quote_number}\nClient: ${booking.client_name}\nEmail: ${booking.client_email}\nPhone: ${booking.client_phone}\n\nStatus: Client approved, awaiting contractor selection`,
+        summary: calendarTitle,
+        description: `Quote: #${booking.quote_number}\nClient: ${booking.client_name}\nEmail: ${booking.client_email}\nPhone: ${booking.client_phone}\n\nPayment: ${paymentStatus}\nStatus: Client approved, awaiting contractor selection`,
         location: booking.location || undefined,
         startDate: booking.event_date,
         startTime: booking.event_time || undefined,
@@ -61,6 +92,9 @@ export async function GET(request: Request) {
       .from('client_approvals')
       .update({
         client_approved_at: new Date().toISOString(),
+        payment_status: paymentStatus,
+        payment_method: skipPayment ? 'none' : paymentMethod || null,
+        paid_at: paidAt,
       })
       .eq('id', approval.id);
 
@@ -81,7 +115,7 @@ export async function GET(request: Request) {
 
     if (updateBookingError) {
       console.error('Error updating booking:', updateBookingError);
-      return NextResponse.redirect(`${baseUrl}/client-approval?error=update_failed`);
+      return NextResponse.json({ success: false, message: 'Update failed' }, { status: 500 });
     }
 
     // Notify dad with link to select contractors
@@ -193,10 +227,10 @@ export async function GET(request: Request) {
       console.log(`Sent confirmation email to client: ${booking.client_email}`);
     }
 
-    // Redirect client to success page
-    return NextResponse.redirect(`${baseUrl}/client-approval?success=true&event=${encodeURIComponent(booking.event_name || 'Event')}`);
+    // Return success response (frontend handles navigation)
+    return NextResponse.json({ success: true, paymentStatus });
   } catch (error) {
     console.error('Error processing client approval:', error);
-    return NextResponse.redirect(`${baseUrl}/client-approval?error=server_error`);
+    return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });
   }
 }

@@ -15,7 +15,7 @@ function formatDate(dateStr: string): string {
 /**
  * Generate a quote Google Sheet from quote data
  *
- * NEW FORMAT (2024):
+ * NEW FORMAT (2025):
  * - LineItems use gear names from Master Equipment Sheet
  * - Pricing is auto-calculated via VLOOKUP formulas
  * - Uses suggestedGear (priority) or lineItems for equipment list
@@ -92,6 +92,25 @@ export async function POST(request: Request) {
           quantity: Number(item.quantity || item.qty || 1),
           days: Number(item.days || defaultDays),
         }));
+    }
+
+    // Add tech time / labour as a line item (if present in structured lineItems)
+    // Tech time is stored as { hours, rate, cost } in quote.lineItems.techTime
+    const structuredLineItems = quote.lineItems as Record<string, unknown> | undefined;
+    if (structuredLineItems?.techTime) {
+      const techTime = structuredLineItems.techTime as { hours?: number; rate?: number; cost?: number };
+      if (techTime.hours && techTime.hours > 0) {
+        const rate = techTime.rate || 65;
+        const cost = techTime.cost || (techTime.hours * rate);
+        // Add labour with direct pricing (bypasses VLOOKUP which wouldn't find it)
+        lineItems.push({
+          gearName: 'Sound Technician',
+          quantity: techTime.hours,
+          days: 1,
+          unitRate: rate,      // Write $65/hr directly
+          lineTotal: cost,     // Write total directly (hours × rate)
+        });
+      }
     }
 
     // Determine folder type

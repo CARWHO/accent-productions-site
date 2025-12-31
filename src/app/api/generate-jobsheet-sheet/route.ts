@@ -12,7 +12,7 @@ const EDGE_FUNCTION_SECRET = process.env.EDGE_FUNCTION_SECRET || 'default-secret
 /**
  * Generate a jobsheet Google Sheet
  *
- * NEW FORMAT (2024):
+ * NEW FORMAT (2025):
  * - Event Data tab: Key-value pairs with event metadata + timing details
  * - Equipment tab: Gear names from Master Sheet with quantities
  * - Crew tab: Roles, names, rates (pay auto-calculated)
@@ -33,6 +33,8 @@ const EDGE_FUNCTION_SECRET = process.env.EDGE_FUNCTION_SECRET || 'default-secret
  *   setTime?: string,
  *   finishTime?: string,
  *   packDownTime?: string,
+ *   suggestedGear?: Array<{ item: string, quantity: number, notes?: string }>,
+ *   executionNotes?: string[],
  *   equipment?: Array<{ gearName: string, quantity: number, notes?: string }>,
  *   crew?: Array<{ role: string, name?: string, phone?: string, rate?: number, hours?: number }>,
  *   folderType?: 'fullsystem' | 'backline' | 'soundtech'
@@ -62,6 +64,8 @@ export async function POST(request: Request) {
       setTime,
       finishTime,
       packDownTime,
+      suggestedGear,
+      executionNotes,
       equipment,
       crew,
       folderType,
@@ -92,6 +96,9 @@ export async function POST(request: Request) {
       setTime: setTime || '',
       finishTime: finishTime || '',
       packDownTime: packDownTime || '',
+      // AI-generated content (stored as JSON in sheet)
+      suggestedGear: suggestedGear || undefined,
+      executionNotes: executionNotes || undefined,
     };
 
     // Convert equipment to new format

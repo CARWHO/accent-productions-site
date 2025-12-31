@@ -92,7 +92,10 @@ export interface LineItem {
   gearName: string;      // Equipment name (for VLOOKUP)
   quantity: number;      // Qty
   days: number;          // Rental days
-  // Note: unitRate, day2Rate, lineTotal are calculated by sheet formulas
+  // Note: unitRate, day2Rate, lineTotal are normally calculated by sheet formulas
+  // But for labour/services, we can override with direct values:
+  unitRate?: number;     // Optional: bypass VLOOKUP with direct rate
+  lineTotal?: number;    // Optional: bypass formula with direct total
 }
 
 // Legacy format for backward compatibility
@@ -110,7 +113,7 @@ export interface CreateQuoteSheetResult {
 /**
  * Copy a template spreadsheet and populate it with quote data
  *
- * NEW STRUCTURE (2024):
+ * NEW STRUCTURE (2025):
  * - Data tab: Key-value pairs for metadata
  * - LineItems tab: A=Gear Name, B=Qty, C=Days, D-F=Formulas (auto-calc from Master Sheet)
  * - Totals tab: Formulas for subtotal/gst/total
@@ -170,21 +173,47 @@ export async function createQuoteSheet(
       },
     });
 
-    // 3. Populate line items on LineItems tab (Gear Name, Qty, Days only)
-    // Columns D-F have formulas that auto-calculate pricing from Master Sheet
-    if (lineItems.length > 0) {
-      const lineItemValues = lineItems.map(item => [
-        item.gearName,      // A: Gear Name (triggers VLOOKUP for pricing)
-        item.quantity,      // B: Qty
-        item.days,          // C: Days
+    // 3. Populate line items on LineItems tab
+    // Split into equipment (uses VLOOKUP formulas in D-F) and labour (direct pricing)
+    const equipmentItems = lineItems.filter(item => item.unitRate === undefined);
+    const labourItems = lineItems.filter(item => item.unitRate !== undefined);
+
+    // Write equipment items to A-C only (preserves VLOOKUP formulas in D-F)
+    if (equipmentItems.length > 0) {
+      const equipmentValues = equipmentItems.map(item => [
+        item.gearName,
+        item.quantity,
+        item.days,
       ]);
 
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: 'LineItems!A2:C' + (1 + lineItems.length),
+        range: 'LineItems!A2:C' + (1 + equipmentItems.length),
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: lineItemValues,
+          values: equipmentValues,
+        },
+      });
+    }
+
+    // Write labour items with direct pricing to A-F (after equipment rows)
+    if (labourItems.length > 0) {
+      const startRow = 2 + equipmentItems.length;
+      const labourValues = labourItems.map(item => [
+        item.gearName,
+        item.quantity,
+        item.days,
+        item.unitRate,
+        '',  // Day2+ rate not applicable
+        item.lineTotal,
+      ]);
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `LineItems!A${startRow}:F${startRow + labourItems.length - 1}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: labourValues,
         },
       });
     }
@@ -233,7 +262,7 @@ export interface QuoteSheetData {
 /**
  * Read data from a quote Google Sheet (for PDF generation)
  *
- * NEW STRUCTURE (2024):
+ * NEW STRUCTURE (2025):
  * - Data tab: A=key, B=value
  * - LineItems tab: A=Gear Name, B=Qty, C=Days, D=Unit Rate, E=Day2+ Rate, F=Line Total
  * - Totals tab: A=key (subtotal, gst, total), B=value (formulas)
@@ -379,8 +408,7 @@ export function getSheetEditUrl(spreadsheetId: string): string {
 /**
  * Update line items in an existing quote sheet
  *
- * NEW STRUCTURE: Updates LineItems tab with Gear Name, Qty, Days
- * (pricing formulas auto-calculate from columns D-F)
+ * Updates LineItems tab with Gear Name, Qty, Days, and optionally direct pricing
  */
 export async function updateQuoteLineItems(
   spreadsheetId: string,
@@ -395,15 +423,19 @@ export async function updateQuoteLineItems(
 
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
 
-    // Clear existing line items (rows 2-51 to preserve header and formulas structure)
+    // Clear existing line items (rows 2-51, columns A-C only to preserve formulas in D-F)
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
       range: 'LineItems!A2:C51',
     });
 
-    // Write new line items (Gear Name, Qty, Days only)
-    if (lineItems.length > 0) {
-      const lineItemValues = lineItems.map(item => [
+    // Split into equipment (uses VLOOKUP) and labour (direct pricing)
+    const equipmentItems = lineItems.filter(item => item.unitRate === undefined);
+    const labourItems = lineItems.filter(item => item.unitRate !== undefined);
+
+    // Write equipment items to A-C only
+    if (equipmentItems.length > 0) {
+      const equipmentValues = equipmentItems.map(item => [
         item.gearName,
         item.quantity,
         item.days,
@@ -411,10 +443,32 @@ export async function updateQuoteLineItems(
 
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: 'LineItems!A2:C' + (1 + lineItems.length),
+        range: 'LineItems!A2:C' + (1 + equipmentItems.length),
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: lineItemValues,
+          values: equipmentValues,
+        },
+      });
+    }
+
+    // Write labour items with direct pricing to A-F (after equipment rows)
+    if (labourItems.length > 0) {
+      const startRow = 2 + equipmentItems.length;
+      const labourValues = labourItems.map(item => [
+        item.gearName,
+        item.quantity,
+        item.days,
+        item.unitRate,
+        '',
+        item.lineTotal,
+      ]);
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `LineItems!A${startRow}:F${startRow + labourItems.length - 1}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: labourValues,
         },
       });
     }
@@ -441,6 +495,9 @@ export interface JobSheetEventData {
   setTime?: string;
   finishTime?: string;
   packDownTime?: string;
+  // AI-generated content (stored as JSON in sheet)
+  suggestedGear?: Array<{ item: string; quantity: number; notes?: string }>;
+  executionNotes?: string[];
 }
 
 export interface JobSheetEquipment {
@@ -460,7 +517,7 @@ export interface JobSheetCrew {
 /**
  * Create a job sheet from template
  *
- * NEW STRUCTURE (2024):
+ * NEW STRUCTURE (2025):
  * - Event Data tab: Key-value pairs (B column only - A has keys)
  * - Equipment tab: A=Gear Name, B=Qty, C=Notes
  * - Crew tab: A=Role, B=Name, C=Phone, D=Rate, E=Hours, F=Pay (formula)
@@ -502,6 +559,7 @@ export async function createJobSheet(
     console.log(`Created job sheet: ${spreadsheetId}`);
 
     // 2. Populate Event Data tab (B column only - A has keys)
+    // Rows 1-14: Basic event info
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: "'Event Data'!B1:B14",
@@ -524,6 +582,48 @@ export async function createJobSheet(
           [eventData.packDownTime || ''],
         ],
       },
+    });
+
+    // Row 16: Suggested Gear section header
+    // Rows 17-31: Gear items (Item | Qty | Notes) - up to 15 items
+    const gearRows: string[][] = [
+      ['SUGGESTED GEAR', 'Item', 'Qty', 'Notes'], // Header row
+    ];
+    const suggestedGear = eventData.suggestedGear || [];
+    for (let i = 0; i < 15; i++) {
+      if (i < suggestedGear.length) {
+        gearRows.push(['', suggestedGear[i].item, String(suggestedGear[i].quantity), suggestedGear[i].notes || '']);
+      } else {
+        gearRows.push(['', '', '', '']); // Empty row placeholder
+      }
+    }
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: "'Event Data'!A16:D31",
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: gearRows },
+    });
+
+    // Row 33: Execution Notes section header
+    // Rows 34-48: Individual notes - up to 15 notes
+    const notesRows: string[][] = [
+      ['EXECUTION NOTES'], // Header row
+    ];
+    const executionNotes = eventData.executionNotes || [];
+    for (let i = 0; i < 15; i++) {
+      if (i < executionNotes.length) {
+        notesRows.push([executionNotes[i]]);
+      } else {
+        notesRows.push(['']); // Empty row placeholder
+      }
+    }
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: "'Event Data'!A33:A48",
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: notesRows },
     });
 
     // 3. Populate Equipment tab (Gear Name, Qty, Notes)
@@ -580,6 +680,151 @@ export async function createJobSheet(
     };
   } catch (error) {
     console.error('Error creating job sheet:', error);
+    return null;
+  }
+}
+
+// ============================================
+// READ JOB SHEET DATA
+// ============================================
+
+export interface JobSheetData {
+  quoteNumber: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  location: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  loadInTime: string;
+  soundCheckTime: string;
+  doorsTime: string;
+  setTime: string;
+  finishTime: string;
+  packDownTime: string;
+  suggestedGear: Array<{ item: string; quantity: number; notes?: string }>;
+  executionNotes: string[];
+  equipment: Array<{ gearName: string; quantity: number; notes: string }>;
+  crew: Array<{ role: string; name: string; phone: string; rate: number; hours: number }>;
+}
+
+/**
+ * Read job sheet data from Google Sheets
+ * Used by notify-contractors to get admin-edited data
+ *
+ * Layout:
+ * - Rows 1-14: Basic event data (B column)
+ * - Rows 17-31: Suggested Gear (B=Item, C=Qty, D=Notes)
+ * - Rows 34-48: Execution Notes (A column)
+ */
+export async function readJobSheetData(
+  spreadsheetId: string
+): Promise<JobSheetData | null> {
+  try {
+    const oauth2Client = getOAuth2Client();
+    if (!oauth2Client) {
+      console.warn('Google not configured');
+      return null;
+    }
+
+    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+
+    // Read Event Data tab - basic info (B column, rows 1-14)
+    const eventDataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "'Event Data'!B1:B14",
+    });
+
+    const eventRows = eventDataResponse.data.values || [];
+    const getValue = (index: number): string => {
+      const row = eventRows[index];
+      return row && row[0] !== undefined ? String(row[0]) : '';
+    };
+
+    // Read Suggested Gear section (rows 17-31, columns B-D)
+    const gearResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "'Event Data'!B17:D31",
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const gearRows = gearResponse.data.values || [];
+    const suggestedGear: Array<{ item: string; quantity: number; notes?: string }> = gearRows
+      .filter(row => row[0]) // Has item name in column B
+      .map(row => ({
+        item: String(row[0] || ''),
+        quantity: Number(row[1]) || 1,
+        notes: row[2] ? String(row[2]) : undefined,
+      }));
+
+    // Read Execution Notes section (rows 34-48, column A)
+    const notesResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "'Event Data'!A34:A48",
+    });
+
+    const notesRows = notesResponse.data.values || [];
+    const executionNotes: string[] = notesRows
+      .filter(row => row[0]) // Has content
+      .map(row => String(row[0]));
+
+    // Read Equipment tab (A=Gear Name, B=Qty, C=Notes)
+    const equipmentResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Equipment!A2:C100',
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const equipmentRows = equipmentResponse.data.values || [];
+    const equipment = equipmentRows
+      .filter(row => row[0]) // Has gear name
+      .map(row => ({
+        gearName: String(row[0] || ''),
+        quantity: Number(row[1]) || 1,
+        notes: String(row[2] || ''),
+      }));
+
+    // Read Crew tab (A=Role, B=Name, C=Phone, D=Rate, E=Hours)
+    const crewResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Crew!A2:E50',
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    const crewRows = crewResponse.data.values || [];
+    const crew = crewRows
+      .filter(row => row[0]) // Has role
+      .map(row => ({
+        role: String(row[0] || ''),
+        name: String(row[1] || ''),
+        phone: String(row[2] || ''),
+        rate: Number(row[3]) || 0,
+        hours: Number(row[4]) || 0,
+      }));
+
+    return {
+      quoteNumber: getValue(0),
+      eventName: getValue(1),
+      eventDate: getValue(2),
+      eventTime: getValue(3),
+      location: getValue(4),
+      clientName: getValue(5),
+      clientEmail: getValue(6),
+      clientPhone: getValue(7),
+      loadInTime: getValue(8),
+      soundCheckTime: getValue(9),
+      doorsTime: getValue(10),
+      setTime: getValue(11),
+      finishTime: getValue(12),
+      packDownTime: getValue(13),
+      suggestedGear,
+      executionNotes,
+      equipment,
+      crew,
+    };
+  } catch (error) {
+    console.error('Error reading job sheet:', error);
     return null;
   }
 }

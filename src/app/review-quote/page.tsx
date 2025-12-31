@@ -51,11 +51,24 @@ interface Booking {
   quote_sheet_id: string | null;
 }
 
+interface ClientApproval {
+  sentToClient: boolean;
+  sentAt: string;
+  lastAdjustedTotal: number | null;
+  lastNotes: string | null;
+  lastDepositAmount: number | null;
+  resendCount: number;
+  paymentStatus: string | null;
+  clientApprovedAt: string | null;
+}
+
 function ReviewQuoteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [clientApproval, setClientApproval] = useState<ClientApproval | null>(null);
+  const [sheetTotal, setSheetTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<string>('');
@@ -81,6 +94,25 @@ function ReviewQuoteContent() {
         }
 
         setBooking(data.booking);
+
+        // Set sheet total if available
+        if (data.sheetTotal) {
+          setSheetTotal(data.sheetTotal);
+        }
+
+        // If there's existing client approval data, pre-populate form
+        if (data.clientApproval) {
+          setClientApproval(data.clientApproval);
+          // Pre-populate notes if they exist
+          if (data.clientApproval.lastNotes) {
+            setNotes(data.clientApproval.lastNotes);
+          }
+          // Calculate deposit percent from amount if available
+          if (data.clientApproval.lastDepositAmount != null && data.clientApproval.lastAdjustedTotal) {
+            const percent = Math.round((data.clientApproval.lastDepositAmount / data.clientApproval.lastAdjustedTotal) * 100);
+            setDepositPercent(String(percent));
+          }
+        }
       } catch (err) {
         console.error('Error fetching booking:', err);
         setError('Failed to load booking');
@@ -103,7 +135,7 @@ function ReviewQuoteContent() {
         body: JSON.stringify({
           bookingId: booking.id,
           notes: notes || null,
-          depositPercent: depositPercent ? parseFloat(depositPercent) : 50,
+          depositPercent: depositPercent === '' ? 50 : Number(depositPercent),
         }),
       });
 
@@ -164,17 +196,23 @@ function ReviewQuoteContent() {
   }
 
   if (sent) {
+    const isResend = clientApproval?.sentToClient;
     return (
       <PageCard centered>
         <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-[#000000] rounded-md flex items-center justify-center mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-20 h-20 bg-green-100 rounded-md flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Quote Sent!</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            {isResend ? 'Updated Quote Sent!' : 'Quote Sent!'}
+          </h2>
           <p className="text-gray-700 text-lg font-medium">
-            The quote has been sent to {booking?.client_email}.
+            {isResend
+              ? `An updated quote has been sent to ${booking?.client_email}. The previous approval link is no longer valid.`
+              : `The quote has been sent to ${booking?.client_email}.`
+            }
           </p>
         </div>
       </PageCard>
@@ -220,6 +258,44 @@ function ReviewQuoteContent() {
             {booking.status.replace(/_/g, ' ').toUpperCase()}
           </span>
         </div>
+
+        {/* Already Sent Banner */}
+        {clientApproval?.sentToClient && !clientApproval.clientApprovedAt && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="font-semibold text-amber-900">
+                  Quote sent on {new Date(clientApproval.sentAt).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Awaiting client approval. Make changes below and resend if needed.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Already Approved Banner */}
+        {clientApproval?.clientApprovedAt && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <div>
+                <p className="font-semibold text-green-900">
+                  Quote approved on {new Date(clientApproval.clientApprovedAt).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+                <p className="text-sm text-green-700 mt-1">
+                  This booking has been confirmed by the client.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-4 flex-grow overflow-y-auto">
           {/* Event Details */}
@@ -338,6 +414,21 @@ function ReviewQuoteContent() {
             </div>
           )}
 
+          {/* Amount to Send (from Google Sheet) */}
+          {sheetTotal !== null && (
+            <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
+              <div className="text-sm text-green-700 uppercase tracking-wide font-semibold mb-1">
+                Amount to Invoice (from Sheet)
+              </div>
+              <div className="text-3xl font-bold text-green-700">
+                {formatCurrency(sheetTotal)}
+              </div>
+              <p className="text-xs text-green-600 mt-2">
+                This is the total from your Google Sheet. Edit the sheet to change this amount.
+              </p>
+            </div>
+          )}
+
           {/* Deposit Percent */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -356,7 +447,9 @@ function ReviewQuoteContent() {
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">%</span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Percentage of total to request upfront (default 50%)</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Deposit: {formatCurrency((sheetTotal || booking?.quote_total || 0) * (depositPercent === '' ? 50 : Number(depositPercent)) / 100)}
+            </p>
           </div>
 
           {/* Notes */}
@@ -376,18 +469,35 @@ function ReviewQuoteContent() {
 
         {/* Action Button */}
         <div className="flex flex-col gap-3 pt-6 mt-auto">
-          <button
-            onClick={handleSendToClient}
-            disabled={sending}
-            className="w-full bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
-          >
-            {sending ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Sending...
-              </span>
-            ) : 'Send to Client for Approval'}
-          </button>
+          {clientApproval?.clientApprovedAt ? (
+            <div className="text-center text-gray-500 py-3">
+              This quote has already been approved by the client.
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={handleSendToClient}
+                disabled={sending}
+                className={`w-full py-3 rounded-md font-bold text-base transition-colors disabled:opacity-50 ${
+                  clientApproval?.sentToClient
+                    ? 'bg-amber-600 text-white border border-amber-600 hover:bg-amber-700'
+                    : 'bg-[#000000] text-white border border-[#000000]'
+                }`}
+              >
+                {sending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Sending...
+                  </span>
+                ) : clientApproval?.sentToClient ? 'Resend Updated Quote' : 'Send to Client for Approval'}
+              </button>
+              {clientApproval?.sentToClient && (
+                <p className="text-xs text-gray-500 text-center">
+                  This will send a new approval link. The previous link will no longer work.
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
     </PageCard>

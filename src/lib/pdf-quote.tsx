@@ -205,6 +205,7 @@ function categorizeEquipment(lineItems: { description: string; amount: number }[
     'Microphones': { items: [], total: 0 },
     'Console & Stage Box': { items: [], total: 0 },
     'Accessories': { items: [], total: 0 },
+    'Labour': { items: [], total: 0 },
   };
 
   for (const item of lineItems) {
@@ -228,6 +229,9 @@ function categorizeEquipment(lineItems: { description: string; amount: number }[
     } else if (desc.includes('di') || desc.includes('cable') || desc.includes('stand') || desc.includes('snake') || desc.includes('power')) {
       categories['Accessories'].items.push(item.description);
       categories['Accessories'].total += item.amount;
+    } else if (desc.includes('technician') || desc.includes('labour') || desc.includes('labor') || desc.includes('tech time')) {
+      categories['Labour'].items.push(item.description);
+      categories['Labour'].total += item.amount;
     } else {
       // Default to accessories for unmatched items
       categories['Accessories'].items.push(item.description);
@@ -266,6 +270,10 @@ function categorizeEquipment(lineItems: { description: string; amount: number }[
 
   if (categories['Accessories'].total > 0) {
     result.push({ description: 'Accessories', cost: categories['Accessories'].total });
+  }
+
+  if (categories['Labour'].total > 0) {
+    result.push({ description: 'Sound Technician', cost: categories['Labour'].total });
   }
 
   return result;

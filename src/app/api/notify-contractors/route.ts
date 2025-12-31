@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
 import { generateJobSheetPDF, JobSheetInput } from '@/lib/pdf-job-sheet';
 import { uploadJobSheetToDrive, shareFileWithLink, FolderType } from '@/lib/google-drive';
+import { readJobSheetData } from '@/lib/google-sheets';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -28,10 +29,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Database not configured' }, { status: 500 });
     }
 
-    // Validate booking and token - include inquiry for original form data
+    // Validate booking and token - include inquiry for original form data AND quote_data
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .select('*, inquiries(form_data_json)')
+      .select('*, inquiries(form_data_json, quote_data)')
       .eq('id', bookingId)
       .single();
 
@@ -56,8 +57,36 @@ export async function POST(request: Request) {
     }
 
     // Use original form data from inquiry, fallback to booking.details_json
-    const originalFormData = (booking.inquiries as { form_data_json: Record<string, unknown> } | null)?.form_data_json;
+    const inquiryData = booking.inquiries as { form_data_json: Record<string, unknown>; quote_data: Record<string, unknown> } | null;
+    const originalFormData = inquiryData?.form_data_json;
+    const quoteData = inquiryData?.quote_data;
     const details = originalFormData || (booking.details_json as Record<string, unknown> | null);
+
+    // Read suggestedGear and executionNotes from Google Sheet (source of truth for admin edits)
+    // Fallback to quote_data if sheet read fails
+    let suggestedGear: Array<{ item: string; quantity: number; notes?: string }> | undefined;
+    let executionNotes: string[] | undefined;
+
+    if (booking.jobsheet_sheet_id) {
+      try {
+        const jobSheetData = await readJobSheetData(booking.jobsheet_sheet_id);
+        if (jobSheetData) {
+          suggestedGear = jobSheetData.suggestedGear;
+          executionNotes = jobSheetData.executionNotes;
+          console.log(`Read AI content from Google Sheet: ${suggestedGear?.length || 0} gear items, ${executionNotes?.length || 0} notes`);
+        }
+      } catch (sheetError) {
+        console.warn('Failed to read from jobsheet sheet, falling back to quote_data:', sheetError);
+      }
+    }
+
+    // Fallback to quote_data if sheet read failed or sheet doesn't exist
+    if (!suggestedGear) {
+      suggestedGear = quoteData?.suggestedGear as Array<{ item: string; quantity: number; notes?: string }> | undefined;
+    }
+    if (!executionNotes) {
+      executionNotes = quoteData?.executionNotes as string[] | undefined;
+    }
     let equipmentWithNotes: Array<{ name: string; quantity: number; notes?: string | null }> = [];
     if (details?.equipment && Array.isArray(details.equipment)) {
       const equipmentNames = (details.equipment as Array<{ name: string }>).map(e => e.name);
@@ -135,20 +164,25 @@ export async function POST(request: Request) {
             ? `$${hourlyRate}/hr × ${hours} hrs = $${totalPay.toFixed(0)}`
             : `$${totalPay.toFixed(0)}`;
 
-          // Build content requirements array
+          // Build content requirements array from boolean flags
           const contentRequirements: string[] = [];
           if (details?.contentRequirements && Array.isArray(details.contentRequirements)) {
             contentRequirements.push(...(details.contentRequirements as string[]));
           }
-
-          // Build venue info
-          const venue = details?.venue as Record<string, unknown> | undefined;
+          // Also build from individual boolean flags if present
+          if (details?.hasDJ) contentRequirements.push('DJ');
+          if (details?.hasBand) contentRequirements.push('Live Band');
+          if (details?.hasLiveMusic) contentRequirements.push('Live Music');
+          if (details?.hasSpeeches) contentRequirements.push('Speeches/Presentations');
+          if (details?.needsMic) contentRequirements.push('Microphone Required');
+          if (details?.playbackFromDevice) contentRequirements.push('Playback from Device');
 
           // Generate Job Sheet PDF
           const jobSheetInput: JobSheetInput = {
             eventName: booking.event_name || 'Event',
             eventDate: booking.event_date,
             eventTime: booking.event_time,
+            eventEndTime: (details?.eventEndTime as string) || null,
             location: booking.location || 'TBC',
             quoteNumber: booking.quote_number || '',
             contractorName: contractor.name,
@@ -160,12 +194,23 @@ export async function POST(request: Request) {
             eventType: (details?.eventType as string) || null,
             attendance: (details?.attendance as string) || null,
             setupTime: (details?.setupTime as string) || null,
-            indoorOutdoor: (venue?.indoorOutdoor as string) || null,
+            indoorOutdoor: (details?.indoorOutdoor as string) || null,
             contentRequirements,
             additionalNotes: (details?.additionalNotes as string) || (details?.additionalInfo as string) || null,
+            // Venue details
+            venueContact: (details?.venueContact as string) || null,
+            hasStage: (details?.hasStage as boolean) || false,
+            stageDetails: (details?.stageDetails as string) || null,
+            powerAccess: (details?.powerAccess as string) || null,
+            wetWeatherPlan: (details?.wetWeatherPlan as string) || null,
+            needsGenerator: (details?.needsGenerator as boolean) || false,
+            // Client
             clientName: booking.client_name,
             clientPhone: booking.client_phone || '',
             clientEmail: booking.client_email,
+            // AI-generated content from quote_data
+            suggestedGear,
+            executionNotes,
           };
 
           let jobSheetDriveLink: string | null = null;
@@ -207,10 +252,16 @@ export async function POST(request: Request) {
           if (details?.package) eventDetailItems.push(`Package: ${details.package}`);
           if (details?.attendance) eventDetailItems.push(`Attendance: ${details.attendance}`);
           if (details?.setupTime) eventDetailItems.push(`Setup: ${details.setupTime}`);
-          if (venue?.indoorOutdoor) eventDetailItems.push(`Venue: ${venue.indoorOutdoor}`);
-          if (details?.contentRequirements && Array.isArray(details.contentRequirements) && details.contentRequirements.length > 0) {
-            eventDetailItems.push(`Requirements: ${(details.contentRequirements as string[]).join(', ')}`);
+          if (details?.indoorOutdoor) eventDetailItems.push(`Environment: ${details.indoorOutdoor}`);
+          if (details?.hasStage || details?.stageDetails) {
+            eventDetailItems.push(`Stage: ${details.stageDetails || (details.hasStage ? 'Yes' : 'No')}`);
           }
+          if (contentRequirements.length > 0) {
+            eventDetailItems.push(`Content: ${contentRequirements.join(', ')}`);
+          }
+          if (details?.powerAccess) eventDetailItems.push(`Power: ${details.powerAccess}`);
+          if (details?.needsGenerator) eventDetailItems.push(`Generator: Required`);
+          if (details?.wetWeatherPlan) eventDetailItems.push(`Wet Weather: ${details.wetWeatherPlan}`);
           if (eventDetailItems.length > 0) {
             eventDetailsHtml = `
               <div style="margin: 15px 0;">
@@ -218,6 +269,16 @@ export async function POST(request: Request) {
                 <ul style="margin: 5px 0 0 0; padding-left: 20px; color: #4b5563;">
                   ${eventDetailItems.map(item => `<li>${item}</li>`).join('')}
                 </ul>
+              </div>
+            `;
+          }
+
+          // Build venue contact section
+          let venueContactHtml = '';
+          if (details?.venueContact) {
+            venueContactHtml = `
+              <div style="background: #f1f5f9; border-radius: 8px; padding: 12px 15px; margin: 15px 0; font-size: 14px;">
+                <strong>VENUE CONTACT:</strong> ${details.venueContact}
               </div>
             `;
           }
@@ -265,6 +326,9 @@ export async function POST(request: Request) {
 
                 <!-- Event Details -->
                 ${eventDetailsHtml}
+
+                <!-- Venue Contact -->
+                ${venueContactHtml}
 
                 <!-- Client Contact -->
                 <div style="background: #f8fafc; border-radius: 8px; padding: 12px 15px; margin: 20px 0; font-size: 14px;">
