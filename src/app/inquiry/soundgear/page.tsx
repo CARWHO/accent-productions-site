@@ -498,7 +498,7 @@ function InquiryForm() {
   const totalSteps = formData.package === 'small' ? 2 : 4;
 
   return (
-    <PageCard stretch>
+    <PageCard>
       {/* Parsing Loading Overlay */}
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
@@ -1423,7 +1423,7 @@ function InquiryForm() {
                 <textarea
                   value={formData.additionalInfo || ''}
                   onChange={(e) => updateField('additionalInfo', e.target.value)}
-                  rows={4}
+                  rows={10}
                   className={`${inputStyles} resize-none`}
                   placeholder={techRiderFile ? "Multiple bands, special requirements, etc..." : "Band names, number of performers, any other details..."}
                 />

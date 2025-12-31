@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sync-equipment",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/check-contractor-payments",
+      "schedule": "0 18 * * *"
     }
   ]
 }

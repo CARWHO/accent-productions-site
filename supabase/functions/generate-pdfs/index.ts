@@ -178,6 +178,50 @@ async function readQuoteSheetData(spreadsheetId: string): Promise<QuoteSheetData
   }
 }
 
+interface JobSheetSheetData {
+  quoteNumber: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  location: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  loadInTime: string;
+  soundCheckTime: string;
+  doorsTime: string;
+  setTime: string;
+  finishTime: string;
+  packDownTime: string;
+  suggestedGear: Array<{ item: string; quantity: number; notes?: string }>;
+  executionNotes: string[];
+  equipment: Array<{ gearName: string; quantity: number; notes: string }>;
+  crew: Array<{ role: string; name: string; phone: string; rate: number; hours: number }>;
+}
+
+async function readJobSheetSheetData(spreadsheetId: string): Promise<JobSheetSheetData | null> {
+  try {
+    const response = await fetch(`${SITE_URL}/api/read-jobsheet-sheet`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${EDGE_FUNCTION_SECRET}`,
+      },
+      body: JSON.stringify({ spreadsheetId }),
+    });
+
+    if (!response.ok) {
+      console.error("Failed to read jobsheet sheet:", await response.text());
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error reading jobsheet sheet:", error);
+    return null;
+  }
+}
+
 // ============================================
 // PDF GENERATION
 // ============================================
@@ -352,43 +396,53 @@ serve(async (req) => {
         }
       }
     } else {
-      // Generate Jobsheet PDF
+      // Generate Jobsheet PDF - read from Google Sheet (source of truth for admin edits)
       const jobsheetSheetId = record.jobsheet_sheet_id;
-      // For now, use original quote data for jobsheet (can add sheet reading later)
       const quoteData = record.quote_data || record.inquiry?.quote_data;
       const formData = record.form_data_json || record.inquiry?.form_data_json;
-
-      if (!quoteData) throw new Error("No quote data found for jobsheet");
 
       const folderId = isBackline ? GOOGLE_DRIVE_BACKLINE_JOBSHEET_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_JOBSHEET_FOLDER_ID;
       if (!folderId) throw new Error("Jobsheet folder not configured");
 
+      // Try to read from Google Sheet first (has admin edits)
+      let sheetData: JobSheetSheetData | null = null;
+      if (jobsheetSheetId) {
+        sheetData = await readJobSheetSheetData(jobsheetSheetId);
+        if (sheetData) {
+          console.log("[generate-pdfs] Using jobsheet data from Google Sheet");
+        } else {
+          console.warn("[generate-pdfs] Failed to read from sheet, falling back to quote_data");
+        }
+      }
+
+      // Build job sheet input - prefer sheet data, fallback to quote_data/formData
       const jobSheetInput: JobSheetInput = {
-        eventName: formData?.eventName || record.event_name || "Event",
-        eventDate: formData?.eventDate || record.event_date || "TBC",
-        eventTime: formData?.eventStartTime && formData?.eventEndTime
+        eventName: sheetData?.eventName || formData?.eventName || record.event_name || "Event",
+        eventDate: sheetData?.eventDate || formData?.eventDate || record.event_date || "TBC",
+        eventTime: sheetData?.eventTime || (formData?.eventStartTime && formData?.eventEndTime
           ? `${formData.eventStartTime} - ${formData.eventEndTime}`
-          : null,
-        location: formData?.location || record.location || "TBC",
-        quoteNumber: quoteData.quoteNumber || record.quote_number,
+          : null),
+        location: sheetData?.location || formData?.location || record.location || "TBC",
+        quoteNumber: sheetData?.quoteNumber || quoteData?.quoteNumber || record.quote_number,
         contractorName: record.contractor_name || "TBC",
         hourlyRate: record.contractor_hourly_rate || null,
         estimatedHours: record.contractor_hours || null,
         payAmount: record.contractor_pay || 0,
         tasksDescription: record.contractor_tasks || null,
-        executionNotes: quoteData.executionNotes || [],
-        equipment: [],
-        suggestedGear: quoteData.suggestedGear || [],
-        unavailableGear: quoteData.unavailableGear || [],
+        // AI content from sheet (admin-editable) or fallback to quote_data
+        executionNotes: sheetData?.executionNotes || quoteData?.executionNotes || [],
+        equipment: sheetData?.equipment?.map(e => ({ name: e.gearName, quantity: e.quantity, notes: e.notes })) || [],
+        suggestedGear: sheetData?.suggestedGear || quoteData?.suggestedGear || [],
+        unavailableGear: quoteData?.unavailableGear || [],
         eventType: formData?.eventType || null,
         attendance: formData?.attendance ? String(formData.attendance) : null,
         setupTime: formData?.setupTime || null,
         indoorOutdoor: formData?.indoorOutdoor || null,
         contentRequirements: [],
         additionalNotes: formData?.additionalInfo || null,
-        clientName: formData?.contactName || record.client_name,
-        clientPhone: formData?.contactPhone || record.client_phone,
-        clientEmail: formData?.contactEmail || record.client_email,
+        clientName: sheetData?.clientName || formData?.contactName || record.client_name,
+        clientPhone: sheetData?.clientPhone || formData?.contactPhone || record.client_phone,
+        clientEmail: sheetData?.clientEmail || formData?.contactEmail || record.client_email,
       };
 
       driveFileId = await generateJobSheetPDF(jobSheetInput, folderId, accessToken);

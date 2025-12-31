@@ -130,9 +130,8 @@ export default function Home() {
     e.preventDefault();
     const servicesSection = document.getElementById('services');
     if (servicesSection) {
-      const headerOffset = 80; // Height of sticky header (h-20)
       const elementPosition = servicesSection.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      const offsetPosition = elementPosition + window.pageYOffset;
 
       window.scrollTo({
         top: offsetPosition,

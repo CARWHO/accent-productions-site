@@ -65,18 +65,10 @@ export default function ServicesPage() {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash;
       if (hash) {
-        // Small delay to ensure page is rendered
         setTimeout(() => {
           const element = document.querySelector(hash);
           if (element) {
-            const headerOffset = 230; // Account for sticky header
-            const elementPosition = element.getBoundingClientRect().top;
-            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-            window.scrollTo({
-              top: offsetPosition,
-              behavior: 'smooth',
-            });
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         }, 100);
       }
