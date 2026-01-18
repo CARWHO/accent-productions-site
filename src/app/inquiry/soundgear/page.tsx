@@ -419,6 +419,10 @@ function InquiryForm() {
       indoorOutdoor: 'Indoor',
       hasStage: true,
       stageDetails: '4m x 3m stage',
+      // Setup timing
+      roomAvailableFrom: '2:00 PM',
+      callTime: '3:00 PM',
+      packOutTime: '12:00 AM',
       contactName: 'James Huddon',
       contactEmail: 'relahunter@gmail.com',
       contactPhone: '123467',
@@ -499,8 +503,11 @@ function InquiryForm() {
   // medium/large = 4 (Venue + Contact + Event Details + Content)
   const totalSteps = formData.package === 'small' ? 2 : 4;
 
+  // Step 1 (package selection) should fit on screen, other steps can stretch
+  const shouldStretch = step !== 1;
+
   return (
-    <PageCard>
+    <PageCard stretch={shouldStretch}>
       {/* Parsing Loading Overlay */}
       {isParsing && (
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
@@ -544,19 +551,15 @@ function InquiryForm() {
                 }}
                 className="cursor-pointer border-2 border-gray-200 rounded-md overflow-hidden flex flex-col min-h-0"
               >
-                <div className="flex-1 relative min-h-[120px]">
+                <div className="relative w-full min-h-[100px] flex-1 bg-gray-100">
                   <Image src={pkg.image} alt={pkg.label} fill className="object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-transparent" />
-                  <div className="absolute top-0 left-0 right-0 p-3">
-                    <div className="flex justify-between items-start text-white">
-                      <h3 className="text-lg font-bold leading-tight">{pkg.label}</h3>
-                      <span className="text-base font-bold leading-tight">{pkg.price}</span>
-                    </div>
-                    <p className="text-xs text-white/90 leading-tight mt-1">{pkg.size}</p>
-                  </div>
                 </div>
-                <div className="px-3 py-2 bg-white flex-shrink-0">
-                  <p className="text-xs text-gray-600 font-medium leading-tight m-0">{pkg.description}</p>
+                <div className="p-3 bg-white flex-shrink-0">
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-semibold text-gray-900 text-sm lg:text-base">{pkg.label} <span className="text-xs text-gray-500 font-normal">({pkg.size})</span></h3>
+                    <span className="text-sm font-semibold text-gray-900">{pkg.price}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 font-medium leading-tight mt-1">{pkg.description}</p>
                 </div>
               </div>
             ))}
@@ -874,7 +877,7 @@ function InquiryForm() {
                     placeholder="Stage dimensions, height, access details..."
                     value={formData.stageDetails || ''}
                     onChange={(e) => updateField('stageDetails', e.target.value)}
-                    rows={4}
+                    rows={1}
                     className={`${inputStyles} resize-none`}
                   />
                 </div>
