@@ -116,99 +116,8 @@ export async function GET(request: Request) {
       return timeStr;
     };
 
-    // Build "Add to Google Calendar" URL for contractor
-    const buildAddToCalendarUrl = () => {
-      if (!booking.event_date) return null;
-
-      const eventTitle = encodeURIComponent(`${booking.event_name || 'Event'} - Accent Productions`);
-      const location = encodeURIComponent(booking.location || '');
-
-      // Build detailed description from booking details
-      const descriptionParts: string[] = [];
-      const bookingDetails = booking.details_json as Record<string, unknown> | null;
-
-      if (bookingDetails) {
-        if (bookingDetails.type === 'backline') {
-          const equipment = bookingDetails.equipment as Array<{ name: string; quantity: number }> | null;
-          if (equipment && equipment.length > 0) {
-            descriptionParts.push('EQUIPMENT:');
-            equipment.forEach(e => descriptionParts.push(`• ${e.quantity}x ${e.name}`));
-            descriptionParts.push('');
-          }
-          if (bookingDetails.otherEquipment) {
-            descriptionParts.push(`Other: ${bookingDetails.otherEquipment}`);
-            descriptionParts.push('');
-          }
-          const period = bookingDetails.rentalPeriod as { start: string; end: string } | null;
-          if (period) {
-            descriptionParts.push(`Rental: ${period.start} to ${period.end}`);
-          }
-          if (bookingDetails.deliveryMethod === 'delivery' && bookingDetails.deliveryAddress) {
-            descriptionParts.push(`Delivery to: ${bookingDetails.deliveryAddress}`);
-          } else {
-            descriptionParts.push('Collection: Customer pickup');
-          }
-        } else if (bookingDetails.type === 'fullsystem') {
-          if (bookingDetails.eventType) descriptionParts.push(`Event: ${bookingDetails.eventType}`);
-          if (bookingDetails.attendance) descriptionParts.push(`Attendance: ${bookingDetails.attendance}`);
-          if (bookingDetails.setupTime) descriptionParts.push(`Setup: ${bookingDetails.setupTime}`);
-          const reqs = bookingDetails.contentRequirements as string[] | null;
-          if (reqs && reqs.length > 0) {
-            descriptionParts.push(`Requirements: ${reqs.join(', ')}`);
-          }
-          if (bookingDetails.bandNames) descriptionParts.push(`Band(s): ${bookingDetails.bandNames}`);
-        }
-
-        if (bookingDetails.additionalNotes || bookingDetails.details) {
-          descriptionParts.push('');
-          descriptionParts.push(`Notes: ${bookingDetails.additionalNotes || bookingDetails.details}`);
-        }
-      }
-
-      descriptionParts.push('');
-      descriptionParts.push('---');
-      descriptionParts.push(`Client: ${booking.client_name}`);
-      descriptionParts.push(`Phone: ${booking.client_phone}`);
-      if (quoteLink) {
-        descriptionParts.push('');
-        descriptionParts.push(`📄 View Quote: ${quoteLink}`);
-      }
-      descriptionParts.push('');
-      descriptionParts.push('Booked via Accent Productions');
-
-      const details = encodeURIComponent(descriptionParts.join('\n'));
-
-      // Parse date and time
-      const startDate = new Date(booking.event_date);
-      if (booking.event_time) {
-        const timeMatch = booking.event_time.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
-        if (timeMatch) {
-          let hours = parseInt(timeMatch[1], 10);
-          const mins = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-          const meridiem = timeMatch[3]?.toLowerCase();
-          if (meridiem === 'pm' && hours < 12) hours += 12;
-          if (meridiem === 'am' && hours === 12) hours = 0;
-          startDate.setHours(hours, mins, 0, 0);
-        }
-      } else {
-        startDate.setHours(9, 0, 0, 0); // Default to 9am
-      }
-
-      // End time: 4 hours later
-      const endDate = new Date(startDate);
-      endDate.setHours(endDate.getHours() + 4);
-
-      // Format as YYYYMMDDTHHMMSS (local time)
-      const formatDateTime = (d: Date) => {
-        return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-      };
-
-      const dates = `${formatDateTime(startDate)}/${formatDateTime(endDate)}`;
-
-      return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${dates}&details=${details}&location=${location}`;
-    };
-
-    const addToCalendarUrl = buildAddToCalendarUrl();
+    // Build .ics calendar link
+    const icsUrl = `${baseUrl}/api/generate-ics?booking_id=${booking.id}`;
 
     // Notify business owner
     if (resend) {
@@ -293,14 +202,12 @@ export async function GET(request: Request) {
             ${quoteLink ? `<p><strong>Quote:</strong> <a href="${quoteLink}" style="color: #2563eb;">View PDF</a></p>` : ''}
           </div>
 
-          ${addToCalendarUrl ? `
-          <p style="margin: 20px 0;">
-            <a href="${addToCalendarUrl}"
-               style="display: inline-block; background: #4285f4; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-              Add to My Google Calendar
+          <div style="margin: 20px 0;">
+            <a href="${icsUrl}"
+               style="display: inline-block; background: #6b7280; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+              Add to Calendar
             </a>
-          </p>
-          ` : ''}
+          </div>
 
           <h3>Client Contact</h3>
           <p><strong>Name:</strong> ${booking.client_name}</p>

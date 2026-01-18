@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { uploadTechRiderToSharedFolder } from '@/lib/google-drive';
+import { parseTechRider, TechRiderRequirements } from '@/lib/parse-tech-rider';
 import { randomUUID } from 'crypto';
 
 export async function POST(request: Request) {
@@ -49,6 +51,10 @@ export async function POST(request: Request) {
       powerAccess: getField('powerAccess'),
       hasStage: getBoolField('hasStage'),
       stageDetails: getField('stageDetails'),
+      // Timing fields for contractors
+      roomAvailableFrom: getField('roomAvailableFrom'),
+      callTime: getField('callTime'),
+      packOutTime: getField('packOutTime'),
       contactName: getField('contactName'),
       contactEmail: getField('contactEmail'),
       contactPhone: getField('contactPhone'),
@@ -66,29 +72,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get tech rider file if present and upload to Supabase Storage
+    // Get tech rider file if present, upload to Google Drive, and parse it
     const techRiderFile = formData.get('techRider') as File | null;
-    let techRiderStoragePath: string | null = null;
+    let techRiderDriveFileId: string | null = null;
+    let techRiderRequirements: TechRiderRequirements | null = null;
 
     if (techRiderFile && techRiderFile.size > 0) {
-      const fileExt = techRiderFile.name.split('.').pop() || 'pdf';
-      const fileName = `${randomUUID()}.${fileExt}`;
-      const filePath = `tech-riders/${fileName}`;
-
       const buffer = Buffer.from(await techRiderFile.arrayBuffer());
 
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('inquiry-files')
-        .upload(filePath, buffer, {
-          contentType: techRiderFile.type,
-          upsert: false,
-        });
+      // Upload to Google Drive shared tech riders folder
+      techRiderDriveFileId = await uploadTechRiderToSharedFolder(
+        buffer,
+        techRiderFile.name,
+        techRiderFile.type
+      );
 
-      if (uploadError) {
-        console.error('Error uploading tech rider:', uploadError);
+      if (techRiderDriveFileId) {
+        console.log(`Tech rider uploaded to Google Drive: ${techRiderDriveFileId}`);
       } else {
-        techRiderStoragePath = filePath;
-        console.log(`Tech rider uploaded to: ${filePath}`);
+        console.error('Failed to upload tech rider to Google Drive');
+      }
+
+      // Parse tech rider to extract requirements (for AI quote generation)
+      try {
+        console.log(`Parsing tech rider: ${techRiderFile.name}`);
+        techRiderRequirements = await parseTechRider(buffer, techRiderFile.name);
+        if (techRiderRequirements) {
+          console.log('Tech rider parsed successfully:', {
+            specificGear: techRiderRequirements.specificGear,
+            hasBackline: techRiderRequirements.hasBackline,
+            inputChannels: techRiderRequirements.inputChannels,
+          });
+        }
+      } catch (parseError) {
+        console.error('Error parsing tech rider (non-fatal):', parseError);
+        // Continue without parsed data - quote will just use form fields
       }
     }
 
@@ -98,8 +116,10 @@ export async function POST(request: Request) {
     // Build form data JSON for Edge Function to process
     const formDataJson = {
       ...body,
-      techRiderStoragePath,
+      techRiderDriveFileId,
       techRiderOriginalName: techRiderFile?.name || null,
+      // Include parsed tech rider requirements for AI quote generation
+      techRiderRequirements: techRiderRequirements || null,
     };
 
     // Save inquiry with status='pending_quote' - Edge Function will process it

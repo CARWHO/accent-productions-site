@@ -11,7 +11,6 @@ const services = [
     images: [
       { src: '/images/image1-public-parilament.png', location: 'Parliament, Wellington' },
       { src: '/images/image1-public-waitangipark.png', location: 'Waitangi Park, Wellington' },
-      { src: '/images/image3-public-waitangipark.webp', location: 'Waitangi Park, Wellington' },
     ],
     href: '/services#public',
   },
@@ -20,7 +19,6 @@ const services = [
     description: 'Conferences, presentations, and company events.',
     images: [
       { src: '/images/image1-corporate.png', location: 'Wellington CBD, New Zealand' },
-      { src: '/images/image2-corporate.jpg', location: 'Wellington CBD, New Zealand' },
     ],
     href: '/services#corporate',
   },
@@ -28,10 +26,8 @@ const services = [
     title: 'Festivals',
     description: 'Large-scale outdoor sound systems.',
     images: [
-      { src: '/images/image1-festival-bontanic-gardens.jpg', location: 'Botanic Gardens, Wellington' },
-      { src: '/images/image2-festival-bontanic-gardens.jpg', location: 'Botanic Gardens, Wellington' },
+      { src: '/images/image1-festival-slavfest.jpeg', location: 'Slavfest, Wellington' },
       { src: '/images/image1-festival-cuba-st.png', location: 'Cuba Street, Wellington' },
-      { src: '/images/image3-festival-waterfront.jpg', location: 'Waterfront, Wellington' },
       { src: '/images/image3-festival-newtown-festival.jpg', location: 'Newtown Festival, Wellington' },
     ],
     href: '/services#festivals',
@@ -40,9 +36,9 @@ const services = [
     title: 'Private Events',
     description: 'Sound equipment for any celebration.',
     images: [
-      { src: '/images/image1-private.png', location: 'Wellington CBD, New Zealand' },
-      { src: '/images/image2-private.png', location: 'Wellington CBD, New Zealand' },
-      { src: '/images/image3-private.png', location: 'Wellington CBD, New Zealand' },
+      { src: '/images/image1-private-marton.jpeg', location: 'Marton, NZ' },
+      { src: '/images/image2-private-newtown.jpeg', location: 'Newtown, Wellington' },
+      { src: '/images/image3-private-paekakariki.jpeg', location: 'Paekakariki, NZ' },
     ],
     href: '/services#parties',
   },

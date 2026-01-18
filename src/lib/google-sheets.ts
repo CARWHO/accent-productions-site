@@ -489,12 +489,13 @@ export interface JobSheetEventData {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
-  loadInTime?: string;
+  roomAvailableFrom?: string;  // When venue opens for setup
+  loadInTime?: string;         // When crew arrives (call time)
   soundCheckTime?: string;
   doorsTime?: string;
   setTime?: string;
   finishTime?: string;
-  packDownTime?: string;
+  packDownTime?: string;       // When teardown finishes (pack-out time)
   // AI-generated content (stored as JSON in sheet)
   suggestedGear?: Array<{ item: string; quantity: number; notes?: string }>;
   executionNotes?: string[];
@@ -559,10 +560,10 @@ export async function createJobSheet(
     console.log(`Created job sheet: ${spreadsheetId}`);
 
     // 2. Populate Event Data tab (B column only - A has keys)
-    // Rows 1-14: Basic event info
+    // Rows 1-15: Basic event info + timing
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: "'Event Data'!B1:B14",
+      range: "'Event Data'!B1:B15",
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [
@@ -574,18 +575,19 @@ export async function createJobSheet(
           [eventData.clientName],
           [eventData.clientEmail],
           [eventData.clientPhone],
-          [eventData.loadInTime || ''],
+          [eventData.roomAvailableFrom || ''],  // NEW: When venue opens for setup
+          [eventData.loadInTime || ''],         // When crew arrives (call time)
           [eventData.soundCheckTime || ''],
           [eventData.doorsTime || ''],
           [eventData.setTime || ''],
           [eventData.finishTime || ''],
-          [eventData.packDownTime || ''],
+          [eventData.packDownTime || ''],       // When teardown finishes (pack-out time)
         ],
       },
     });
 
-    // Row 16: Suggested Gear section header
-    // Rows 17-31: Gear items (Item | Qty | Notes) - up to 15 items
+    // Row 17: Suggested Gear section header (shifted down by 1 due to roomAvailableFrom)
+    // Rows 18-32: Gear items (Item | Qty | Notes) - up to 15 items
     const gearRows: string[][] = [
       ['SUGGESTED GEAR', 'Item', 'Qty', 'Notes'], // Header row
     ];
@@ -600,13 +602,13 @@ export async function createJobSheet(
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: "'Event Data'!A16:D31",
+      range: "'Event Data'!A17:D32",
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: gearRows },
     });
 
-    // Row 33: Execution Notes section header
-    // Rows 34-48: Individual notes - up to 15 notes
+    // Row 34: Execution Notes section header
+    // Rows 35-49: Individual notes - up to 15 notes
     const notesRows: string[][] = [
       ['EXECUTION NOTES'], // Header row
     ];
@@ -621,7 +623,7 @@ export async function createJobSheet(
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: "'Event Data'!A33:A48",
+      range: "'Event Data'!A34:A49",
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: notesRows },
     });
@@ -697,12 +699,13 @@ export interface JobSheetData {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
-  loadInTime: string;
+  roomAvailableFrom: string;  // When venue opens for setup
+  loadInTime: string;         // When crew arrives (call time)
   soundCheckTime: string;
   doorsTime: string;
   setTime: string;
   finishTime: string;
-  packDownTime: string;
+  packDownTime: string;       // When teardown finishes (pack-out time)
   suggestedGear: Array<{ item: string; quantity: number; notes?: string }>;
   executionNotes: string[];
   equipment: Array<{ gearName: string; quantity: number; notes: string }>;
@@ -714,9 +717,9 @@ export interface JobSheetData {
  * Used by notify-contractors to get admin-edited data
  *
  * Layout:
- * - Rows 1-14: Basic event data (B column)
- * - Rows 17-31: Suggested Gear (B=Item, C=Qty, D=Notes)
- * - Rows 34-48: Execution Notes (A column)
+ * - Rows 1-15: Basic event data (B column) - includes roomAvailableFrom at row 9
+ * - Rows 18-32: Suggested Gear (B=Item, C=Qty, D=Notes)
+ * - Rows 35-49: Execution Notes (A column)
  */
 export async function readJobSheetData(
   spreadsheetId: string
@@ -730,10 +733,10 @@ export async function readJobSheetData(
 
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
 
-    // Read Event Data tab - basic info (B column, rows 1-14)
+    // Read Event Data tab - basic info (B column, rows 1-15)
     const eventDataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "'Event Data'!B1:B14",
+      range: "'Event Data'!B1:B15",
     });
 
     const eventRows = eventDataResponse.data.values || [];
@@ -742,10 +745,10 @@ export async function readJobSheetData(
       return row && row[0] !== undefined ? String(row[0]) : '';
     };
 
-    // Read Suggested Gear section (rows 17-31, columns B-D)
+    // Read Suggested Gear section (rows 18-32, columns B-D)
     const gearResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "'Event Data'!B17:D31",
+      range: "'Event Data'!B18:D32",
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
@@ -758,10 +761,10 @@ export async function readJobSheetData(
         notes: row[2] ? String(row[2]) : undefined,
       }));
 
-    // Read Execution Notes section (rows 34-48, column A)
+    // Read Execution Notes section (rows 35-49, column A)
     const notesResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "'Event Data'!A34:A48",
+      range: "'Event Data'!A35:A49",
     });
 
     const notesRows = notesResponse.data.values || [];
@@ -812,12 +815,13 @@ export async function readJobSheetData(
       clientName: getValue(5),
       clientEmail: getValue(6),
       clientPhone: getValue(7),
-      loadInTime: getValue(8),
-      soundCheckTime: getValue(9),
-      doorsTime: getValue(10),
-      setTime: getValue(11),
-      finishTime: getValue(12),
-      packDownTime: getValue(13),
+      roomAvailableFrom: getValue(8),  // When venue opens for setup
+      loadInTime: getValue(9),         // When crew arrives (call time)
+      soundCheckTime: getValue(10),
+      doorsTime: getValue(11),
+      setTime: getValue(12),
+      finishTime: getValue(13),
+      packDownTime: getValue(14),      // When teardown finishes (pack-out time)
       suggestedGear,
       executionNotes,
       equipment,

@@ -27,12 +27,13 @@ const EDGE_FUNCTION_SECRET = process.env.EDGE_FUNCTION_SECRET || 'default-secret
  *   clientName: string,
  *   clientEmail?: string,
  *   clientPhone?: string,
- *   loadInTime?: string,
+ *   roomAvailableFrom?: string,  // When venue opens for setup
+ *   loadInTime?: string,         // When crew arrives (call time)
  *   soundCheckTime?: string,
  *   doorsTime?: string,
  *   setTime?: string,
  *   finishTime?: string,
- *   packDownTime?: string,
+ *   packDownTime?: string,       // When teardown finishes (pack-out time)
  *   suggestedGear?: Array<{ item: string, quantity: number, notes?: string }>,
  *   executionNotes?: string[],
  *   equipment?: Array<{ gearName: string, quantity: number, notes?: string }>,
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       clientName,
       clientEmail,
       clientPhone,
+      roomAvailableFrom,
       loadInTime,
       soundCheckTime,
       doorsTime,
@@ -90,6 +92,7 @@ export async function POST(request: Request) {
       clientName,
       clientEmail: clientEmail || '',
       clientPhone: clientPhone || '',
+      roomAvailableFrom: roomAvailableFrom || '',
       loadInTime: loadInTime || '',
       soundCheckTime: soundCheckTime || '',
       doorsTime: doorsTime || '',

@@ -8,6 +8,11 @@ const businessEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
 
 function verifyCronSecret(request: Request): boolean {
+  // Allow local dev without auth
+  if (process.env.NODE_ENV === 'development') {
+    return true;
+  }
+
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
@@ -115,9 +120,9 @@ export async function GET(request: Request) {
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.name}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">$${c.amount}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
-              <a href="${baseUrl}/api/confirm-contractor-payment?token=${c.token}"
+              <a href="${baseUrl}/pay-contractor?token=${c.token}"
                  style="background: #16a34a; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 12px;">
-                Confirm Paid
+                Pay
               </a>
             </td>
           </tr>
@@ -148,7 +153,7 @@ export async function GET(request: Request) {
       await resend.emails.send({
         from: 'Accent Productions <notifications@accent-productions.co.nz>',
         to: [businessEmail],
-        subject: `💰 ${validPayments.length} Contractor Payment${validPayments.length > 1 ? 's' : ''} Ready`,
+        subject: `${validPayments.length} Contractor Payment${validPayments.length > 1 ? 's' : ''} Ready`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px;">
             <h1 style="color: #111;">Contractor Payments Due</h1>
@@ -157,7 +162,7 @@ export async function GET(request: Request) {
             ${bookingsHtml}
 
             <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
-              Click "Confirm Paid" after processing each payment in iPayroll.
+              Click "Confirm Paid" after processing each payment.
             </p>
           </div>
         `,
@@ -166,14 +171,126 @@ export async function GET(request: Request) {
       console.log('Payment reminder email sent to admin');
     }
 
+    // === CHECK CLIENT BALANCES DUE ===
+    console.log('Checking for completed events with client balances due...');
+
+    const { data: pendingBalances, error: balanceError } = await supabase
+      .from('client_approvals')
+      .select(`
+        *,
+        bookings (id, event_name, event_date, quote_number, client_name, client_email)
+      `)
+      .not('deposit_amount', 'is', null)
+      .eq('balance_status', 'pending')
+      .lt('bookings.event_date', today);
+
+    if (balanceError) {
+      console.error('Error fetching pending balances:', balanceError);
+    }
+
+    // Filter for valid balances (has booking, balance > 0)
+    const validBalances = (pendingBalances || []).filter(ca => {
+      if (!ca.bookings) return false;
+      const total = Number(ca.adjusted_quote_total) || 0;
+      const deposit = Number(ca.deposit_amount) || 0;
+      return total > deposit;
+    });
+
+    if (validBalances.length > 0) {
+      console.log(`Found ${validBalances.length} pending client balances`);
+
+      // Generate balance payment tokens
+      for (const approval of validBalances) {
+        if (!approval.balance_payment_token) {
+          const token = crypto.randomBytes(32).toString('hex');
+          await supabase
+            .from('client_approvals')
+            .update({ balance_payment_token: token })
+            .eq('id', approval.id);
+          approval.balance_payment_token = token;
+        }
+      }
+
+      // Send email to admin about client balances
+      if (resend) {
+        const formatDate = (dateStr: string) => {
+          return new Date(dateStr).toLocaleDateString('en-NZ', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          });
+        };
+
+        const balanceRows = validBalances.map(ca => {
+          const booking = ca.bookings as { id: string; event_name: string | null; event_date: string; quote_number: string | null; client_name: string; client_email: string };
+          const total = Number(ca.adjusted_quote_total) || 0;
+          const deposit = Number(ca.deposit_amount) || 0;
+          const balance = total - deposit;
+
+          return `
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
+                <strong>${booking.event_name || 'Event'}</strong><br>
+                <span style="color: #6b7280; font-size: 12px;">${formatDate(booking.event_date)}</span>
+              </td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${booking.client_name}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">$${balance.toFixed(0)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
+                <a href="${baseUrl}/collect-balance?token=${ca.balance_payment_token}"
+                   style="background: #1c1917; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 12px;">
+                  Collect
+                </a>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        await resend.emails.send({
+          from: 'Accent Productions <notifications@accent-productions.co.nz>',
+          to: [businessEmail],
+          subject: `Client Balances Due: ${validBalances.length} event${validBalances.length > 1 ? 's' : ''}`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px;">
+              <h1 style="color: #111;">Client Balances Due</h1>
+              <p>The following events have completed with outstanding client balances:</p>
+
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <thead>
+                  <tr style="background: #e5e7eb;">
+                    <th style="padding: 8px; text-align: left;">Event</th>
+                    <th style="padding: 8px; text-align: left;">Client</th>
+                    <th style="padding: 8px; text-align: left;">Balance</th>
+                    <th style="padding: 8px; text-align: left;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${balanceRows}
+                </tbody>
+              </table>
+
+              <p style="color: #6b7280; font-size: 14px;">
+                Click "Collect" to send an invoice to the client.
+              </p>
+            </div>
+          `,
+        });
+
+        console.log('Client balance reminder email sent to admin');
+      }
+    } else {
+      console.log('No pending client balances found');
+    }
+
     return NextResponse.json({
       success: true,
-      pending: validPayments.length,
+      contractorPayments: validPayments.length,
+      clientBalances: validBalances.length,
       emailSent: !!resend
     });
 
   } catch (error) {
-    console.error('Error in contractor payment check cron:', error);
+    console.error('Error in payment check cron:', error);
     return NextResponse.json({
       error: 'Check failed',
       details: error instanceof Error ? error.message : 'Unknown error'

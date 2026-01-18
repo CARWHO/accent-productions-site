@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('equipment')
-      .select('id, category, name, notes, hire_rate_per_day, stock_quantity')
+      .select('id, category, name, notes, hire_rate_per_day, stock_quantity, image_url')
       .eq('available', true)
       .eq('type', 'backline');
 

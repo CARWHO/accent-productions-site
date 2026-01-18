@@ -29,6 +29,41 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate equipment quantities against stock
+    if (equipment.length > 0) {
+      const equipmentNames = equipment.map((item: { name: string; quantity: number }) => item.name);
+
+      const { data: stockData, error: stockError } = await supabaseAdmin
+        .from('equipment')
+        .select('name, stock_quantity')
+        .in('name', equipmentNames);
+
+      if (stockError) {
+        console.error('Error fetching stock data:', stockError);
+        return NextResponse.json(
+          { success: false, message: 'Failed to validate stock' },
+          { status: 500 }
+        );
+      }
+
+      // Create a map of name -> stock_quantity
+      const stockMap = new Map<string, number>();
+      for (const item of stockData || []) {
+        stockMap.set(item.name, item.stock_quantity || 1);
+      }
+
+      // Check each item's requested quantity against stock
+      for (const item of equipment as { name: string; quantity: number }[]) {
+        const stock = stockMap.get(item.name);
+        if (stock !== undefined && item.quantity > stock) {
+          return NextResponse.json(
+            { success: false, message: `Quantity for "${item.name}" exceeds available stock (${stock} available)` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Upload tech rider to storage if present
     let techRiderStoragePath: string | null = null;
     if (techRiderFile && techRiderFile.size > 0) {

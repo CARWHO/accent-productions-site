@@ -10,9 +10,12 @@ interface EquipmentCardProps {
   notes: string | null;
   hireRate: number | null;
   stockQuantity: number;
+  imageUrl?: string | null;
 }
 
-export function EquipmentCard({ id, name, category, notes, hireRate, stockQuantity }: EquipmentCardProps) {
+const PLACEHOLDER_IMAGE = 'https://placehold.co/400x300/1a1a1a/ffffff?text=Equipment';
+
+export function EquipmentCard({ id, name, category, notes, hireRate, stockQuantity, imageUrl }: EquipmentCardProps) {
   const { addItem, isInCart, getItemQuantity, updateQuantity } = useCart();
   const inCart = isInCart(id);
   const quantity = getItemQuantity(id);
@@ -26,11 +29,14 @@ export function EquipmentCard({ id, name, category, notes, hireRate, stockQuanti
     <div className={`border rounded-md overflow-hidden transition-all ${inCart ? 'border-[#000000] bg-[#000000]/5' : 'border-gray-200'}`}>
       <div className="aspect-[4/3] relative w-full bg-gray-100">
         <Image
-          src="https://placehold.co/400x300/1a1a1a/ffffff?text=Equipment"
+          src={imageUrl || PLACEHOLDER_IMAGE}
           alt={name}
           fill
           className="object-cover"
           unoptimized
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
+          }}
         />
       </div>
       <div className="p-3">

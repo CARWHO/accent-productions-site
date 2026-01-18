@@ -187,7 +187,59 @@ export async function uploadJobSheetToDrive(
 }
 
 /**
- * Upload a Tech Rider PDF to the appropriate tech riders folder
+ * Copy a file in Google Drive
+ * Returns the new file ID or null if failed
+ */
+export async function copyFile(fileId: string, newName: string): Promise<string | null> {
+  try {
+    const oauth2Client = getOAuth2Client();
+    if (!oauth2Client) {
+      console.warn('Google Drive not configured');
+      return null;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    const response = await drive.files.copy({
+      fileId,
+      requestBody: {
+        name: newName,
+      },
+    });
+
+    console.log(`Copied file ${fileId} to new file ${response.data.id} with name "${newName}"`);
+    return response.data.id || null;
+  } catch (error) {
+    console.error('Error copying file in Google Drive:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete a file from Google Drive
+ * Returns true if successful, false if failed
+ */
+export async function deleteFile(fileId: string): Promise<boolean> {
+  try {
+    const oauth2Client = getOAuth2Client();
+    if (!oauth2Client) {
+      console.warn('Google Drive not configured');
+      return false;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    await drive.files.delete({ fileId });
+    console.log(`Deleted file ${fileId} from Google Drive`);
+    return true;
+  } catch (error) {
+    console.error('Error deleting file from Google Drive:', error);
+    return false;
+  }
+}
+
+/**
+ * Upload a Tech Rider PDF to the appropriate tech riders folder (per folder type)
  */
 export async function uploadTechRiderToDrive(
   fileBuffer: Buffer,
@@ -228,6 +280,67 @@ export async function uploadTechRiderToDrive(
 
     console.log(`Uploaded Tech Rider ${filename} to Google Drive ${folderType} folder (ID: ${response.data.id})`);
     return response.data.id || null;
+  } catch (error) {
+    console.error('Error uploading Tech Rider to Google Drive:', error);
+    return null;
+  }
+}
+
+/**
+ * Upload a Tech Rider to the shared tech riders folder
+ * Uses GOOGLE_DRIVE_TECH_RIDERS_FOLDER_ID env var
+ * Returns the file ID or null if failed
+ */
+export async function uploadTechRiderToSharedFolder(
+  fileBuffer: Buffer,
+  filename: string,
+  mimeType?: string
+): Promise<string | null> {
+  try {
+    const rawFolderId = process.env.GOOGLE_DRIVE_TECH_RIDERS_FOLDER_ID;
+    const folderId = rawFolderId ? extractFolderId(rawFolderId) : null;
+    const oauth2Client = getOAuth2Client();
+
+    if (!folderId || !oauth2Client) {
+      console.warn('Google Drive tech riders folder not configured, skipping upload');
+      return null;
+    }
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    // Determine mime type based on file extension if not provided
+    let fileMimeType = mimeType || 'application/pdf';
+    if (!mimeType) {
+      const lowerFilename = filename.toLowerCase();
+      if (lowerFilename.endsWith('.docx')) {
+        fileMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      } else if (lowerFilename.endsWith('.doc')) {
+        fileMimeType = 'application/msword';
+      } else if (lowerFilename.endsWith('.png')) {
+        fileMimeType = 'image/png';
+      } else if (lowerFilename.endsWith('.jpg') || lowerFilename.endsWith('.jpeg')) {
+        fileMimeType = 'image/jpeg';
+      }
+    }
+
+    const response = await drive.files.create({
+      requestBody: {
+        name: filename,
+        parents: [folderId],
+      },
+      media: {
+        mimeType: fileMimeType,
+        body: Readable.from(fileBuffer),
+      },
+    });
+
+    const fileId = response.data.id || null;
+    if (fileId) {
+      console.log(`Uploaded Tech Rider ${filename} to Google Drive (ID: ${fileId})`);
+      // Make the file publicly viewable
+      await shareFileWithLink(fileId);
+    }
+    return fileId;
   } catch (error) {
     console.error('Error uploading Tech Rider to Google Drive:', error);
     return null;

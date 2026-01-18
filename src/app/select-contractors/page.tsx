@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import PageCard from '@/components/ui/PageCard';
+import { SuccessIcon, ErrorIcon } from '@/components/ui/StatusIcons';
 
 interface Contractor {
   id: string;
@@ -22,6 +23,9 @@ interface Booking {
   client_name: string;
   booking_type: string;
   details_json: Record<string, unknown> | null;
+  vehicle_type: string | null;
+  vehicle_amount: number | null;
+  vehicle_contractor_id: string | null;
 }
 
 interface Assignment {
@@ -34,6 +38,7 @@ interface Assignment {
 
 function SelectContractorsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const token = searchParams.get('token');
 
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -43,6 +48,13 @@ function SelectContractorsContent() {
   const [error, setError] = useState<string | null>(null);
   const [notifying, setNotifying] = useState(false);
   const [notified, setNotified] = useState(false);
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+
+  // Vehicle contractor (who gets the vehicle payment when using personal vehicle)
+  const [vehicleContractorId, setVehicleContractorId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -63,6 +75,11 @@ function SelectContractorsContent() {
 
         setBooking(data.booking);
         setContractors(data.contractors);
+
+        // Load existing vehicle contractor assignment
+        if (data.booking.vehicle_contractor_id) {
+          setVehicleContractorId(data.booking.vehicle_contractor_id);
+        }
 
         // Load existing assignments if any
         if (data.existingAssignments?.length > 0) {
@@ -142,6 +159,7 @@ function SelectContractorsContent() {
         body: JSON.stringify({
           token,
           bookingId: booking.id,
+          vehicleContractorId: booking.vehicle_type === 'personal' ? vehicleContractorId : null,
           assignments: assignmentList.map(a => ({
             contractor_id: a.contractor_id,
             hourly_rate: parseFloat(a.hourly_rate),
@@ -184,6 +202,35 @@ function SelectContractorsContent() {
     });
   };
 
+  // Get all unique skills from contractors
+  const allSkills = Array.from(
+    new Set(contractors.flatMap(c => c.skills || []))
+  ).sort();
+
+  // Filter contractors based on search and selected skills
+  const filteredContractors = contractors.filter(contractor => {
+    // Search filter
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery ||
+      contractor.name.toLowerCase().includes(searchLower) ||
+      contractor.email.toLowerCase().includes(searchLower) ||
+      contractor.skills?.some(s => s.toLowerCase().includes(searchLower));
+
+    // Skill filter
+    const matchesSkills = selectedSkills.length === 0 ||
+      selectedSkills.some(skill => contractor.skills?.includes(skill));
+
+    return matchesSearch && matchesSkills;
+  });
+
+  const toggleSkillFilter = (skill: string) => {
+    setSelectedSkills(prev =>
+      prev.includes(skill)
+        ? prev.filter(s => s !== skill)
+        : [...prev, skill]
+    );
+  };
+
   if (loading) {
     return (
       <PageCard>
@@ -200,11 +247,7 @@ function SelectContractorsContent() {
     return (
       <PageCard centered>
         <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-md flex items-center justify-center mb-6">
-            <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
+          <div className="mb-6"><ErrorIcon /></div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-700 text-lg font-medium">{error}</p>
         </div>
@@ -216,11 +259,7 @@ function SelectContractorsContent() {
     return (
       <PageCard centered>
         <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-md flex items-center justify-center mb-6">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
+          <div className="mb-6"><SuccessIcon /></div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Contractors Notified!</h2>
           <p className="text-gray-700 text-lg font-medium">
             {Object.keys(assignments).length} contractor{Object.keys(assignments).length !== 1 ? 's have' : ' has'} been notified.
@@ -236,20 +275,31 @@ function SelectContractorsContent() {
   if (!booking) return null;
 
   const selectedCount = Object.keys(assignments).length;
-  const totalPay = Object.values(assignments).reduce((sum, a) => {
+  const basePay = Object.values(assignments).reduce((sum, a) => {
     const rate = parseFloat(a.hourly_rate) || 0;
     const hours = parseFloat(a.estimated_hours) || 0;
     return sum + (rate * hours);
   }, 0);
+  // Add vehicle amount if personal vehicle is selected and a contractor is assigned
+  const vehiclePayAmount = (booking?.vehicle_type === 'personal' && vehicleContractorId && booking?.vehicle_amount)
+    ? booking.vehicle_amount
+    : 0;
+  const totalPay = basePay + vehiclePayAmount;
 
   return (
     <PageCard stretch>
       <div className="space-y-6">
         {/* Header */}
         <div className="border-b border-stone-200 pb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Select Contractors</h1>
-        <p className="text-gray-600">Quote #{booking.quote_number}</p>
-      </div>
+          <button
+            onClick={() => router.push(`/review-jobsheet?token=${token}`)}
+            className="text-sm text-gray-600 hover:text-gray-900 mb-2 transition-colors underline"
+          >
+            Back
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Select Contractors</h1>
+          <p className="text-gray-600">Quote #{booking.quote_number}</p>
+        </div>
 
       {/* Job Summary */}
       <div className="bg-stone-50 rounded-lg p-4">
@@ -262,11 +312,114 @@ function SelectContractorsContent() {
         </div>
       </div>
 
+      {/* Vehicle Assignment (only when using contractor's personal vehicle) */}
+      {booking.vehicle_type === 'personal' && booking.vehicle_amount && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <h3 className="font-semibold text-blue-900">Vehicle Payment</h3>
+          </div>
+          <p className="text-sm text-blue-800 mb-3">
+            <strong>${booking.vehicle_amount}</strong> vehicle allowance - select which contractor will use their personal vehicle:
+          </p>
+          <select
+            value={vehicleContractorId || ''}
+            onChange={(e) => setVehicleContractorId(e.target.value || null)}
+            className="w-full border border-blue-300 rounded-md px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Select contractor for vehicle...</option>
+            {Object.keys(assignments).map(contractorId => {
+              const contractor = contractors.find(c => c.id === contractorId);
+              return contractor ? (
+                <option key={contractorId} value={contractorId}>
+                  {contractor.name}
+                </option>
+              ) : null;
+            })}
+          </select>
+          {selectedCount > 0 && !vehicleContractorId && (
+            <p className="text-xs text-blue-600 mt-2">
+              Vehicle payment will be added to the selected contractor&apos;s pay
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Search and Filter */}
+      <div className="space-y-3">
+        {/* Search Input */}
+        <div className="relative">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search contractors by name, email, or skill..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Skill Filters */}
+        {allSkills.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {allSkills.map(skill => (
+              <button
+                key={skill}
+                onClick={() => toggleSkillFilter(skill)}
+                className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                  selectedSkills.includes(skill)
+                    ? 'bg-black text-white'
+                    : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                }`}
+              >
+                {skill}
+              </button>
+            ))}
+            {selectedSkills.length > 0 && (
+              <button
+                onClick={() => setSelectedSkills([])}
+                className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Contractors List */}
       <div>
-        <h3 className="font-semibold mb-3">Available Contractors</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold">Available Contractors</h3>
+          <span className="text-sm text-gray-500">
+            {filteredContractors.length} of {contractors.length}
+          </span>
+        </div>
         <div className="space-y-3">
-          {contractors.map(contractor => {
+          {filteredContractors.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No contractors match your search
+            </div>
+          ) : filteredContractors.map(contractor => {
             const isSelected = !!assignments[contractor.id];
             const assignment = assignments[contractor.id];
 
@@ -385,7 +538,13 @@ function SelectContractorsContent() {
           <div className="flex justify-between items-center">
             <div>
               <p className="font-semibold">{selectedCount} contractor{selectedCount !== 1 ? 's' : ''} selected</p>
-              <p className="text-sm text-gray-600">Total pay: ${totalPay.toFixed(2)}</p>
+              <p className="text-sm text-gray-600">
+                Contractor pay: ${basePay.toFixed(2)}
+                {vehiclePayAmount > 0 && (
+                  <span className="text-blue-600"> + ${vehiclePayAmount} vehicle</span>
+                )}
+              </p>
+              <p className="text-sm font-semibold text-gray-900">Total: ${totalPay.toFixed(2)}</p>
             </div>
           </div>
         </div>

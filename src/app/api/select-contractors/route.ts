@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { token, bookingId, assignments } = body;
+    const { token, bookingId, assignments, vehicleContractorId } = body;
 
     if (!token || !bookingId || !assignments || !Array.isArray(assignments)) {
       return NextResponse.json({ message: 'Invalid request' }, { status: 400 });
@@ -103,11 +103,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 403 });
     }
 
+    // Validate each assignment's hours and rates
+    for (const a of assignments) {
+      const rate = Number(a.hourly_rate);
+      const hours = Number(a.estimated_hours);
+
+      if (isNaN(rate) || rate < 20 || rate > 500) {
+        return NextResponse.json({ message: 'Hourly rate must be between $20 and $500' }, { status: 400 });
+      }
+      if (isNaN(hours) || hours < 0.5 || hours > 24) {
+        return NextResponse.json({ message: 'Estimated hours must be between 0.5 and 24' }, { status: 400 });
+      }
+    }
+
     // Delete existing assignments for this booking
     await supabase
       .from('booking_contractor_assignments')
       .delete()
       .eq('booking_id', bookingId);
+
+    // Determine vehicle amount for contractor who uses personal vehicle
+    const vehicleAmount = (booking.vehicle_type === 'personal' && vehicleContractorId && booking.vehicle_amount)
+      ? Number(booking.vehicle_amount)
+      : 0;
 
     // Insert new assignments
     const assignmentsToInsert = assignments.map((a: {
@@ -117,16 +135,21 @@ export async function POST(request: Request) {
       pay_amount: number;
       tasks_description?: string;
       equipment_assigned?: string[];
-    }) => ({
-      booking_id: bookingId,
-      contractor_id: a.contractor_id,
-      hourly_rate: a.hourly_rate,
-      estimated_hours: a.estimated_hours,
-      pay_amount: a.pay_amount, // Calculated: hourly_rate × estimated_hours
-      tasks_description: a.tasks_description || null,
-      equipment_assigned: a.equipment_assigned || null,
-      status: 'pending',
-    }));
+    }) => {
+      // Add vehicle amount to pay if this contractor is assigned the vehicle
+      const additionalVehiclePay = (a.contractor_id === vehicleContractorId) ? vehicleAmount : 0;
+
+      return {
+        booking_id: bookingId,
+        contractor_id: a.contractor_id,
+        hourly_rate: a.hourly_rate,
+        estimated_hours: a.estimated_hours,
+        pay_amount: a.pay_amount + additionalVehiclePay, // Base pay + vehicle allowance if applicable
+        tasks_description: a.tasks_description || null,
+        equipment_assigned: a.equipment_assigned || null,
+        status: 'pending',
+      };
+    });
 
     const { error: insertError } = await supabase
       .from('booking_contractor_assignments')
@@ -137,13 +160,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Failed to save assignments' }, { status: 500 });
     }
 
-    // Update booking status
+    // Update booking status and vehicle contractor assignment
+    const bookingUpdate: Record<string, string | null> = {
+      status: 'selecting_contractors',
+      contractors_selected_at: new Date().toISOString(),
+    };
+
+    // Save vehicle contractor ID if provided (only valid when vehicle_type is 'personal')
+    if (vehicleContractorId !== undefined) {
+      bookingUpdate.vehicle_contractor_id = vehicleContractorId || null;
+    }
+
     await supabase
       .from('bookings')
-      .update({
-        status: 'selecting_contractors',
-        contractors_selected_at: new Date().toISOString(),
-      })
+      .update(bookingUpdate)
       .eq('id', bookingId);
 
     return NextResponse.json({

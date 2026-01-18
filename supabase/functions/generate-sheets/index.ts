@@ -64,6 +64,10 @@ interface FullSystemFormData {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  // Timing fields for contractors
+  roomAvailableFrom?: string;
+  callTime?: string;
+  packOutTime?: string;
 }
 
 type FormData = BacklineFormData | FullSystemFormData;
@@ -168,6 +172,10 @@ interface JobsheetOptions {
   needsMic?: boolean;
   playbackFromDevice?: boolean;
   additionalInfo?: string;
+  // Timing fields for contractors
+  roomAvailableFrom?: string;
+  callTime?: string;
+  packOutTime?: string;
 }
 
 async function generateJobsheetSheet(
@@ -226,6 +234,10 @@ async function generateJobsheetSheet(
         powerAccess: options?.powerAccess || null,
         wetWeatherPlan: options?.wetWeatherPlan || null,
         needsGenerator: options?.needsGenerator || false,
+        // Timing fields for contractors (from client form)
+        loadInTime: options?.callTime || null,           // callTime maps to loadInTime (crew arrival)
+        roomAvailableFrom: options?.roomAvailableFrom || null,  // When venue opens for setup
+        packDownTime: options?.packOutTime || null,      // packOutTime maps to packDownTime (teardown complete)
         // Content requirements
         contentRequirements,
         additionalNotes: options?.additionalInfo || null,
@@ -353,6 +365,10 @@ serve(async (req) => {
       needsMic: fsData.needsMic || false,
       playbackFromDevice: fsData.playbackFromDevice || false,
       additionalInfo: fsData.additionalInfo || undefined,
+      // Timing fields for contractors
+      roomAvailableFrom: fsData.roomAvailableFrom || undefined,
+      callTime: fsData.callTime || undefined,
+      packOutTime: fsData.packOutTime || undefined,
     } : undefined;
 
     const jobsheetResult = await generateJobsheetSheet(

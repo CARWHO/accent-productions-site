@@ -48,6 +48,19 @@ interface BacklineFormData {
   contactPhone: string;
 }
 
+// Tech rider requirements parsed from uploaded document
+interface TechRiderRequirements {
+  specificGear: string[];
+  hasBackline: boolean;
+  inputChannels: number | null;
+  monitorMixes: number | null;
+  hasBand: boolean;
+  hasDJ: boolean;
+  stageLayout: string | null;
+  powerRequirements: string | null;
+  notes: string | null;
+}
+
 interface FullSystemFormData {
   type?: "fullsystem";
   package: string;
@@ -82,10 +95,17 @@ interface FullSystemFormData {
   powerAccess: string;
   hasStage: boolean;
   stageDetails: string;
+  // Timing fields for contractors
+  roomAvailableFrom?: string;
+  callTime?: string;
+  packOutTime?: string;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
   details: string;
+  // Tech rider data parsed from uploaded document
+  techRiderRequirements?: TechRiderRequirements | null;
+  techRiderOriginalName?: string | null;
 }
 
 type FormData = BacklineFormData | FullSystemFormData;
@@ -99,6 +119,7 @@ interface QuoteLineItems {
   cables: number;
   vehicle: number;
   techTime: { hours: number; rate: number; cost: number };
+  backline?: number; // Optional backline hire cost (drums, amps, keys, etc.)
 }
 
 interface QuoteOutput {
@@ -296,6 +317,21 @@ CONSOLE & STAGE BOX:
 
 ### Wireless Microphone
 - ADD wireless microphone system from inventory
+
+### Backline Hire (WHEN TECH RIDER REQUESTS INSTRUMENTS)
+When the tech rider or form mentions backline/instrument requests:
+- Look for drum kits in inventory (e.g., "Ludwig" → Drum Kits category)
+- Look for bass amps/cabs in inventory (e.g., "Ampeg SVT" → Bass Heads + Bass Cabinets)
+- Look for guitar amps in inventory (e.g., "Fender Deluxe", "Vox AC30" → Guitar Amps category)
+- Look for keyboards in inventory (e.g., "Nord", "Rhodes" → Keyboards category)
+- Include matching items from inventory in suggestedGear
+- Add backline costs to the appropriate line items
+
+Common backline mappings:
+- "Drum Kit" / "Ludwig" / "DW" → Find drum kits in Drum Kits category
+- "SVT" / "Ampeg" / "Bass Rig" → Find bass heads + bass cabinets
+- "Fender" / "Vox" / "Marshall" / "Guitar Amp" → Find items in Guitar Amps
+- "Keys" / "Keyboard" / "Nord" / "Piano" → Find items in Keyboards
 
 ## TECH TIME CALCULATION (IMPORTANT)
 Tech time = Event Duration + Setup Time + Load Time + Unload Time + Pack-out Time
@@ -540,6 +576,21 @@ ${formData.hasSpeeches ? "- Speeches/presentations" : ""}
 ${formData.needsWirelessMic ? "- Wireless microphones" : ""}
 ${formData.additionalInfo ? `- Additional: ${formData.additionalInfo}` : ""}
 ${formData.details ? `- Other details: ${formData.details}` : ""}
+${formData.techRiderRequirements ? `
+## TECH RIDER REQUIREMENTS (IMPORTANT - from uploaded document: ${formData.techRiderOriginalName || "tech rider"})
+${formData.techRiderRequirements.specificGear?.length ? `- Specific gear requests: ${formData.techRiderRequirements.specificGear.join(", ")}` : ""}
+${formData.techRiderRequirements.hasBackline ? "- BACKLINE REQUIRED - Include backline hire items from inventory" : ""}
+${formData.techRiderRequirements.inputChannels ? `- Input channels needed: ${formData.techRiderRequirements.inputChannels}` : ""}
+${formData.techRiderRequirements.monitorMixes ? `- Monitor mixes: ${formData.techRiderRequirements.monitorMixes}` : ""}
+${formData.techRiderRequirements.hasBand ? "- Has live band (from tech rider)" : ""}
+${formData.techRiderRequirements.hasDJ ? "- Has DJ (from tech rider)" : ""}
+${formData.techRiderRequirements.stageLayout ? `- Stage layout: ${formData.techRiderRequirements.stageLayout}` : ""}
+${formData.techRiderRequirements.powerRequirements ? `- Power requirements: ${formData.techRiderRequirements.powerRequirements}` : ""}
+${formData.techRiderRequirements.notes ? `- Additional notes: ${formData.techRiderRequirements.notes}` : ""}
+
+CRITICAL: The tech rider lists specific backline/gear requests. You MUST include these items in the quote if they exist in our inventory.
+Match requested items to our inventory (e.g., "Ludwig Drum Kit" → find drum kits, "Ampeg SVT" → find bass amps, "Fender Deluxe/Vox AC30" → find guitar amps).
+` : ""}
 
 Return a JSON object with this EXACT structure:
 {
@@ -552,7 +603,8 @@ Return a JSON object with this EXACT structure:
     "console": <number - mixing console + stage box cost>,
     "cables": <number - cables, DI boxes, accessories cost>,
     "vehicle": <number - delivery/pickup cost, usually 100-150>,
-    "techTime": { "hours": ${totalTechHours}, "rate": ${DEFAULT_TECH_RATE}, "cost": ${totalTechHours * DEFAULT_TECH_RATE} }
+    "techTime": { "hours": ${totalTechHours}, "rate": ${DEFAULT_TECH_RATE}, "cost": ${totalTechHours * DEFAULT_TECH_RATE} },
+    "backline": <number - 0 if no backline requested, otherwise sum of drum kit, amps, keyboards hire rates>
   },
   "executionNotes": [
     "<bullet point 1 - specific setup instruction>",
@@ -580,6 +632,7 @@ Return a JSON object with this EXACT structure:
 - Console: Hire rate for mixing console + stage box if needed
 - Cables: $150-300 depending on complexity
 - Vehicle: $100-150 depending on gear quantity
+- Backline: Sum hire rates for all requested backline items (drums, guitar amps, bass amps, keyboards) - set to 0 if no backline requested
 
 Return ONLY the JSON object, no other text.`;
 
@@ -608,6 +661,7 @@ Return ONLY the JSON object, no other text.`;
       rate: parsed.lineItems?.techTime?.rate ?? DEFAULT_TECH_RATE,
       cost: parsed.lineItems?.techTime?.cost ?? totalTechHours * DEFAULT_TECH_RATE,
     },
+    backline: parsed.lineItems?.backline ?? 0,
   };
 
   // Calculate subtotal from structured line items
@@ -618,7 +672,8 @@ Return ONLY the JSON object, no other text.`;
     lineItems.console +
     lineItems.cables +
     lineItems.vehicle +
-    lineItems.techTime.cost;
+    lineItems.techTime.cost +
+    (lineItems.backline || 0);
 
   const gst = Math.round(subtotal * 0.15 * 100) / 100;
 
@@ -705,12 +760,17 @@ serve(async (req) => {
       bookingData.event_time = formData.eventStartTime && formData.eventEndTime ? `${formData.eventStartTime} - ${formData.eventEndTime}` : null;
       bookingData.location = formData.location || null;
       bookingData.event_name = formData.eventName || null;
+      // Timing fields from client form
+      bookingData.room_available_from = formData.roomAvailableFrom || null;
+      bookingData.call_time = formData.callTime || null;
+      bookingData.pack_out_time = formData.packOutTime || null;
       const contentReqs: string[] = [];
       if (formData.playbackFromDevice) contentReqs.push("Playback");
       if (formData.hasDJ) contentReqs.push("DJ");
       if (formData.hasBand) contentReqs.push("Band");
       if (formData.hasSpeeches) contentReqs.push("Speeches");
-      bookingData.details_json = { type: "fullsystem", package: formData.package, eventType: formData.eventType, contentRequirements: contentReqs, lineItems: quote.lineItems, executionNotes: quote.executionNotes, suggestedGear: quote.suggestedGear, unavailableGear: quote.unavailableGear };
+      const fullQuote = quote as QuoteOutput;
+      bookingData.details_json = { type: "fullsystem", package: formData.package, eventType: formData.eventType, contentRequirements: contentReqs, lineItems: fullQuote.lineItems, executionNotes: fullQuote.executionNotes, suggestedGear: fullQuote.suggestedGear, unavailableGear: fullQuote.unavailableGear };
     }
 
     await supabase.from("bookings").insert(bookingData);

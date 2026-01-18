@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import PageCard from '@/components/ui/PageCard';
+import { SuccessIcon, ErrorIcon, InfoIcon } from '@/components/ui/StatusIcons';
 
 function AcceptJobContent() {
   const searchParams = useSearchParams();
@@ -14,11 +15,7 @@ function AcceptJobContent() {
   if (success) {
     return (
       <div className="flex flex-col items-center text-center">
-        <div className="w-20 h-20 bg-green-100 rounded-md flex items-center justify-center mb-6">
-          <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
+        <div className="mb-6"><SuccessIcon /></div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">You&apos;re Booked!</h2>
         <p className="text-gray-700 text-lg font-medium">
           You&apos;ve been assigned to <strong>{eventName || 'this event'}</strong>.
@@ -33,11 +30,7 @@ function AcceptJobContent() {
   if (status === 'already_yours') {
     return (
       <div className="flex flex-col items-center text-center">
-        <div className="w-20 h-20 bg-amber-100 rounded-md flex items-center justify-center mb-6">
-          <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
+        <div className="mb-6"><InfoIcon /></div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Already Yours!</h2>
         <p className="text-gray-700 text-lg font-medium">
           You&apos;ve already accepted this job.
@@ -56,15 +49,7 @@ function AcceptJobContent() {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <div className="w-20 h-20 bg-amber-100 rounded-md flex items-center justify-center mb-6">
-        <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          {error === 'already_taken' ? (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          ) : (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          )}
-        </svg>
-      </div>
+      <div className="mb-6">{error === 'already_taken' ? <InfoIcon /> : <ErrorIcon />}</div>
       <h2 className="text-3xl font-bold text-gray-900 mb-2">
         {error === 'already_taken' ? 'Job Taken' : 'Error'}
       </h2>

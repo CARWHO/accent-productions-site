@@ -35,8 +35,8 @@ const services = [
     id: 'festivals',
     title: 'Festivals',
     description: 'Large-scale sound systems for outdoor events. Line arrays, stage monitors, and full front-of-house setups.',
-    image: '/images/image2-festival-bontanic-gardens.jpg',
-    location: 'Botanic Gardens, Wellington',
+    image: '/images/image1-festival-slavfest.jpeg',
+    location: 'Slavfest, Wellington',
     includes: [
       'Line array speaker systems',
       'Stage monitors',
@@ -48,8 +48,8 @@ const services = [
     id: 'parties',
     title: 'Private Events',
     description: 'Sound equipment for birthdays, anniversaries, and celebrations. We deliver, set up, and pick up.',
-    image: '/images/image2-corporate.jpg',
-    location: 'CBD, Wellington',
+    image: '/images/image2-private-newtown.jpeg',
+    location: 'Newtown, Wellington',
     includes: [
       'Speaker and subwoofer packages',
       'DJ equipment',

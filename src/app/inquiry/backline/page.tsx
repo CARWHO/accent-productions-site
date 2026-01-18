@@ -13,16 +13,22 @@ interface CategoryInfo {
 }
 
 const categoryConfig: Record<string, { slug: string; image: string }> = {
-  'Drum Kits': { slug: 'drum-kits', image: '/images/categories/drum-kits.jpg' },
-  'Cymbals': { slug: 'cymbals', image: '/images/categories/cymbals.jpg' },
-  'Percussion': { slug: 'percussion', image: '/images/categories/percussion.jpg' },
-  'Guitar Amps': { slug: 'guitar-amps', image: '/images/categories/guitar-amps.jpg' },
-  'Bass Heads': { slug: 'bass-heads', image: '/images/categories/bass-heads.jpg' },
-  'Bass Cabinets': { slug: 'bass-cabinets', image: '/images/categories/bass-cabinets.jpg' },
-  'Keyboards': { slug: 'keyboards', image: '/images/categories/keyboards.jpg' },
-  'Guitars': { slug: 'guitars', image: '/images/categories/guitars.jpg' },
-  'Bass Guitars': { slug: 'bass-guitars', image: '/images/categories/bass-guitars.jpg' },
-  'Accessories': { slug: 'accessories', image: '/images/categories/accessories.jpg' },
+  'Drum Kits': { slug: 'drum-kits', image: '/images/drumkits.png' },
+  'Cymbals': { slug: 'cymbals', image: '/images/cymbals.png' },
+  'Percussion': { slug: 'percussion', image: '/images/percussion.png' },
+  'Guitar Amps': { slug: 'guitar-amps', image: '/images/guitar-amps.png' },
+  'Bass Heads': { slug: 'bass-heads', image: '/images/base-heads.png' },
+  'Bass Cabinets': { slug: 'bass-cabinets', image: '/images/bass-cabinets.png' },
+  'Keyboards': { slug: 'keyboards', image: '/images/keyboard.png' },
+  'Guitars': { slug: 'guitars', image: '/images/guitars.png' },
+};
+
+// Categories to hide from the listing
+const hiddenCategories = new Set(['Accessories']);
+
+// Categories to merge into "Guitars"
+const mergedCategories: Record<string, string[]> = {
+  'Guitars': ['Guitars', 'Bass Guitars'],
 };
 
 const categoryOrder = [
@@ -34,8 +40,6 @@ const categoryOrder = [
   'Bass Cabinets',
   'Keyboards',
   'Guitars',
-  'Bass Guitars',
-  'Accessories',
 ];
 
 export default function BacklinePage() {
@@ -50,12 +54,43 @@ export default function BacklinePage() {
         const response = await fetch('/api/hire-items');
         const data = await response.json();
         if (data.success) {
-          const cats: CategoryInfo[] = Object.entries(data.items).map(([name, items]) => ({
-            name,
-            slug: categoryConfig[name]?.slug || name.toLowerCase().replace(/\s+/g, '-'),
-            count: (items as unknown[]).length,
-            image: categoryConfig[name]?.image || 'https://placehold.co/400x300/1a1a1a/ffffff?text=Equipment',
-          }));
+          const itemsByCategory = data.items as Record<string, unknown[]>;
+
+          // Track which categories have been merged
+          const mergedInto = new Set<string>();
+          Object.values(mergedCategories).forEach(sources => {
+            sources.forEach(source => mergedInto.add(source));
+          });
+
+          const cats: CategoryInfo[] = [];
+
+          // First, add merged categories
+          Object.entries(mergedCategories).forEach(([targetName, sourceNames]) => {
+            const totalCount = sourceNames.reduce((sum, sourceName) => {
+              return sum + (itemsByCategory[sourceName]?.length || 0);
+            }, 0);
+
+            if (totalCount > 0) {
+              cats.push({
+                name: targetName,
+                slug: categoryConfig[targetName]?.slug || targetName.toLowerCase().replace(/\s+/g, '-'),
+                count: totalCount,
+                image: categoryConfig[targetName]?.image || 'https://placehold.co/400x300/1a1a1a/ffffff?text=Equipment',
+              });
+            }
+          });
+
+          // Then add non-merged categories (excluding hidden ones)
+          Object.entries(itemsByCategory).forEach(([name, items]) => {
+            if (!mergedInto.has(name) && !hiddenCategories.has(name)) {
+              cats.push({
+                name,
+                slug: categoryConfig[name]?.slug || name.toLowerCase().replace(/\s+/g, '-'),
+                count: (items as unknown[]).length,
+                image: categoryConfig[name]?.image || 'https://placehold.co/400x300/1a1a1a/ffffff?text=Equipment',
+              });
+            }
+          });
 
           // Sort by predefined order
           cats.sort((a, b) => {

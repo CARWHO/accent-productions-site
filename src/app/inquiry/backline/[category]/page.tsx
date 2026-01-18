@@ -13,6 +13,7 @@ interface HireItem {
   notes: string | null;
   hire_rate_per_day: number | null;
   stock_quantity: number;
+  image_url: string | null;
 }
 
 const slugToCategory: Record<string, string> = {
@@ -26,6 +27,11 @@ const slugToCategory: Record<string, string> = {
   'guitars': 'Guitars',
   'bass-guitars': 'Bass Guitars',
   'accessories': 'Accessories',
+};
+
+// Categories that should fetch multiple database categories
+const mergedCategories: Record<string, string[]> = {
+  'Guitars': ['Guitars', 'Bass Guitars'],
 };
 
 export default function CategoryPage() {
@@ -42,11 +48,29 @@ export default function CategoryPage() {
   useEffect(() => {
     async function fetchItems() {
       try {
-        const response = await fetch(`/api/hire-items?category=${encodeURIComponent(categoryName)}`);
-        const data = await response.json();
-        if (data.success) {
-          setItems(data.allItems || []);
-          setFilteredItems(data.allItems || []);
+        // Check if this category should fetch multiple database categories
+        const categoriesToFetch = mergedCategories[categoryName] || [categoryName];
+
+        // Fetch all categories in parallel
+        const responses = await Promise.all(
+          categoriesToFetch.map(cat =>
+            fetch(`/api/hire-items?category=${encodeURIComponent(cat)}`)
+          )
+        );
+
+        const allItems: HireItem[] = [];
+        for (const response of responses) {
+          const data = await response.json();
+          if (data.success && data.allItems) {
+            allItems.push(...data.allItems);
+          }
+        }
+
+        if (allItems.length > 0 || categoriesToFetch.length > 0) {
+          // Sort by name
+          allItems.sort((a, b) => a.name.localeCompare(b.name));
+          setItems(allItems);
+          setFilteredItems(allItems);
         } else {
           setError(true);
         }
@@ -131,6 +155,7 @@ export default function CategoryPage() {
                 notes={item.notes}
                 hireRate={item.hire_rate_per_day}
                 stockQuantity={item.stock_quantity}
+                imageUrl={item.image_url}
               />
             ))}
           </div>

@@ -129,7 +129,7 @@ export async function POST(request: Request) {
         });
       };
 
-      const selectContractorsUrl = `${baseUrl}/select-contractors?token=${contractorSelectionToken}`;
+      const reviewJobSheetUrl = `${baseUrl}/review-jobsheet?token=${contractorSelectionToken}`;
 
       // Get quote Drive link for both emails
       let quoteDriveLink: string | null = null;
@@ -142,30 +142,43 @@ export async function POST(request: Request) {
         to: [businessEmail],
         subject: `Client Approved: ${booking.event_name || 'Event'} - Quote #${booking.quote_number}`,
         html: `
-          <h1 style="color: #16a34a;">Client Approved!</h1>
-          <p>Great news! The client has approved the quote.</p>
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px;">
+            <div style="margin-bottom: 24px;">
+              <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 80px; width: auto;" />
+            </div>
 
-          <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
-            <h2 style="margin-top: 0; color: #155724;">${booking.event_name || 'Event'}</h2>
-            <p><strong>Quote:</strong> #${booking.quote_number}</p>
-            <p><strong>Date:</strong> ${formatDate(booking.event_date)}</p>
-            <p><strong>Client:</strong> ${booking.client_name}</p>
-            ${approval.adjusted_quote_total ? `<p><strong>Amount:</strong> $${approval.adjusted_quote_total}</p>` : ''}
+            <h1 style="color: #16a34a; margin: 0 0 20px 0;">Client Approved!</h1>
+            <p style="margin: 0 0 20px 0;">Great news! The client has approved the quote.</p>
+
+            <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin: 20px 0;">
+              <div style="font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Quote #${booking.quote_number}</div>
+              <div style="font-size: 24px; font-weight: bold; color: #15803d; margin-bottom: 15px;">${booking.event_name || 'Event'}</div>
+              <div style="border-top: 1px solid #bbf7d0; padding-top: 15px;">
+                <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${formatDate(booking.event_date)}</p>
+                <p style="margin: 0 0 8px 0;"><strong>Client:</strong> ${booking.client_name}</p>
+                ${approval.adjusted_quote_total ? `<p style="margin: 0;"><strong>Amount:</strong> $${approval.adjusted_quote_total}</p>` : ''}
+              </div>
+            </div>
+
+            <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Next step:</strong> Review the job sheet, add call times and notes, then select contractors.</p>
+            </div>
+
+            <div style="margin: 30px 0;">
+              <a href="${reviewJobSheetUrl}"
+                 style="display: inline-block; background: #16a34a; color: #fff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                Review Job Sheet
+              </a>
+            </div>
+
+            <p style="color: #666; font-size: 14px;">
+              A calendar event has been created and is awaiting contractor assignment.
+            </p>
+            ${quoteDriveLink ? `<p style="font-size: 12px; color: #94a3b8;"><a href="${quoteDriveLink}" style="color: #2563eb;">View Quote PDF</a></p>` : ''}
+
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
+            <p style="color: #999; font-size: 12px;">Accent Productions | Professional Sound & Lighting</p>
           </div>
-
-          <p>Next step: Select which contractors to assign to this job and set their pay rates.</p>
-
-          <p style="margin: 30px 0;">
-            <a href="${selectContractorsUrl}"
-               style="display: inline-block; background: #000; color: #fff; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-              Select Contractors
-            </a>
-          </p>
-
-          <p style="color: #666; font-size: 14px;">
-            A calendar event has been created and is awaiting contractor assignment.
-          </p>
-          ${quoteDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${quoteDriveLink}" style="color: #94a3b8;">Quote PDF</a></p>` : ''}
         `,
       });
 
@@ -176,34 +189,34 @@ export async function POST(request: Request) {
         to: [booking.client_email],
         subject: `Booking Confirmed - ${booking.event_name || 'Your Event'}`,
         html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; text-align: left;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px;">
             <div style="margin-bottom: 24px;">
-              <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 100px; width: auto;" />
+              <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 80px; width: auto;" />
             </div>
 
-            <h1 style="color: #16a34a; margin-bottom: 10px; text-align: left;">Booking Confirmed!</h1>
+            <h1 style="color: #16a34a; margin: 0 0 20px 0;">Booking Confirmed!</h1>
 
-            <p style="text-align: left;">Hi ${booking.client_name.split(' ')[0]},</p>
-            <p style="text-align: left;">Thanks for confirming your booking with us! We're excited to work with you.</p>
+            <p>Hi ${booking.client_name.split(' ')[0]},</p>
+            <p>Thanks for confirming your booking with us! We're excited to work with you.</p>
 
-            <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin: 25px 0; text-align: left;">
+            <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin: 20px 0;">
               <div style="font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Your Event</div>
               <div style="font-size: 24px; font-weight: bold; color: #15803d; margin-bottom: 15px;">${booking.event_name || 'Your Event'}</div>
               <div style="border-top: 1px solid #bbf7d0; padding-top: 15px;">
-                <div style="margin-bottom: 5px;"><strong>Date:</strong> ${formatDate(booking.event_date)}</div>
-                <div style="margin-bottom: 5px;"><strong>Location:</strong> ${booking.location || 'TBC'}</div>
-                <div><strong>Quote:</strong> #${booking.quote_number}</div>
+                <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${formatDate(booking.event_date)}</p>
+                <p style="margin: 0 0 8px 0;"><strong>Location:</strong> ${booking.location || 'TBC'}</p>
+                <p style="margin: 0;"><strong>Quote:</strong> #${booking.quote_number}</p>
               </div>
             </div>
 
-            <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: left;">
+            <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;">
               <p style="margin: 0; color: #92400e; font-size: 14px;">
                 <strong>Important:</strong> We won't assign contractors to your event until we receive the deposit payment. Please ensure payment is made to secure your booking.
               </p>
             </div>
 
-            <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: left;">
-              <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #374151;">What happens next?</h3>
+            <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">What happens next?</p>
               <ul style="margin: 0; padding-left: 20px; color: #4b5563;">
                 <li style="margin-bottom: 8px;">Once we receive your deposit, we'll assign our crew to your event</li>
                 <li style="margin-bottom: 8px;">You'll receive a job sheet with all the details closer to the date</li>
@@ -211,15 +224,15 @@ export async function POST(request: Request) {
               </ul>
             </div>
 
-            <p style="color: #666; font-size: 14px; text-align: left; margin-top: 30px;">
+            <p style="color: #666; font-size: 14px; margin-top: 30px;">
               Questions? Reply to this email or call us on 027 602 3869.
             </p>
 
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
-            <p style="color: #999; font-size: 12px; text-align: left;">
+            <p style="color: #999; font-size: 12px;">
               Accent Productions | Professional Sound & Lighting
             </p>
-            ${quoteDriveLink ? `<p style="font-size: 11px; color: #94a3b8;"><a href="${quoteDriveLink}" style="color: #94a3b8;">Quote PDF</a></p>` : ''}
+            ${quoteDriveLink ? `<p style="font-size: 12px;"><a href="${quoteDriveLink}" style="color: #2563eb;">View Quote PDF</a></p>` : ''}
           </div>
         `,
       });

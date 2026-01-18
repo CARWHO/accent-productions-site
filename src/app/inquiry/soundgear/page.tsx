@@ -4,6 +4,7 @@ import React, { useState, Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import PageCard from '@/components/ui/PageCard';
+import { SuccessIcon } from '@/components/ui/StatusIcons';
 import type { TechRiderRequirements } from '@/lib/parse-tech-rider';
 
 type PackageType = 'small' | 'medium' | 'large' | 'extra_large';
@@ -53,6 +54,11 @@ interface PackageFormData {
   // Stage
   hasStage?: boolean;
   stageDetails?: string;
+
+  // Timing (for contractors)
+  roomAvailableFrom?: string;
+  callTime?: string;
+  packOutTime?: string;
 
   // Contact
   contactName?: string;
@@ -200,7 +206,7 @@ function TimeInput({
       {isOpen && filteredSuggestions.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+          className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
         >
           {filteredSuggestions.map((time) => (
             <div
@@ -478,11 +484,7 @@ function InquiryForm() {
     return (
       <PageCard centered>
         <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-md flex items-center justify-center mb-6">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
+          <div className="mb-6"><SuccessIcon /></div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Thank you</h2>
           <p className="text-gray-700 text-lg font-medium">We&apos;ll be in touch within 24 hours.</p>
         </div>
@@ -504,7 +506,7 @@ function InquiryForm() {
         <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
           <div className="animate-spin w-12 h-12 border-4 border-black border-t-transparent rounded-full mb-4" />
           <p className="text-lg font-medium">Loading your Tech Rider...</p>
-          <p className="text-sm text-gray-500 mt-2">This can take 30-40 seconds</p>
+          <p className="text-sm text-gray-500 mt-2">This can take 10-20 seconds</p>
         </div>
       )}
 
@@ -731,7 +733,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(1)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
+            <button onClick={() => goToStep(1)} disabled={isSubmitting} className="px-5 py-3 text-gray-700 font-bold border border-transparent disabled:opacity-50">Back</button>
             <button
               onClick={() => {
                 if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
@@ -762,17 +764,14 @@ function InquiryForm() {
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Venue & Logistics</h2>
             <div className="grid gap-3 lg:gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Venue Location *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Venue Location</label>
               <input
                 type="text"
                 placeholder="Full venue address"
                 value={formData.location || ''}
                 onChange={(e) => updateField('location', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.location ? 'border-red-500' : ''}`}
+                className={inputStyles}
               />
-              {showValidation && !formData.location && (
-                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-              )}
             </div>
 
             <div>
@@ -881,6 +880,46 @@ function InquiryForm() {
                 </div>
               )}
             </div>
+
+            {/* Timing Section */}
+            <div className="border-t border-gray-200 pt-4 mt-2">
+              <h3 className="text-base font-semibold text-gray-900 mb-3">Setup Timing (Optional)</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Help us plan crew schedules. You can fill these in now or we&apos;ll confirm later.
+              </p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Room Available From</label>
+                  <TimeInput
+                    value={formData.roomAvailableFrom || ''}
+                    onChange={(val) => updateField('roomAvailableFrom', val)}
+                    placeholder="e.g., 2:00 PM"
+                    inputStyles={inputStyles}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">When venue opens</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Crew Call Time</label>
+                  <TimeInput
+                    value={formData.callTime || ''}
+                    onChange={(val) => updateField('callTime', val)}
+                    placeholder="e.g., 3:00 PM"
+                    inputStyles={inputStyles}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">When crew arrives</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Pack-out By</label>
+                  <TimeInput
+                    value={formData.packOutTime || ''}
+                    onChange={(val) => updateField('packOutTime', val)}
+                    placeholder="e.g., 12:00 AM"
+                    inputStyles={inputStyles}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">When tear-down finishes</p>
+                </div>
+              </div>
+            </div>
           </div>
           </div>
 
@@ -889,7 +928,7 @@ function InquiryForm() {
             <button
               onClick={() => {
                 const isOutdoor = formData.indoorOutdoor === 'Outdoor';
-                if (!formData.location || !formData.indoorOutdoor || (isOutdoor && !formData.powerAccess)) {
+                if (!formData.indoorOutdoor || (isOutdoor && !formData.powerAccess)) {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
@@ -1099,30 +1138,22 @@ function InquiryForm() {
 
             <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time</label>
                 <TimeInput
                   value={formData.eventStartTime || ''}
                   onChange={(val) => updateField('eventStartTime', val)}
                   placeholder="e.g., 6:00 PM"
-                  hasError={showValidation && !formData.eventStartTime}
                   inputStyles={inputStyles}
                 />
-                {showValidation && !formData.eventStartTime && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time</label>
                 <TimeInput
                   value={formData.eventEndTime || ''}
                   onChange={(val) => updateField('eventEndTime', val)}
                   placeholder="e.g., 11:00 PM"
-                  hasError={showValidation && !formData.eventEndTime}
                   inputStyles={inputStyles}
                 />
-                {showValidation && !formData.eventEndTime && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
               </div>
             </div>
 
@@ -1201,10 +1232,10 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(3)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
+            <button onClick={() => goToStep(3)} disabled={isSubmitting} className="px-5 py-3 text-gray-700 font-bold border border-transparent disabled:opacity-50">Back</button>
             <button
               onClick={() => {
-                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
+                if (!formData.eventType || !formData.eventName || !formData.eventDate) {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
@@ -1303,30 +1334,22 @@ function InquiryForm() {
             {/* Event Times */}
             <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event Start Time</label>
                 <TimeInput
                   value={formData.eventStartTime || ''}
                   onChange={(val) => updateField('eventStartTime', val)}
                   placeholder="e.g., 6:00 PM"
-                  hasError={showValidation && !formData.eventStartTime}
                   inputStyles={inputStyles}
                 />
-                {showValidation && !formData.eventStartTime && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Event End Time</label>
                 <TimeInput
                   value={formData.eventEndTime || ''}
                   onChange={(val) => updateField('eventEndTime', val)}
                   placeholder="e.g., 11:00 PM"
-                  hasError={showValidation && !formData.eventEndTime}
                   inputStyles={inputStyles}
                 />
-                {showValidation && !formData.eventEndTime && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
               </div>
             </div>
           </div>
@@ -1336,7 +1359,7 @@ function InquiryForm() {
             <button onClick={() => goToStep(4)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
-                if (!formData.eventType || !formData.eventName || !formData.eventDate || !formData.eventStartTime || !formData.eventEndTime) {
+                if (!formData.eventType || !formData.eventName || !formData.eventDate) {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
@@ -1432,7 +1455,7 @@ function InquiryForm() {
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
-            <button onClick={() => goToStep(5)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
+            <button onClick={() => goToStep(5)} disabled={isSubmitting} className="px-5 py-3 text-gray-700 font-bold border border-transparent disabled:opacity-50">Back</button>
             <button
               onClick={() => handleSubmit()}
               disabled={isSubmitting}

@@ -2,66 +2,12 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { updateCalendarEvent } from '@/lib/google-calendar';
-import { shareFileWithLink, uploadJobSheetToDrive, FolderType } from '@/lib/google-drive';
-import { generateJobSheetPDF, JobSheetInput } from '@/lib/pdf-job-sheet';
+import { shareFileWithLink } from '@/lib/google-drive';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const businessEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
 
-function getJobSheetFolderType(bookingType: string | null): FolderType {
-  if (bookingType === 'backline') return 'backline';
-  if (bookingType === 'soundgear' || bookingType === 'full_system') return 'fullsystem';
-  return 'soundtech'; // default for contractor bookings
-}
-
-// Build Google Calendar "Add to Calendar" link
-function buildAddToCalendarUrl(params: {
-  title: string;
-  date: string;
-  time?: string | null;
-  location?: string | null;
-  description?: string;
-  durationHours?: number;
-}): string {
-  const { title, date, time, location, description, durationHours = 4 } = params;
-
-  // Parse date and time
-  const eventDate = new Date(date);
-  let startHour = 9; // Default 9am
-  let startMinute = 0;
-
-  if (time) {
-    // Parse time like "6pm", "6:30pm", "18:00"
-    const timeMatch = time.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-    if (timeMatch) {
-      startHour = parseInt(timeMatch[1], 10);
-      startMinute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-      if (timeMatch[3]?.toLowerCase() === 'pm' && startHour !== 12) startHour += 12;
-      if (timeMatch[3]?.toLowerCase() === 'am' && startHour === 12) startHour = 0;
-    }
-  }
-
-  eventDate.setHours(startHour, startMinute, 0, 0);
-  const endDate = new Date(eventDate.getTime() + durationHours * 60 * 60 * 1000);
-
-  // Format dates as YYYYMMDDTHHMMSSZ (UTC)
-  const formatGoogleDate = (d: Date) => {
-    return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  };
-
-  const dates = `${formatGoogleDate(eventDate)}/${formatGoogleDate(endDate)}`;
-
-  const queryParams = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: title,
-    dates: dates,
-    ...(location && { location }),
-    ...(description && { details: description }),
-  });
-
-  return `https://calendar.google.com/calendar/render?${queryParams.toString()}`;
-}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -69,12 +15,12 @@ export async function GET(request: Request) {
   const action = searchParams.get('action');
 
   if (!token || !action || !['accept', 'decline'].includes(action)) {
-    return NextResponse.redirect(`${baseUrl}/contractor-response?error=invalid_params`);
+    return NextResponse.redirect(`${baseUrl}/result?type=error&error=invalid_params`);
   }
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
-    return NextResponse.redirect(`${baseUrl}/contractor-response?error=server_error`);
+    return NextResponse.redirect(`${baseUrl}/result?type=error&error=server_error`);
   }
 
   try {
@@ -86,12 +32,12 @@ export async function GET(request: Request) {
       .single();
 
     if (fetchError || !assignment) {
-      return NextResponse.redirect(`${baseUrl}/contractor-response?error=invalid_token`);
+      return NextResponse.redirect(`${baseUrl}/result?type=error&error=invalid_token`);
     }
 
     // Check if already responded
     if (assignment.status === 'accepted' || assignment.status === 'declined') {
-      return NextResponse.redirect(`${baseUrl}/contractor-response?error=already_responded&status=${assignment.status}`);
+      return NextResponse.redirect(`${baseUrl}/result?type=already_done&message=${encodeURIComponent('You have already responded to this job offer.')}`);
     }
 
     const contractor = assignment.contractors;
@@ -110,7 +56,7 @@ export async function GET(request: Request) {
 
     if (updateError) {
       console.error('Error updating assignment:', updateError);
-      return NextResponse.redirect(`${baseUrl}/contractor-response?error=update_failed`);
+      return NextResponse.redirect(`${baseUrl}/result?type=error&error=update_failed`);
     }
 
     const formatDate = (dateStr: string) => {
@@ -207,91 +153,19 @@ export async function GET(request: Request) {
           ? `$${hourlyRate}/hr × ${hours} hrs = $${totalPay.toFixed(0)}`
           : `$${totalPay.toFixed(0)}`;
 
-        // Fetch original form data from inquiry for consistent job sheet
-        let originalFormData: Record<string, unknown> | null = null;
-        if (booking.inquiry_id) {
-          const { data: inquiry } = await supabase
-            .from('inquiries')
-            .select('form_data_json')
-            .eq('id', booking.inquiry_id)
-            .single();
-          originalFormData = inquiry?.form_data_json as Record<string, unknown> | null;
-        }
-
-        // Use original form data from inquiry, fallback to booking.details_json
-        const details = originalFormData || (booking.details_json as Record<string, unknown> | null);
-        let equipmentWithNotes: Array<{ name: string; quantity: number; notes?: string | null }> = [];
-
-        // Fetch equipment notes from equipment table
-        if (details?.equipment && Array.isArray(details.equipment)) {
-          const equipmentNames = (details.equipment as Array<{ name: string }>).map(e => e.name);
-          const { data: equipmentItems } = await supabase
-            .from('equipment')
-            .select('name, notes')
-            .in('name', equipmentNames);
-
-          equipmentWithNotes = (details.equipment as Array<{ name: string; quantity: number }>).map(item => ({
-            name: item.name,
-            quantity: item.quantity,
-            notes: equipmentItems?.find(e => e.name === item.name)?.notes || null,
-          }));
-        }
-
-        // Build content requirements
-        const contentRequirements: string[] = [];
-        if (details?.contentRequirements && Array.isArray(details.contentRequirements)) {
-          contentRequirements.push(...(details.contentRequirements as string[]));
-        }
-        const venue = details?.venue as Record<string, unknown> | undefined;
-
-        const jobSheetInput: JobSheetInput = {
-          eventName: booking.event_name || 'Event',
-          eventDate: booking.event_date,
-          eventTime: booking.event_time,
-          location: booking.location || 'TBC',
-          quoteNumber: booking.quote_number || '',
-          contractorName: contractor.name,
-          hourlyRate: hourlyRate || null,
-          estimatedHours: hours || null,
-          payAmount: totalPay,
-          tasksDescription: assignment.tasks_description || null,
-          equipment: equipmentWithNotes,
-          eventType: (details?.eventType as string) || null,
-          attendance: (details?.attendance as string) || null,
-          setupTime: (details?.setupTime as string) || null,
-          indoorOutdoor: (venue?.indoorOutdoor as string) || null,
-          contentRequirements,
-          additionalNotes: (details?.additionalNotes as string) || (details?.additionalInfo as string) || null,
-          clientName: booking.client_name,
-          clientPhone: booking.client_phone || '',
-          clientEmail: booking.client_email,
-        };
-
+        // Reuse the jobsheet PDF that was generated when notifying contractor
+        // (stored in assignment.jobsheet_drive_file_id)
         let jobSheetDriveLink: string | null = null;
-        const jobSheetFilename = `JobSheet-CONFIRMED-${booking.quote_number || 'Job'}-${contractor.name.split(' ')[0]}.pdf`;
-        try {
-          const jobSheetBuffer = await generateJobSheetPDF(jobSheetInput);
-          // Upload confirmed job sheet to Google Drive and get shareable link
-          if (jobSheetBuffer) {
-            const folderType = getJobSheetFolderType(booking.booking_type);
-            const fileId = await uploadJobSheetToDrive(jobSheetBuffer, jobSheetFilename, folderType);
-            if (fileId) {
-              jobSheetDriveLink = await shareFileWithLink(fileId);
-            }
+        if (assignment.jobsheet_drive_file_id) {
+          try {
+            jobSheetDriveLink = await shareFileWithLink(assignment.jobsheet_drive_file_id);
+          } catch (shareError) {
+            console.error('Error sharing Job Sheet PDF:', shareError);
           }
-        } catch (pdfError) {
-          console.error('Error generating Job Sheet PDF:', pdfError);
         }
 
-        // Build calendar link
-        const calendarUrl = buildAddToCalendarUrl({
-          title: `WORK: ${booking.event_name || 'Event'} - Accent Productions`,
-          date: booking.event_date,
-          time: booking.event_time,
-          location: booking.location,
-          description: `${assignment.tasks_description || 'General support'}\n\nPay: ${payBreakdown}\n\nClient: ${booking.client_name}\nPhone: ${booking.client_phone}`,
-          durationHours: hours || 4,
-        });
+        // Build .ics calendar link
+        const icsUrl = `${baseUrl}/api/generate-ics?booking_id=${booking.id}`;
 
         await resend.emails.send({
           from: 'Accent Productions <notifications@accent-productions.co.nz>',
@@ -320,10 +194,9 @@ export async function GET(request: Request) {
 
               <!-- Add to Calendar Button -->
               <div style="margin: 25px 0;">
-                <a href="${calendarUrl}"
-                   target="_blank"
-                   style="display: inline-block; background: #4285f4; color: #fff; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                  Add to Google Calendar
+                <a href="${icsUrl}"
+                   style="display: inline-block; background: #6b7280; color: #fff; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                  Add to Calendar
                 </a>
               </div>
 
@@ -340,7 +213,7 @@ export async function GET(request: Request) {
         });
       }
 
-      return NextResponse.redirect(`${baseUrl}/contractor-response?success=true&action=accepted&event=${encodeURIComponent(booking.event_name || 'Event')}&pay=${assignment.pay_amount}`);
+      return NextResponse.redirect(`${baseUrl}/result?type=contractor_booked&event=${encodeURIComponent(booking.event_name || 'Event')}&amount=${assignment.pay_amount}`);
     } else {
       // Declined - notify dad
       if (resend) {
@@ -370,10 +243,10 @@ export async function GET(request: Request) {
         });
       }
 
-      return NextResponse.redirect(`${baseUrl}/contractor-response?success=true&action=declined`);
+      return NextResponse.redirect(`${baseUrl}/result?type=contractor_declined`);
     }
   } catch (error) {
     console.error('Error processing contractor response:', error);
-    return NextResponse.redirect(`${baseUrl}/contractor-response?error=server_error`);
+    return NextResponse.redirect(`${baseUrl}/result?type=error&error=server_error`);
   }
 }

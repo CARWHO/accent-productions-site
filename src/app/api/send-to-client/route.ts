@@ -1,230 +1,30 @@
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
-import { getSupabaseAdmin } from '@/lib/supabase';
-import { randomUUID } from 'crypto';
-import { readQuoteSheetData } from '@/lib/google-sheets';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
+// Thin proxy to edge function
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(request: Request) {
   try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ success: false, message: 'Not configured' }, { status: 500 });
+    }
+
     const body = await request.json();
-    const { bookingId, adjustedAmount, notes, depositPercent } = body;
 
-    if (!bookingId) {
-      return NextResponse.json({ success: false, message: 'Missing booking ID' }, { status: 400 });
-    }
-
-    const supabase = getSupabaseAdmin();
-    if (!supabase) {
-      return NextResponse.json({ success: false, message: 'Database not configured' }, { status: 500 });
-    }
-
-    // Fetch booking with related inquiry (for original quote data)
-    const { data: booking, error: fetchError } = await supabase
-      .from('bookings')
-      .select('*, inquiries(quote_data)')
-      .eq('id', bookingId)
-      .single();
-
-    if (fetchError || !booking) {
-      return NextResponse.json({ success: false, message: 'Booking not found' }, { status: 404 });
-    }
-
-    // Generate invoice number (INV-YYYY-XXXX format)
-    const year = new Date().getFullYear();
-    const invoiceNumber = `INV-${year}-${booking.quote_number?.split('-')[1] || randomUUID().slice(0, 4).toUpperCase()}`;
-
-    // Generate client approval token
-    const clientApprovalToken = randomUUID();
-
-    // Get the actual total from the Google Sheet (source of truth)
-    let finalAmount = adjustedAmount || booking.quote_total || 0;
-
-    if (booking.quote_sheet_id) {
-      try {
-        const sheetData = await readQuoteSheetData(booking.quote_sheet_id);
-        if (sheetData && sheetData.total > 0) {
-          finalAmount = sheetData.total;
-          console.log(`Read total from Google Sheet: $${finalAmount}`);
-        } else {
-          console.warn('Could not read total from sheet, using booking.quote_total');
-        }
-      } catch (sheetError) {
-        console.error('Error reading quote sheet:', sheetError);
-      }
-    }
-
-    // Calculate deposit amount from percentage (default 50%)
-    const depositPercentValue = depositPercent ?? 50;
-    const depositAmount = (finalAmount * depositPercentValue) / 100;
-
-    // Check if this is a resend (existing record)
-    const { data: existingApproval } = await supabase
-      .from('client_approvals')
-      .select('resend_count')
-      .eq('booking_id', bookingId)
-      .single();
-
-    const isResend = !!existingApproval;
-    const resendCount = (existingApproval?.resend_count || 0) + (isResend ? 1 : 0);
-
-    // Create or update client_approvals record (new token invalidates old link)
-    const { error: approvalError } = await supabase
-      .from('client_approvals')
-      .upsert({
-        booking_id: bookingId,
-        adjusted_quote_total: finalAmount,
-        quote_notes: notes || null,
-        deposit_amount: depositAmount,
-        client_approval_token: clientApprovalToken,
-        sent_to_client_at: new Date().toISOString(),
-        client_email: booking.client_email,
-        resend_count: resendCount,
-      }, {
-        onConflict: 'booking_id'
-      });
-
-    if (approvalError) {
-      console.error('Error creating client approval:', approvalError);
-      return NextResponse.json({ success: false, message: 'Failed to create approval record' }, { status: 500 });
-    }
-
-    // Update booking with invoice number
-    await supabase
-      .from('bookings')
-      .update({
-        status: 'sent_to_client',
-        invoice_number: invoiceNumber,
-      })
-      .eq('id', bookingId);
-
-    // Send email to client
-    if (resend) {
-      const formatDate = (dateStr: string) => {
-        return new Date(dateStr).toLocaleDateString('en-NZ', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
-      };
-
-      // Generate invoice PDF via edge function
-      let invoiceDriveLink: string | null = null;
-      if (booking.quote_sheet_id) {
-        try {
-          const edgeFunctionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-pdfs`;
-          const response = await fetch(edgeFunctionUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-            },
-            body: JSON.stringify({
-              booking_id: bookingId,
-              pdfType: 'invoice',
-            }),
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            invoiceDriveLink = result.driveLink;
-            console.log(`Invoice PDF generated via edge function: ${invoiceDriveLink}`);
-          } else {
-            console.error('Edge function failed:', await response.text());
-          }
-        } catch (pdfError) {
-          console.error('Error calling generate-pdfs edge function:', pdfError);
-        }
-      } else {
-        console.error('No quote_sheet_id - cannot generate invoice PDF');
-      }
-
-      // Client approval URL
-      const approveUrl = `${baseUrl}/api/client-approve?token=${clientApprovalToken}`;
-
-      await resend.emails.send({
-        from: 'Accent Productions <notifications@accent-productions.co.nz>',
-        to: [booking.client_email],
-        subject: isResend
-          ? `Updated Quote from Accent Productions - ${booking.event_name || 'Your Event'}`
-          : `Invoice from Accent Productions - ${booking.event_name || 'Your Event'}`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; text-align: left;">
-            <div style="margin-bottom: 24px;">
-              <img src="${baseUrl}/images/logoblack.png" alt="Accent Productions" style="height: 100px; width: auto;" />
-            </div>
-
-            <h1 style="color: #16a34a; margin-bottom: 10px; text-align: left;">${isResend ? 'Updated Quote' : 'Invoice Ready'}</h1>
-            <p style="color: #666; margin-top: 0; text-align: left;">${invoiceDriveLink ? `<a href="${invoiceDriveLink}" style="color: #2563eb;">Invoice #${invoiceNumber}</a>` : `Invoice #${invoiceNumber}`}</p>
-
-            <p style="text-align: left;">Hi ${booking.client_name.split(' ')[0]},</p>
-            <p style="text-align: left;">${isResend
-              ? 'We\'ve updated your quote based on your feedback. Please review the changes and approve when ready.'
-              : 'Thanks for booking with us! Please review and approve your invoice to confirm the booking.'
-            }</p>
-
-            <div style="background: #f0fdf4; border: 2px solid #16a34a; border-radius: 12px; padding: 24px; margin: 25px 0; text-align: left;">
-              <div style="font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Amount Due</div>
-              <div style="font-size: 36px; font-weight: bold; color: #15803d; margin-bottom: 15px;">$${finalAmount.toFixed(2)}</div>
-              <div style="border-top: 1px solid #bbf7d0; padding-top: 15px;">
-                <div style="margin-bottom: 5px;"><strong>Event:</strong> ${booking.event_name || 'Your Event'}</div>
-                <div style="margin-bottom: 5px;"><strong>Date:</strong> ${formatDate(booking.event_date)}</div>
-                <div><strong>Location:</strong> ${booking.location || 'TBC'}</div>
-              </div>
-            </div>
-
-            ${depositAmount > 0 ? `
-            <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: left;">
-              <div style="font-size: 14px; color: #92400e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Deposit Required (${depositPercentValue}%)</div>
-              <div style="font-size: 28px; font-weight: bold; color: #b45309;">$${depositAmount.toFixed(2)}</div>
-              <p style="margin: 10px 0 0 0; color: #92400e; font-size: 14px;">
-                A ${depositPercentValue}% deposit is required to confirm your booking.
-              </p>
-            </div>
-            ` : ''}
-
-            ${notes ? `
-            <div style="background: #e8f4fd; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3; text-align: left;">
-              <p style="margin: 0;"><strong>Note:</strong></p>
-              <p style="margin: 8px 0 0 0;">${notes}</p>
-            </div>
-            ` : ''}
-
-            <p style="text-align: left; margin-top: 25px;">${depositAmount > 0 ? 'Click below to approve and pay your deposit:' : 'Click below to confirm your booking:'}</p>
-
-            <div style="margin: 25px 0; text-align: left;">
-              <a href="${approveUrl}"
-                 style="display: inline-block; background: #16a34a; color: #fff; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px;">
-                ${depositAmount > 0 ? 'Approve & Pay Deposit' : 'Approve Quote'}
-              </a>
-            </div>
-
-            <p style="color: #666; font-size: 14px; text-align: left; margin-top: 30px;">
-              Questions? Reply to this email or call us on 027 602 3869.
-            </p>
-
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
-            <p style="color: #999; font-size: 12px; text-align: left;">
-              Accent Productions | Professional Sound & Lighting
-            </p>
-          </div>
-        `,
-      });
-
-      console.log(`Sent invoice to client: ${booking.client_email}`);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Invoice sent to client',
-      invoiceNumber,
-      clientApprovalId: clientApprovalToken
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/send-email-client`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify(body),
     });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Error sending to client:', error);
+    console.error('Error proxying to send-to-client edge function:', error);
     return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });
   }
 }

@@ -247,6 +247,7 @@ async function createJobsheetTemplate(folderType) {
         { properties: { title: 'Event Data', index: 0 } },
         { properties: { title: 'Equipment', index: 1 } },
         { properties: { title: 'Crew', index: 2 } },
+        { properties: { title: 'Lookup', index: 3, hidden: true } },
       ],
     },
   });
@@ -255,14 +256,15 @@ async function createJobsheetTemplate(folderType) {
   const eventDataSheetId = spreadsheet.data.sheets[0].properties.sheetId;
   const equipmentSheetId = spreadsheet.data.sheets[1].properties.sheetId;
   const crewSheetId = spreadsheet.data.sheets[2].properties.sheetId;
+  const lookupSheetId = spreadsheet.data.sheets[3].properties.sheetId;
 
   // ============================================
   // EVENT DATA TAB - Metadata (empty values)
   // ============================================
-  // Rows 1-14: Basic event info
+  // Rows 1-15: Basic event info + timing
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: "'Event Data'!A1:B14",
+    range: "'Event Data'!A1:B15",
     valueInputOption: 'RAW',
     requestBody: {
       values: [
@@ -274,32 +276,33 @@ async function createJobsheetTemplate(folderType) {
         ['client_name', ''],
         ['client_email', ''],
         ['client_phone', ''],
-        ['load_in_time', ''],
+        ['room_available_from', ''],  // When venue opens for setup
+        ['load_in_time', ''],         // When crew arrives (call time)
         ['sound_check_time', ''],
         ['doors_time', ''],
         ['set_time', ''],
         ['finish_time', ''],
-        ['pack_down_time', ''],
+        ['pack_down_time', ''],       // When teardown finishes (pack-out time)
       ],
     },
   });
 
-  // Row 16: Suggested Gear section header + column labels
-  // Rows 17-31: Placeholder rows for gear items (Item | Qty | Notes)
+  // Row 17: Suggested Gear section header + column labels (shifted down by 1)
+  // Rows 18-32: Placeholder rows for gear items (Item | Qty | Notes)
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: "'Event Data'!A16:D16",
+    range: "'Event Data'!A17:D17",
     valueInputOption: 'RAW',
     requestBody: {
       values: [['SUGGESTED GEAR', 'Item', 'Qty', 'Notes']],
     },
   });
 
-  // Row 33: Execution Notes section header
-  // Rows 34-48: Placeholder rows for notes
+  // Row 34: Execution Notes section header
+  // Rows 35-49: Placeholder rows for notes
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: "'Event Data'!A33",
+    range: "'Event Data'!A34",
     valueInputOption: 'RAW',
     requestBody: {
       values: [['EXECUTION NOTES']],
@@ -307,7 +310,19 @@ async function createJobsheetTemplate(folderType) {
   });
 
   // ============================================
-  // EQUIPMENT TAB - Gear list (empty)
+  // LOOKUP TAB - Equipment names for dropdown (like Quote template)
+  // ============================================
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: 'Lookup!A1',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[`=IMPORTRANGE("${MASTER_SHEET_ID}","Equipment!B2:B500")`]],
+    },
+  });
+
+  // ============================================
+  // EQUIPMENT TAB - Gear list with dropdown support
   // ============================================
   await sheets.spreadsheets.values.update({
     spreadsheetId,
@@ -316,6 +331,18 @@ async function createJobsheetTemplate(folderType) {
     requestBody: {
       values: [['Gear Name', 'Qty', 'Notes']],
     },
+  });
+
+  // Add 50 empty rows for equipment (to support dropdown validation)
+  const equipmentRows = [];
+  for (let row = 2; row <= 51; row++) {
+    equipmentRows.push(['', '', '']); // Gear Name, Qty, Notes
+  }
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: 'Equipment!A2:C51',
+    valueInputOption: 'RAW',
+    requestBody: { values: equipmentRows },
   });
 
   // ============================================
@@ -430,6 +457,26 @@ async function createJobsheetTemplate(folderType) {
             fields: 'pixelSize',
           },
         },
+        // Equipment - data validation dropdown for Gear Name column (like Quote template)
+        {
+          setDataValidation: {
+            range: {
+              sheetId: equipmentSheetId,
+              startRowIndex: 1,
+              endRowIndex: 51,
+              startColumnIndex: 0,
+              endColumnIndex: 1,
+            },
+            rule: {
+              condition: {
+                type: 'ONE_OF_RANGE',
+                values: [{ userEnteredValue: '=Lookup!$A:$A' }],
+              },
+              showCustomUi: true,
+              strict: false,
+            },
+          },
+        },
         // Crew - header formatting
         {
           repeatCell: {
@@ -511,11 +558,12 @@ async function main() {
   console.log('='.repeat(60));
 
   console.log('\nIMPORTANT: After creating templates, you need to:');
-  console.log('1. Open each QUOTE template in Google Sheets');
+  console.log('1. Open each QUOTE and JOBSHEET template in Google Sheets');
   console.log('2. Go to the hidden "Lookup" sheet (unhide it temporarily)');
   console.log('3. Click cell A1 and click "Allow access" for IMPORTRANGE');
-  console.log('4. Also authorize the IMPORTRANGE in LineItems column D');
+  console.log('4. For QUOTE templates: Also authorize the IMPORTRANGE in LineItems column D');
   console.log('   (Both will show #REF! until authorized)');
+  console.log('5. For JOBSHEET templates: The Equipment tab dropdown will work after authorizing Lookup');
 }
 
 main().catch(console.error);

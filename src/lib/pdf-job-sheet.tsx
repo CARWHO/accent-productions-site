@@ -12,6 +12,13 @@ export interface JobSheetInput {
   location: string;
   quoteNumber: string;
 
+  // Group 2 fields (admin-configured times)
+  callTime?: string | null;
+  packOutTime?: string | null;
+  roomAvailableFrom?: string | null;
+  callOutNotes?: string | null;
+  bandNames?: string | null;
+
   // Contractor assignment
   contractorName: string;
   hourlyRate: number | null;
@@ -335,11 +342,17 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
         {/* Event Details Box */}
         <View style={styles.eventBox}>
           <Text style={styles.eventName}>{input.eventName || 'Event'}</Text>
-          <Text style={styles.eventDetail}>
-            DATE: {formatDate(input.eventDate)}
-            {input.eventTime ? `, ${formatTime(input.eventTime)}` : ''}
-            {input.eventEndTime ? ` - ${formatTime(input.eventEndTime)}` : ''}
-          </Text>
+          <Text style={styles.eventDetail}>DATE: {formatDate(input.eventDate)}</Text>
+          {/* Times row: Call | Show | Pack-out */}
+          {(input.callTime || input.eventTime || input.packOutTime) && (
+            <Text style={styles.eventDetail}>
+              {[
+                input.callTime ? `Call: ${formatTime(input.callTime)}` : null,
+                input.eventTime ? `Show: ${formatTime(input.eventTime)}${input.eventEndTime ? ` - ${formatTime(input.eventEndTime)}` : ''}` : null,
+                input.packOutTime ? `Pack-out: ${formatTime(input.packOutTime)}` : null,
+              ].filter(Boolean).join(' | ')}
+            </Text>
+          )}
           <Text style={styles.eventDetail}>LOCATION: {input.location || 'TBC'}</Text>
           {input.venueContact && (
             <Text style={styles.eventDetail}>VENUE CONTACT: {input.venueContact}</Text>
@@ -500,10 +513,20 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
           </View>
         </View>
 
+        {/* Call Out Notes Section */}
+        {input.callOutNotes && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Important Notes</Text>
+            <View style={styles.notesBox}>
+              <Text style={styles.notesText}>{input.callOutNotes}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Notes Section */}
         {input.additionalNotes && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
+            <Text style={styles.sectionTitle}>Additional Notes</Text>
             <View style={styles.notesBox}>
               <Text style={styles.notesText}>{input.additionalNotes}</Text>
             </View>
