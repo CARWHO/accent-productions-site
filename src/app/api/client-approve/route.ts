@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { token, skipPayment, paymentMethod } = body;
+    const { token, skipPayment, paymentMethod, purchaseOrder } = body;
 
     if (!token) {
       return NextResponse.json({ success: false, message: 'Missing token' }, { status: 400 });
@@ -110,6 +110,7 @@ export async function POST(request: Request) {
         client_approved_at: new Date().toISOString(),
         contractor_selection_token: contractorSelectionToken,
         calendar_event_id: calendarEventId,
+        purchase_order: purchaseOrder || null,
       })
       .eq('id', booking.id);
 

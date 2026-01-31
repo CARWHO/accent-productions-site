@@ -45,6 +45,7 @@ interface Booking {
   pack_out_time: string | null;
   vehicle_type: string | null;
   band_names: string | null;
+  purchase_order: string | null;
 }
 
 interface Documents {

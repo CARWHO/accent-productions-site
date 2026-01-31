@@ -12,10 +12,10 @@ const services = [
     image: '/images/image1-public-waitangipark.png',
     location: 'Wellington CBD, New Zealand',
     includes: [
-      'Wireless microphones for ceremony',
-      'Speaker systems for reception',
-      'Music playback equipment',
-      'On-site technician',
+      'Handheld and lapel wireless mics',
+      'Weatherproof outdoor PA systems',
+      'Aux input for your own playlists',
+      'Technician on-site for the duration',
     ],
   },
   {
@@ -25,10 +25,10 @@ const services = [
     image: '/images/image1-public-parilament.png',
     location: 'Parliament, Wellington',
     includes: [
-      'Lectern and lapel microphones',
-      'PA systems',
-      'Video conferencing audio',
-      'Background music',
+      'Gooseneck, handheld, and lapel options',
+      'Distributed speaker coverage for large rooms',
+      'Feed to livestream or recording',
+      'Quiet, unobtrusive setup',
     ],
   },
   {
@@ -38,10 +38,10 @@ const services = [
     image: '/images/image1-festival-slavfest.jpeg',
     location: 'Slavfest, Wellington',
     includes: [
-      'Line array speaker systems',
-      'Stage monitors',
-      'Front of house mixing',
-      'Multi-stage capability',
+      'Flown or ground-stacked line arrays',
+      'Wedge and in-ear monitor options',
+      'Full backline and DI setup',
+      'Experienced crew for load-in and show',
     ],
   },
   {
@@ -51,10 +51,10 @@ const services = [
     image: '/images/image2-private-newtown.jpeg',
     location: 'Newtown, Wellington',
     includes: [
-      'Speaker and subwoofer packages',
-      'DJ equipment',
-      'Microphones for speeches',
-      'Delivery and setup included',
+      'Compact PA with sub for up to 150 guests',
+      'CDJs, mixer, or aux playback',
+      'Wireless mic for toasts',
+      'Same-day delivery and collection',
     ],
   },
 ];
@@ -103,23 +103,10 @@ export default function ServicesPage() {
                       {service.title}
                     </h2>
                     <p className="text-gray-700 mb-6 md:mb-8 text-base md:text-lg font-medium">{service.description}</p>
-                    <ul className="space-y-3 md:space-y-4 mb-8 md:mb-10">
-                      {service.includes.map((item) => (
-                        <li key={item} className="flex items-start gap-3 md:gap-4">
-                          <svg
-                            className="w-5 h-5 md:w-6 md:h-6 text-[#000000] mt-0.5 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          <span className="text-gray-700 text-base md:text-lg font-medium">{item}</span>
+                    <ul className="mb-8 md:mb-10 text-gray-600 text-base md:text-lg">
+                      {service.includes.map((item, i) => (
+                        <li key={item} className="inline">
+                          {item}{i < service.includes.length - 1 && <span className="mx-2">·</span>}
                         </li>
                       ))}
                     </ul>

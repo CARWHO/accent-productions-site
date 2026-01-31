@@ -155,6 +155,32 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTop: '1 solid #000',
   },
+  // Invoice header styles
+  invoiceHeaderRow: {
+    flexDirection: 'row',
+    marginBottom: 15,
+    marginTop: 10,
+  },
+  invoiceTitle: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  invoiceMetadata: {
+    width: 180,
+    fontSize: 9,
+    lineHeight: 1.5,
+  },
+  invoiceMetadataRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  invoiceMetadataLabel: {
+    marginRight: 5,
+  },
+  invoiceMetadataValue: {
+    fontWeight: 'bold',
+  },
 });
 
 export async function generateSoundQuotePDF(
@@ -163,7 +189,7 @@ export async function generateSoundQuotePDF(
   clientEmail: string,
   clientPhone: string,
   organization?: string,
-  options?: { isInvoice?: boolean; invoiceNumber?: string; issuedDate?: string }
+  options?: { isInvoice?: boolean; invoiceNumber?: string; issuedDate?: string; purchaseOrder?: string }
 ): Promise<Buffer> {
   // Use provided issuedDate or fall back to today's date
   const issuedDate = options?.issuedDate || formatDateShort();
@@ -214,7 +240,7 @@ export async function generateSoundQuotePDF(
           <View style={styles.headerText}>
             <Text style={styles.tradingAs}>Barrie Hutton trading as</Text>
             <Text style={styles.businessName}>Accent Entertainment</Text>
-            <Text style={styles.subtitle}>Production Company</Text>
+            <Text style={styles.subtitle}>Production Manager for Festivals & Special Events</Text>
           </View>
         </View>
 
@@ -226,10 +252,33 @@ export async function generateSoundQuotePDF(
           <Text>Email hello@accent-productions.co.nz</Text>
         </View>
 
-        {/* Quote/Invoice Number and Date */}
-        <Text style={styles.quoteHeader}>
-          {isInvoice ? 'Invoice' : 'Quote'} Nº: {documentNumber}   Issued: {issuedDate}
-        </Text>
+        {/* Quote/Invoice Header with metadata */}
+        <View style={styles.invoiceHeaderRow}>
+          <Text style={styles.invoiceTitle}>
+            {isInvoice ? `Tax Invoice ${documentNumber}` : `Quote ${documentNumber}`}
+          </Text>
+          <View style={styles.invoiceMetadata}>
+            <View style={styles.invoiceMetadataRow}>
+              <Text>{issuedDate}</Text>
+            </View>
+            {isInvoice && (
+              <>
+                <View style={styles.invoiceMetadataRow}>
+                  <Text style={styles.invoiceMetadataLabel}>GST No:</Text>
+                  <Text style={styles.invoiceMetadataValue}>14 358 331</Text>
+                </View>
+                <View style={styles.invoiceMetadataRow}>
+                  <Text style={styles.invoiceMetadataLabel}>NZBN:</Text>
+                  <Text style={styles.invoiceMetadataValue}>9429 0435 13611</Text>
+                </View>
+                <View style={styles.invoiceMetadataRow}>
+                  <Text style={styles.invoiceMetadataLabel}>Purchase Order No:</Text>
+                  <Text style={styles.invoiceMetadataValue}>{options?.purchaseOrder || ''}</Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
 
         {/* Client Info */}
         <View style={styles.clientBlock}>

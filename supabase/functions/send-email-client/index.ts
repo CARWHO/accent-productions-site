@@ -75,7 +75,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { bookingId, adjustedAmount, notes, depositPercent } = await req.json();
+    const { bookingId, adjustedAmount, notes, depositPercent, purchaseOrder } = await req.json();
 
     if (!bookingId) {
       return new Response(
@@ -152,10 +152,14 @@ serve(async (req) => {
       );
     }
 
-    // Update booking with invoice number
+    // Update booking with invoice number and purchase order
     await supabase
       .from("bookings")
-      .update({ status: "sent_to_client", invoice_number: invoiceNumber })
+      .update({
+        status: "sent_to_client",
+        invoice_number: invoiceNumber,
+        purchase_order: purchaseOrder || null,
+      })
       .eq("id", bookingId);
 
     // Generate invoice PDF via generate-invoice edge function

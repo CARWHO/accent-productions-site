@@ -30,6 +30,7 @@ function ApproveContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [purchaseOrder, setPurchaseOrder] = useState('');
 
   useEffect(() => {
     if (!token) {
@@ -71,7 +72,7 @@ function ApproveContent() {
       const res = await fetch('/api/client-approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, skipPayment: true }),
+        body: JSON.stringify({ token, skipPayment: true, purchaseOrder: purchaseOrder || null }),
       });
 
       if (res.ok) {
@@ -90,7 +91,7 @@ function ApproveContent() {
       const res = await fetch('/api/client-approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, paymentMethod: 'bank_transfer' }),
+        body: JSON.stringify({ token, paymentMethod: 'bank_transfer', purchaseOrder: purchaseOrder || null }),
       });
 
       if (res.ok) {
@@ -199,6 +200,23 @@ function ApproveContent() {
             <p className="text-sm text-stone-800"><strong>Note:</strong> {data.notes}</p>
           </div>
         )}
+
+        {/* Purchase Order (optional) */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-stone-700 mb-2">
+            Purchase Order No. <span className="text-stone-400 font-normal">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={purchaseOrder}
+            onChange={(e) => setPurchaseOrder(e.target.value)}
+            placeholder="e.g. PO-12345"
+            className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent"
+          />
+          <p className="text-xs text-stone-500 mt-1">
+            If your organisation requires a PO number on the invoice, enter it here.
+          </p>
+        </div>
 
         {/* Bank Transfer Details */}
         <div className="space-y-4">

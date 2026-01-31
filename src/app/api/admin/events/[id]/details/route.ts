@@ -59,7 +59,8 @@ export async function GET(request: Request, { params }: RouteParams) {
         band_names,
         next_occurrence_date,
         recurrence_reminder_days,
-        inquiry_id
+        inquiry_id,
+        purchase_order
       `)
       .eq('id', id)
       .single();

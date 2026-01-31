@@ -77,6 +77,7 @@ function ReviewQuoteContent() {
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<string>('');
   const [depositPercent, setDepositPercent] = useState<string>('50');
+  const [purchaseOrder, setPurchaseOrder] = useState<string>('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -98,6 +99,11 @@ function ReviewQuoteContent() {
         }
 
         setBooking(data.booking);
+
+        // Pre-fill purchase order from booking if exists
+        if (data.booking.purchase_order) {
+          setPurchaseOrder(data.booking.purchase_order);
+        }
 
         // Set sheet total if available
         if (data.sheetTotal) {
@@ -140,6 +146,7 @@ function ReviewQuoteContent() {
           bookingId: booking.id,
           notes: notes || null,
           depositPercent: depositPercent === '' ? 50 : Number(depositPercent),
+          purchaseOrder: purchaseOrder || null,
         }),
       });
 
@@ -438,6 +445,23 @@ function ReviewQuoteContent() {
             </div>
             <p className="text-xs text-gray-500 mt-1">
               Deposit: {formatCurrency((sheetTotal || booking?.quote_total || 0) * (depositPercent === '' ? 50 : Number(depositPercent)) / 100)}
+            </p>
+          </div>
+
+          {/* Purchase Order */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Purchase Order No. <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={purchaseOrder}
+              onChange={(e) => setPurchaseOrder(e.target.value)}
+              placeholder="e.g. PO-12345"
+              className={inputStyles}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              If the client has provided a PO number, enter it here.
             </p>
           </div>
 

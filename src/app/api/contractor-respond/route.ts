@@ -135,6 +135,13 @@ export async function GET(request: Request) {
               <h3>Confirmed Contractors:</h3>
               <ul>${contractorList}</ul>
 
+              <div style="margin: 30px 0;">
+                <a href="${baseUrl}/admin/events/${booking.id}"
+                   style="display: inline-block; background: #16a34a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  View Event Details
+                </a>
+              </div>
+
               <p style="color: #666; font-size: 14px;">
                 The calendar event has been updated with contractor details.
               </p>

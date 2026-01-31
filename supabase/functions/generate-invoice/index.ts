@@ -157,7 +157,8 @@ async function generateInvoicePDF(
   sheetData: QuoteSheetData,
   invoiceNumber: string,
   folderId: string,
-  accessToken: string
+  accessToken: string,
+  purchaseOrder?: string | null
 ): Promise<string | null> {
   try {
     console.log("[generate-invoice] Generating Invoice PDF from sheet data...");
@@ -191,7 +192,7 @@ async function generateInvoicePDF(
         clientEmail: sheetData.clientEmail,
         clientPhone: sheetData.clientPhone,
         eventDate: sheetData.eventDate,
-        options: { isInvoice: true, invoiceNumber, issuedDate: sheetData.issuedDate },
+        options: { isInvoice: true, invoiceNumber, issuedDate: sheetData.issuedDate, purchaseOrder: purchaseOrder || undefined },
       }),
     });
 
@@ -273,11 +274,12 @@ serve(async (req) => {
     if (!sheetData) throw new Error("Failed to read quote sheet data");
 
     const invoiceNumber = record.invoice_number || `INV-${sheetData.quoteNumber.replace("Quote-", "")}`;
+    const purchaseOrder = record.purchase_order || null;
     const folderId = isBackline ? GOOGLE_DRIVE_BACKLINE_QUOTES_FOLDER_ID : GOOGLE_DRIVE_FULL_SYSTEM_QUOTES_FOLDER_ID;
 
     if (!folderId) throw new Error("Drive folder not configured");
 
-    const driveFileId = await generateInvoicePDF(sheetData, invoiceNumber, folderId, accessToken);
+    const driveFileId = await generateInvoicePDF(sheetData, invoiceNumber, folderId, accessToken, purchaseOrder);
 
     if (!driveFileId) {
       throw new Error("Failed to generate invoice PDF");
