@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import PageCard from '@/components/ui/PageCard';
 import { SuccessIcon, ErrorIcon } from '@/components/ui/StatusIcons';
+import { formatDate } from '@/lib/format-utils';
 
 interface Contractor {
   id: string;
@@ -193,15 +194,6 @@ function SelectContractorsContent() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-NZ', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
-
   // Get all unique skills from contractors
   const allSkills = Array.from(
     new Set(contractors.flatMap(c => c.skills || []))
@@ -291,13 +283,15 @@ function SelectContractorsContent() {
       <div className="space-y-6">
         {/* Header */}
         <div className="border-b border-stone-200 pb-4">
-          <button
-            onClick={() => router.push(`/review-jobsheet?token=${token}`)}
-            className="text-sm text-gray-600 hover:text-gray-900 mb-2 transition-colors underline"
-          >
-            Back
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">Select Contractors</h1>
+          <div className="flex items-start justify-between mb-2">
+            <h1 className="text-2xl font-bold text-gray-900">Select Contractors</h1>
+            <button
+              onClick={() => router.push(`/review-jobsheet?token=${token}`)}
+              className="text-gray-700 font-bold text-sm"
+            >
+              Back
+            </button>
+          </div>
           <p className="text-gray-600">Quote #{booking.quote_number}</p>
         </div>
 
@@ -305,7 +299,7 @@ function SelectContractorsContent() {
       <div className="bg-stone-50 rounded-lg p-4">
         <h2 className="font-semibold text-lg mb-2">{booking.event_name || 'Event'}</h2>
         <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-          <p><strong>Date:</strong> {formatDate(booking.event_date)}</p>
+          <p><strong>Date:</strong> {formatDate(booking.event_date, 'short')}</p>
           <p><strong>Time:</strong> {booking.event_time || 'TBC'}</p>
           <p><strong>Location:</strong> {booking.location || 'TBC'}</p>
           <p><strong>Client:</strong> {booking.client_name}</p>

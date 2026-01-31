@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import PageCard from '@/components/ui/PageCard';
 import { SuccessIcon, ErrorIcon } from '@/components/ui/StatusIcons';
+import { formatDate, formatCurrency } from '@/lib/format-utils';
+import { inputStyles } from '@/lib/form-styles';
 
 interface QuoteLineItems {
   foh: number;
@@ -65,6 +67,7 @@ interface ClientApproval {
 
 function ReviewQuoteContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const token = searchParams.get('token');
 
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -153,21 +156,6 @@ function ReviewQuoteContent() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-NZ', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return `$${amount.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
-
   if (loading) {
     return (
       <PageCard>
@@ -225,19 +213,27 @@ function ReviewQuoteContent() {
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Review Quote</h1>
             <p className="text-gray-600 font-medium">Quote #{booking.quote_number}</p>
           </div>
-          {booking.quote_sheet_id && (
-            <a
-              href={`https://docs.google.com/spreadsheets/d/${booking.quote_sheet_id}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          <div className="flex items-center gap-3">
+            {booking.quote_sheet_id && (
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${booking.quote_sheet_id}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/>
+                </svg>
+                Edit in Sheets
+              </a>
+            )}
+            <button
+              onClick={() => router.push('/admin/events')}
+              className="text-gray-700 font-bold text-sm"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/>
-              </svg>
-              Edit in Sheets
-            </a>
-          )}
+              Back
+            </button>
+          </div>
         </div>
 
         {/* Status Badge */}

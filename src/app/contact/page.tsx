@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Alert, Button } from '@/components/ui';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -103,9 +104,9 @@ export default function ContactPage() {
           {/* form */}
           <div>
             {showValidation && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-red-800 font-medium">Please fill in all required fields.</p>
-              </div>
+              <Alert variant="error" className="mb-6">
+                Please fill in all required fields.
+              </Alert>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -180,18 +181,9 @@ export default function ContactPage() {
 
             {/* Submit Button */}
             <div className="pt-4">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-black text-white px-8 py-4 rounded-md font-semibold text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Sending...
-                  </span>
-                ) : 'Send Message'}
-              </button>
+              <Button type="submit" size="lg" loading={isSubmitting} className="w-full">
+                Send Message
+              </Button>
             </div>
           </form>
         </div>
@@ -207,8 +199,8 @@ export default function ContactPage() {
                 </svg>
                 <div>
                   <p className="font-semibold">Email</p>
-                  <a href="mailto:hello@accentproductions.co.nz" className="text-blue-600 hover:underline">
-                    hello@accentproductions.co.nz
+                  <a href="mailto:hello@accent-productions.co.nz" className="text-blue-600 hover:underline">
+                    hello@accent-productions.co.nz
                   </a>
                 </div>
               </div>

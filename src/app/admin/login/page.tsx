@@ -3,6 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-auth-client';
+import { Alert, Button } from '@/components/ui';
 
 function LoginForm() {
   const router = useRouter();
@@ -48,9 +49,9 @@ function LoginForm() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              <Alert variant="error" className="text-sm">
                 {error}
-              </div>
+              </Alert>
             )}
 
             <div>
@@ -83,13 +84,9 @@ function LoginForm() {
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-md font-bold text-base transition-colors bg-black text-white hover:bg-gray-800 disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
+            <Button type="submit" loading={loading} className="w-full">
+              Sign In
+            </Button>
           </form>
         </div>
       </div>

@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Query by booking_id
     const { data: approval, error } = await supabase
       .from('client_approvals')
       .select(`
@@ -24,11 +25,11 @@ export async function GET(request: Request) {
         balance_status,
         bookings (id, event_name, event_date, quote_number, client_name, client_email, client_phone)
       `)
-      .eq('balance_payment_token', token)
+      .eq('booking_id', token)
       .single();
 
     if (error || !approval) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
+      return NextResponse.json({ error: 'Approval not found' }, { status: 404 });
     }
 
     const booking = approval.bookings as unknown as {

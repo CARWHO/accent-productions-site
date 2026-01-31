@@ -163,15 +163,16 @@ async function generateInvoicePDF(
     console.log("[generate-invoice] Generating Invoice PDF from sheet data...");
 
     // Convert sheet data to quote format for PDF generation
+    // Pass through all data - let PDF renderer handle categorization and formatting
     const quote = {
       quoteNumber: sheetData.quoteNumber,
       title: sheetData.eventName,
       description: sheetData.eventLocation,
       lineItems: sheetData.lineItems.map(item => ({
-        description: item.quantity > 1 || item.days > 1
-          ? `${item.gearName} (${item.quantity}x, ${item.days} day${item.days > 1 ? 's' : ''})`
-          : item.gearName,
+        description: item.gearName,
         amount: item.lineTotal,
+        quantity: item.quantity,
+        unitRate: item.unitRate,  // >0 for labour items, 0 for equipment
       })),
       subtotal: sheetData.subtotal,
       gst: sheetData.gst,

@@ -27,7 +27,7 @@ const EDGE_FUNCTION_SECRET = process.env.EDGE_FUNCTION_SECRET || 'default-secret
  *   clientName: string,
  *   clientEmail?: string,
  *   clientPhone?: string,
- *   roomAvailableFrom?: string,  // When venue opens for setup
+ *   siteAvailableFrom?: string,  // When venue opens for setup
  *   loadInTime?: string,         // When crew arrives (call time)
  *   soundCheckTime?: string,
  *   doorsTime?: string,
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       clientName,
       clientEmail,
       clientPhone,
-      roomAvailableFrom,
+      siteAvailableFrom,
       loadInTime,
       soundCheckTime,
       doorsTime,
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       clientName,
       clientEmail: clientEmail || '',
       clientPhone: clientPhone || '',
-      roomAvailableFrom: roomAvailableFrom || '',
+      siteAvailableFrom: siteAvailableFrom || '',
       loadInTime: loadInTime || '',
       soundCheckTime: soundCheckTime || '',
       doorsTime: doorsTime || '',

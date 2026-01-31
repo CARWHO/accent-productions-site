@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import PageCard from '@/components/ui/PageCard';
 import { SuccessIcon } from '@/components/ui/StatusIcons';
+import { Alert, Button } from '@/components/ui';
 
 interface ContractorFormData {
   eventDate: string;
@@ -106,9 +107,9 @@ export default function ContractorInquiryPage() {
       <div className="flex flex-col">
           {/* Error Summary */}
           {showValidation && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
-              <p className="text-sm text-red-800 font-semibold">Please fill in all required fields</p>
-            </div>
+            <Alert variant="error" className="mb-4 text-sm font-semibold">
+              Please fill in all required fields
+            </Alert>
           )}
 
           {/* Progress */}
@@ -273,7 +274,7 @@ export default function ContractorInquiryPage() {
 
               <div className="flex gap-4 mt-auto pt-5">
                 <button onClick={() => goToStep(1)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
-                <button
+                <Button
                   onClick={() => {
                     if (!formData.contactName || !formData.contactEmail || !formData.contactPhone) {
                       setShowValidation(true);
@@ -282,16 +283,11 @@ export default function ContractorInquiryPage() {
                       handleSubmit();
                     }
                   }}
-                  disabled={isSubmitting}
-                  className="flex-1 bg-[#000000] text-white py-3 rounded-md font-bold text-base transition-colors border border-[#000000] disabled:opacity-50"
+                  loading={isSubmitting}
+                  className="flex-1"
                 >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Sending...
-                    </span>
-                  ) : 'Get Quote'}
-                </button>
+                  Get Quote
+                </Button>
               </div>
             </div>
           )}

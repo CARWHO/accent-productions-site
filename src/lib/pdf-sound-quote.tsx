@@ -1,8 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from '@react-pdf/renderer';
 import { SoundQuoteOutput } from './gemini-sound-quote';
-import path from 'path';
-import fs from 'fs';
+import { getLogoBase64, formatCurrency, formatDateShort } from './pdf-utils';
 
 const styles = StyleSheet.create({
   page: {
@@ -158,38 +157,6 @@ const styles = StyleSheet.create({
   },
 });
 
-function formatCurrency(amount: number): string {
-  return `$${amount.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(): string {
-  return new Date().toLocaleDateString('en-NZ', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-}
-
-// Get logo as base64 for embedding in PDF
-function getLogoBase64(): string | null {
-  try {
-    const logoPath = path.join(process.cwd(), 'public', 'images', 'logo-quote.png');
-    if (fs.existsSync(logoPath)) {
-      const logoBuffer = fs.readFileSync(logoPath);
-      return `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
-    // Fallback to logoblack.png
-    const fallbackPath = path.join(process.cwd(), 'public', 'images', 'logoblack.png');
-    if (fs.existsSync(fallbackPath)) {
-      const logoBuffer = fs.readFileSync(fallbackPath);
-      return `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
-  } catch (e) {
-    console.error('Error loading logo:', e);
-  }
-  return null;
-}
-
 export async function generateSoundQuotePDF(
   quote: SoundQuoteOutput,
   clientName: string,
@@ -199,7 +166,7 @@ export async function generateSoundQuotePDF(
   options?: { isInvoice?: boolean; invoiceNumber?: string; issuedDate?: string }
 ): Promise<Buffer> {
   // Use provided issuedDate or fall back to today's date
-  const issuedDate = options?.issuedDate || formatDate();
+  const issuedDate = options?.issuedDate || formatDateShort();
   const logoBase64 = getLogoBase64();
   const isInvoice = options?.isInvoice ?? false;
   const documentNumber = isInvoice ? (options?.invoiceNumber || quote.quoteNumber) : quote.quoteNumber;

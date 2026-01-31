@@ -3,6 +3,8 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import PageCard from '@/components/ui/PageCard';
+import { formatDate, formatCurrencyWhole } from '@/lib/format-utils';
+import { STATUS_COLORS, STATUS_LABELS, ASSIGNMENT_STATUS_COLORS, PAYMENT_STATUS_COLORS } from '@/lib/status-config';
 
 interface Contractor {
   id: string;
@@ -76,41 +78,6 @@ interface EventData {
   adminLinks: AdminLinks;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  quote_sent: 'bg-blue-100 text-blue-800',
-  client_approved: 'bg-green-100 text-green-800',
-  contractors_notified: 'bg-purple-100 text-purple-800',
-  assigned: 'bg-indigo-100 text-indigo-800',
-  completed: 'bg-gray-100 text-gray-800',
-  cancelled: 'bg-red-100 text-red-800',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  quote_sent: 'Quote Sent',
-  client_approved: 'Approved',
-  contractors_notified: 'Notified',
-  assigned: 'Assigned',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
-
-const ASSIGNMENT_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  accepted: 'bg-green-100 text-green-800',
-  declined: 'bg-red-100 text-red-800',
-};
-
-const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  paid: 'bg-green-100 text-green-800',
-  deposit_paid: 'bg-blue-100 text-blue-800',
-  invoiced: 'bg-purple-100 text-purple-800',
-  not_sent: 'bg-gray-100 text-gray-800',
-  not_due: 'bg-gray-100 text-gray-800',
-};
-
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -140,19 +107,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
     fetchEventDetails();
   }, [id]);
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-NZ', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return `$${amount.toLocaleString('en-NZ', { minimumFractionDigits: 0 })}`;
-  };
 
   if (loading) {
     return (
@@ -186,14 +140,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <PageCard stretch>
-      {/* Back Button */}
-      <button
-        onClick={() => router.push('/admin/events')}
-        className="px-5 py-3 text-gray-700 font-bold border border-transparent mb-4"
-      >
-        Back
-      </button>
-
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -202,13 +148,21 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </h1>
           <p className="text-gray-500">Quote #{booking.quote_number}</p>
         </div>
-        <span
-          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-            STATUS_COLORS[booking.status] || 'bg-gray-100 text-gray-800'
-          }`}
-        >
-          {STATUS_LABELS[booking.status] || booking.status}
-        </span>
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+              STATUS_COLORS[booking.status] || 'bg-gray-100 text-gray-800'
+            }`}
+          >
+            {STATUS_LABELS[booking.status] || booking.status}
+          </span>
+          <button
+            onClick={() => router.push('/admin/events')}
+            className="text-gray-700 font-bold text-sm"
+          >
+            Back
+          </button>
+        </div>
       </div>
 
       {/* Event & Client Details */}
@@ -278,7 +232,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      {/* Documents */}
+      {/* Documents
       <div className="mb-6 pb-6 border-b border-gray-200">
         <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
           Documents
@@ -354,7 +308,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </a>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Payment Summary */}
       <div className="mb-6 pb-6 border-b border-gray-200">
@@ -364,11 +318,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center p-3 bg-gray-50 rounded-lg">
             <p className="text-xs text-gray-500 mb-1">Total</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(paymentSummary.quoteTotal)}</p>
+            <p className="text-lg font-bold text-gray-900">{formatCurrencyWhole(paymentSummary.quoteTotal)}</p>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
             <p className="text-xs text-gray-500 mb-1">Deposit</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(paymentSummary.depositAmount)}</p>
+            <p className="text-lg font-bold text-gray-900">{formatCurrencyWhole(paymentSummary.depositAmount)}</p>
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1 ${
                 PAYMENT_STATUS_COLORS[paymentSummary.depositStatus] || 'bg-gray-100 text-gray-800'
@@ -379,7 +333,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
             <p className="text-xs text-gray-500 mb-1">Balance</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(paymentSummary.balanceAmount)}</p>
+            <p className="text-lg font-bold text-gray-900">{formatCurrencyWhole(paymentSummary.balanceAmount)}</p>
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1 ${
                 PAYMENT_STATUS_COLORS[paymentSummary.balanceStatus] || 'bg-gray-100 text-gray-800'
@@ -401,9 +355,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         ) : (
           <div className="space-y-2">
             {assignments.map(assignment => (
-              <div
+              <a
                 key={assignment.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                href={assignment.payUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer block"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
@@ -423,7 +380,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="flex items-center gap-2">
                   {assignment.payAmount && (
                     <span className="text-sm font-medium text-gray-700">
-                      {formatCurrency(assignment.payAmount)}
+                      {formatCurrencyWhole(assignment.payAmount)}
                     </span>
                   )}
                   <span
@@ -443,23 +400,69 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     </span>
                   )}
                   {assignment.jobsheetUrl && (
-                    <a
-                      href={assignment.jobsheetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1 text-gray-400 hover:text-gray-600"
-                      title="View Job Sheet"
+                    <span
+                      className="p-1 text-gray-400"
+                      title="Has Job Sheet"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                    </a>
+                    </span>
                   )}
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         )}
+      </div>
+
+      {/* Client */}
+      <div className="mb-6 pb-6 border-b border-gray-200">
+        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
+          Client
+        </h3>
+        <a
+          href={`/collect-balance?token=${booking.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer block"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-xs font-medium text-blue-600">
+                {booking.client_name?.charAt(0) || '?'}
+              </span>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 text-sm">
+                {booking.client_name}
+              </p>
+              <p className="text-xs text-gray-500">
+                {booking.client_email}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {paymentSummary.quoteTotal > 0 && (
+              <span className="text-sm font-medium text-gray-700">
+                {formatCurrencyWhole(paymentSummary.quoteTotal)}
+              </span>
+            )}
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                PAYMENT_STATUS_COLORS[paymentSummary.depositStatus] || 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              {paymentSummary.depositStatus.replace(/_/g, ' ')}
+            </span>
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </a>
       </div>
 
       {/* Quick Actions */}
@@ -486,6 +489,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </svg>
             Review Job Sheet
           </a>
+          {documents.techRider ? (
+            <a
+              href={documents.techRider}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+              </svg>
+              View Tech Rider
+            </a>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-400 bg-gray-100 rounded-md cursor-not-allowed" title="No tech rider uploaded">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+              </svg>
+              View Tech Rider
+            </span>
+          )}
           <a
             href={adminLinks.selectContractors}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
@@ -511,26 +534,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Collect Balance
-            </span>
-          )}
-          {adminLinks.clientApprovalPage ? (
-            <a
-              href={adminLinks.clientApprovalPage}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              Client Page
-            </a>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-400 bg-gray-100 rounded-md cursor-not-allowed" title="Available after quote is sent to client">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              Client Page
             </span>
           )}
         </div>

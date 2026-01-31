@@ -65,7 +65,7 @@ export async function GET(request: Request) {
         // New fields for Group 2
         call_time: booking.call_time,
         pack_out_time: booking.pack_out_time,
-        room_available_from: booking.room_available_from,
+        site_available_from: booking.site_available_from,
         call_out_notes: booking.call_out_notes,
         vehicle_type: booking.vehicle_type,
         vehicle_amount: booking.vehicle_amount,
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
     const allowedFields = [
       'call_time',
       'pack_out_time',
-      'room_available_from',
+      'site_available_from',
       'call_out_notes',
       'vehicle_type',
       'vehicle_amount',

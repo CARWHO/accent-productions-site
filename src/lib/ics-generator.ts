@@ -139,7 +139,7 @@ export function buildICSFromBooking(booking: {
   if (booking.event_time && booking.event_time !== booking.call_time) {
     descParts.push(`Show Time: ${booking.event_time}`);
   }
-  if (booking.pack_out_time) descParts.push(`Pack-out: ${booking.pack_out_time}`);
+  if (booking.pack_out_time) descParts.push(`Site Vacate: ${booking.pack_out_time}`);
   if (booking.band_names) descParts.push(`Performing: ${booking.band_names}`);
   if (booking.client_name) descParts.push(`Client: ${booking.client_name}`);
   if (booking.client_phone) descParts.push(`Phone: ${booking.client_phone}`);

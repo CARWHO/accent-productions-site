@@ -1,7 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from '@react-pdf/renderer';
-import path from 'path';
-import fs from 'fs';
+import { getLogoBase64, formatDateLong, formatTime } from './pdf-utils';
 
 export interface JobSheetInput {
   // Event info (from bookings)
@@ -15,7 +14,7 @@ export interface JobSheetInput {
   // Group 2 fields (admin-configured times)
   callTime?: string | null;
   packOutTime?: string | null;
-  roomAvailableFrom?: string | null;
+  siteAvailableFrom?: string | null;
   callOutNotes?: string | null;
   bandNames?: string | null;
 
@@ -263,52 +262,6 @@ const styles = StyleSheet.create({
   },
 });
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-NZ', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-}
-
-function formatTime(timeStr: string | null): string {
-  if (!timeStr) return '';
-  const cleanTime = timeStr.trim().toLowerCase();
-  if (/^\d{1,2}(:\d{2})?\s*(am|pm)$/i.test(cleanTime)) {
-    return timeStr.trim();
-  }
-  const match24 = cleanTime.match(/^(\d{1,2}):(\d{2})$/);
-  if (match24) {
-    let hours = parseInt(match24[1], 10);
-    const mins = match24[2];
-    const period = hours >= 12 ? 'pm' : 'am';
-    if (hours > 12) hours -= 12;
-    if (hours === 0) hours = 12;
-    return mins === '00' ? `${hours}${period}` : `${hours}:${mins}${period}`;
-  }
-  return timeStr;
-}
-
-// Get logo as base64 for embedding in PDF
-function getLogoBase64(): string | null {
-  try {
-    const logoPath = path.join(process.cwd(), 'public', 'images', 'logo-quote.png');
-    if (fs.existsSync(logoPath)) {
-      const logoBuffer = fs.readFileSync(logoPath);
-      return `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
-    const fallbackPath = path.join(process.cwd(), 'public', 'images', 'logoblack.png');
-    if (fs.existsSync(fallbackPath)) {
-      const logoBuffer = fs.readFileSync(fallbackPath);
-      return `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
-  } catch (e) {
-    console.error('Error loading logo:', e);
-  }
-  return null;
-}
-
 export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer> {
   const logoBase64 = getLogoBase64();
 
@@ -342,14 +295,14 @@ export async function generateJobSheetPDF(input: JobSheetInput): Promise<Buffer>
         {/* Event Details Box */}
         <View style={styles.eventBox}>
           <Text style={styles.eventName}>{input.eventName || 'Event'}</Text>
-          <Text style={styles.eventDetail}>DATE: {formatDate(input.eventDate)}</Text>
-          {/* Times row: Call | Show | Pack-out */}
+          <Text style={styles.eventDetail}>DATE: {formatDateLong(input.eventDate)}</Text>
+          {/* Times row: Call | Show | Site Vacate */}
           {(input.callTime || input.eventTime || input.packOutTime) && (
             <Text style={styles.eventDetail}>
               {[
                 input.callTime ? `Call: ${formatTime(input.callTime)}` : null,
                 input.eventTime ? `Show: ${formatTime(input.eventTime)}${input.eventEndTime ? ` - ${formatTime(input.eventEndTime)}` : ''}` : null,
-                input.packOutTime ? `Pack-out: ${formatTime(input.packOutTime)}` : null,
+                input.packOutTime ? `Site Vacate: ${formatTime(input.packOutTime)}` : null,
               ].filter(Boolean).join(' | ')}
             </Text>
           )}

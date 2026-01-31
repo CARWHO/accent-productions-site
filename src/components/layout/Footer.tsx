@@ -23,7 +23,7 @@ export function Footer() {
             </nav>
           </div>
           <div className="text-sm text-gray-500">
-            <p>+64 027 602 3869 · hello@accentproductions.co.nz</p>
+            <p>+64 027 602 3869 · hello@accent-productions.co.nz</p>
           </div>
         </div>
         <div className="mt-8 pt-6 border-t border-gray-200 text-sm text-gray-500">

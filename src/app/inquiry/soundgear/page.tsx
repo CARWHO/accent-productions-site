@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, Suspense, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, Suspense, useEffect } from 'react';
 import Image from 'next/image';
 import PageCard from '@/components/ui/PageCard';
 import { SuccessIcon } from '@/components/ui/StatusIcons';
+import { TimeInput } from '@/components/ui/TimeInput';
+import { ContactInfoFields } from '@/components/ui/ContactInfoFields';
 import type { TechRiderRequirements } from '@/lib/parse-tech-rider';
 
 type PackageType = 'small' | 'medium' | 'large' | 'extra_large';
-type EventType = 'wedding' | 'corporate' | 'festival' | 'private_party' | 'other';
+type EventType = 'wedding' | 'corporate' | 'festival' | 'private_party' | 'ticketed' | 'community' | 'touring_band' | 'other';
 
 interface PackageFormData {
   // Package selection
@@ -16,6 +17,7 @@ interface PackageFormData {
 
   // Event basics
   eventType?: EventType;
+  eventTypeOther?: string; // Custom text when "other" is selected
   eventName?: string;
   organization?: string;
   eventDate?: string;
@@ -56,7 +58,7 @@ interface PackageFormData {
   stageDetails?: string;
 
   // Timing (for contractors)
-  roomAvailableFrom?: string;
+  siteAvailableFrom?: string;
   callTime?: string;
   packOutTime?: string;
 
@@ -107,124 +109,13 @@ const eventTypes: { value: EventType; label: string }[] = [
   { value: 'corporate', label: 'Corporate Event' },
   { value: 'festival', label: 'Festival' },
   { value: 'private_party', label: 'Private Party' },
+  { value: 'ticketed', label: 'Ticketed Event' },
+  { value: 'community', label: 'Community Event' },
+  { value: 'touring_band', label: 'Touring Band' },
   { value: 'other', label: 'Other' },
 ];
 
-// Generate common time suggestions (30-minute intervals from 6am to 2am)
-const timeSuggestions: string[] = [];
-for (let hour = 6; hour <= 26; hour++) {
-  const displayHour = hour >= 24 ? hour - 24 : hour;
-  const ampm = (hour >= 12 && hour < 24) ? 'PM' : 'AM';
-  const hour12 = displayHour === 0 ? 12 : (displayHour > 12 ? displayHour - 12 : displayHour);
-  timeSuggestions.push(`${hour12}:00 ${ampm}`);
-  timeSuggestions.push(`${hour12}:30 ${ampm}`);
-}
-
-// Time Input Component - Hybrid combobox (type + select)
-function TimeInput({
-  value,
-  onChange,
-  placeholder,
-  hasError,
-  inputStyles,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  hasError?: boolean;
-  inputStyles: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value);
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
-
-  // Sync internal state with external value
-  React.useEffect(() => {
-    setInputValue(value);
-  }, [value]);
-
-  // Filter suggestions based on input
-  const filteredSuggestions = inputValue
-    ? timeSuggestions.filter(t =>
-        t.toLowerCase().replace(/\s/g, '').includes(inputValue.toLowerCase().replace(/\s/g, ''))
-      )
-    : timeSuggestions;
-
-  // Handle click outside to close dropdown
-  React.useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setInputValue(val);
-    setIsOpen(true);
-    // Pass through immediately for custom times
-    onChange(val);
-  };
-
-  const handleSelect = (time: string) => {
-    setInputValue(time);
-    onChange(time);
-    setIsOpen(false);
-    inputRef.current?.blur();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setIsOpen(false);
-    } else if (e.key === 'Enter' && filteredSuggestions.length > 0) {
-      e.preventDefault();
-      handleSelect(filteredSuggestions[0]);
-    }
-  };
-
-  return (
-    <div className="relative">
-      <input
-        ref={inputRef}
-        type="text"
-        value={inputValue}
-        onChange={handleInputChange}
-        onFocus={() => setIsOpen(true)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className={`${inputStyles} ${hasError ? 'border-red-500' : ''}`}
-      />
-      {isOpen && filteredSuggestions.length > 0 && (
-        <div
-          ref={dropdownRef}
-          className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
-        >
-          {filteredSuggestions.map((time) => (
-            <div
-              key={time}
-              onClick={() => handleSelect(time)}
-              className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm font-medium"
-            >
-              {time}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function InquiryForm() {
-  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -236,6 +127,7 @@ function InquiryForm() {
   // Tech rider parsing state
   const [hasTechRider, setHasTechRider] = useState<boolean>(true);
   const [isParsing, setIsParsing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [autofilledFields, setAutofilledFields] = useState<Set<string>>(new Set());
   const [parsedTechRider, setParsedTechRider] = useState<TechRiderRequirements | null>(null);
 
@@ -420,8 +312,7 @@ function InquiryForm() {
       hasStage: true,
       stageDetails: '4m x 3m stage',
       // Setup timing
-      roomAvailableFrom: '2:00 PM',
-      callTime: '3:00 PM',
+      siteAvailableFrom: '2:00 PM',
       packOutTime: '12:00 AM',
       contactName: 'James Huddon',
       contactEmail: 'relahunter@gmail.com',
@@ -611,26 +502,60 @@ function InquiryForm() {
 
           {/* File Upload (only if Yes) */}
           {hasTechRider && (
-            <div className="border-2 border-dashed border-gray-300 rounded-md p-6 bg-gray-50">
+            <div
+              className={`border-2 border-dashed rounded-md p-6 transition-colors cursor-pointer ${
+                isDragging
+                  ? 'border-black bg-gray-100'
+                  : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+              }`}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file && (file.name.endsWith('.pdf') || file.name.endsWith('.doc') || file.name.endsWith('.docx'))) {
+                  handleTechRiderUpload(file);
+                }
+              }}
+              onClick={() => document.getElementById('tech-rider-input')?.click()}
+            >
               <div className="text-center">
-                <div className="w-12 h-12 bg-black rounded-md flex items-center justify-center mx-auto mb-3">
+                <div className={`w-12 h-12 rounded-md flex items-center justify-center mx-auto mb-3 transition-colors ${isDragging ? 'bg-gray-800' : 'bg-black'}`}>
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-gray-900 mb-1">Upload your tech rider</p>
-                <p className="text-xs text-gray-500 mb-4">PDF, DOC, or DOCX (max 10MB)</p>
-                <div className="flex justify-center">
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => handleTechRiderUpload(e.target.files?.[0] || null)}
-                    className="text-transparent file:mr-3 file:py-2 file:px-3.5 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white cursor-pointer w-[100px]"
-                  />
-                </div>
+                <p className="text-sm font-medium text-gray-900 mb-1">
+                  {isDragging ? 'Drop your file here' : 'Drag & drop or click to upload'}
+                </p>
+                <p className="text-xs text-gray-500 mb-2">PDF, DOC, or DOCX (max 10MB)</p>
+                <input
+                  id="tech-rider-input"
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => handleTechRiderUpload(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
               </div>
               {techRiderFile && (
-                <div className="flex items-center justify-between mt-4 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                <div
+                  className="flex items-center justify-between mt-4 bg-green-50 border border-green-200 rounded-md px-3 py-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <p className="text-sm text-green-700 font-medium flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -639,8 +564,11 @@ function InquiryForm() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => handleTechRiderUpload(null)}
-                    className="text-gray-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTechRiderUpload(null);
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -680,59 +608,19 @@ function InquiryForm() {
             <p className="text-gray-600 mb-4 font-medium">
               For events with 1000+ people, we'll need to discuss your requirements in detail. Please provide your contact information and we'll be in touch within 24 hours.
             </p>
-            <div className="grid gap-3 lg:gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name *</label>
-              <input
-                type="text"
-                value={formData.contactName || ''}
-                onChange={(e) => updateField('contactName', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.contactName ? 'border-red-500' : ''}`}
-                placeholder="John Smith"
-              />
-              {showValidation && !formData.contactName && (
-                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-              )}
-            </div>
-            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                <input
-                  type="email"
-                  value={formData.contactEmail || ''}
-                  onChange={(e) => updateField('contactEmail', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.contactEmail ? 'border-red-500' : ''}`}
-                  placeholder="john@example.com"
-                />
-                {showValidation && !formData.contactEmail && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
-                <input
-                  type="tel"
-                  value={formData.contactPhone || ''}
-                  onChange={(e) => updateField('contactPhone', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.contactPhone ? 'border-red-500' : ''}`}
-                  placeholder="+64 21 123 4567"
-                />
-                {showValidation && !formData.contactPhone && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Details</label>
-              <textarea
-                value={formData.details || ''}
-                onChange={(e) => updateField('details', e.target.value)}
-                rows={3}
-                className={`${inputStyles} resize-none`}
-                placeholder="Tell us about your event..."
-              />
-            </div>
-          </div>
+            <ContactInfoFields
+              contactName={formData.contactName || ''}
+              contactEmail={formData.contactEmail || ''}
+              contactPhone={formData.contactPhone || ''}
+              details={formData.details}
+              showValidation={showValidation}
+              inputStyles={inputStyles}
+              onNameChange={(val) => updateField('contactName', val)}
+              onEmailChange={(val) => updateField('contactEmail', val)}
+              onPhoneChange={(val) => updateField('contactPhone', val)}
+              onDetailsChange={(val) => updateField('details', val)}
+              showDetailsField
+            />
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
@@ -890,36 +778,26 @@ function InquiryForm() {
               <p className="text-sm text-gray-600 mb-4">
                 Help us plan crew schedules. You can fill these in now or we&apos;ll confirm later.
               </p>
-              <div className="grid sm:grid-cols-3 gap-3">
+              <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Room Available From</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Site Available From</label>
                   <TimeInput
-                    value={formData.roomAvailableFrom || ''}
-                    onChange={(val) => updateField('roomAvailableFrom', val)}
+                    value={formData.siteAvailableFrom || ''}
+                    onChange={(val) => updateField('siteAvailableFrom', val)}
                     placeholder="e.g., 2:00 PM"
                     inputStyles={inputStyles}
                   />
-                  <p className="text-xs text-gray-500 mt-1">When venue opens</p>
+                  <p className="text-xs text-gray-500 mt-1">When venue opens for setup</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Crew Call Time</label>
-                  <TimeInput
-                    value={formData.callTime || ''}
-                    onChange={(val) => updateField('callTime', val)}
-                    placeholder="e.g., 3:00 PM"
-                    inputStyles={inputStyles}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">When crew arrives</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Pack-out By</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Site Vacate Time</label>
                   <TimeInput
                     value={formData.packOutTime || ''}
                     onChange={(val) => updateField('packOutTime', val)}
                     placeholder="e.g., 12:00 AM"
                     inputStyles={inputStyles}
                   />
-                  <p className="text-xs text-gray-500 mt-1">When tear-down finishes</p>
+                  <p className="text-xs text-gray-500 mt-1">When we need to leave</p>
                 </div>
               </div>
             </div>
@@ -951,50 +829,16 @@ function InquiryForm() {
         <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
-            <div className="grid gap-3 lg:gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name *</label>
-              <input
-                type="text"
-                value={formData.contactName || ''}
-                onChange={(e) => updateField('contactName', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.contactName ? 'border-red-500' : ''}`}
-                placeholder="John Smith"
-              />
-              {showValidation && !formData.contactName && (
-                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-              )}
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                <input
-                  type="email"
-                  value={formData.contactEmail || ''}
-                  onChange={(e) => updateField('contactEmail', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.contactEmail ? 'border-red-500' : ''}`}
-                  placeholder="john@example.com"
-                />
-                {showValidation && !formData.contactEmail && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
-                <input
-                  type="tel"
-                  value={formData.contactPhone || ''}
-                  onChange={(e) => updateField('contactPhone', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.contactPhone ? 'border-red-500' : ''}`}
-                  placeholder="+64 21 123 4567"
-                />
-                {showValidation && !formData.contactPhone && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-            </div>
-          </div>
+            <ContactInfoFields
+              contactName={formData.contactName || ''}
+              contactEmail={formData.contactEmail || ''}
+              contactPhone={formData.contactPhone || ''}
+              showValidation={showValidation}
+              inputStyles={inputStyles}
+              onNameChange={(val) => updateField('contactName', val)}
+              onEmailChange={(val) => updateField('contactEmail', val)}
+              onPhoneChange={(val) => updateField('contactPhone', val)}
+            />
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
@@ -1022,50 +866,16 @@ function InquiryForm() {
         <div className={`flex-grow flex flex-col`}>
           <div className="flex-grow">
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">Contact Information</h2>
-            <div className="grid gap-3 lg:gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name *</label>
-              <input
-                type="text"
-                value={formData.contactName || ''}
-                onChange={(e) => updateField('contactName', e.target.value)}
-                className={`${inputStyles} ${showValidation && !formData.contactName ? 'border-red-500' : ''}`}
-                placeholder="John Smith"
-              />
-              {showValidation && !formData.contactName && (
-                <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-              )}
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-3 lg:gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                <input
-                  type="email"
-                  value={formData.contactEmail || ''}
-                  onChange={(e) => updateField('contactEmail', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.contactEmail ? 'border-red-500' : ''}`}
-                  placeholder="john@example.com"
-                />
-                {showValidation && !formData.contactEmail && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
-                <input
-                  type="tel"
-                  value={formData.contactPhone || ''}
-                  onChange={(e) => updateField('contactPhone', e.target.value)}
-                  className={`${inputStyles} ${showValidation && !formData.contactPhone ? 'border-red-500' : ''}`}
-                  placeholder="+64 21 123 4567"
-                />
-                {showValidation && !formData.contactPhone && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
-                )}
-              </div>
-            </div>
-          </div>
+            <ContactInfoFields
+              contactName={formData.contactName || ''}
+              contactEmail={formData.contactEmail || ''}
+              contactPhone={formData.contactPhone || ''}
+              showValidation={showValidation}
+              inputStyles={inputStyles}
+              onNameChange={(val) => updateField('contactName', val)}
+              onEmailChange={(val) => updateField('contactEmail', val)}
+              onPhoneChange={(val) => updateField('contactPhone', val)}
+            />
           </div>
 
           <div className="flex gap-4 mt-auto pt-5">
@@ -1107,8 +917,20 @@ function InquiryForm() {
                   <option key={type.value} value={type.value}>{type.label}</option>
                 ))}
               </select>
+              {formData.eventType === 'other' && (
+                <input
+                  type="text"
+                  value={formData.eventTypeOther || ''}
+                  onChange={(e) => updateField('eventTypeOther', e.target.value)}
+                  className={`${inputStyles} mt-2 ${showValidation && !formData.eventTypeOther ? 'border-red-500' : ''}`}
+                  placeholder="Please specify event type..."
+                />
+              )}
               {showValidation && !formData.eventType && (
                 <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+              {showValidation && formData.eventType === 'other' && !formData.eventTypeOther && (
+                <p className="text-xs text-red-600 mt-1 font-medium">Please specify the event type</p>
               )}
             </div>
 
@@ -1238,7 +1060,8 @@ function InquiryForm() {
             <button onClick={() => goToStep(3)} disabled={isSubmitting} className="px-5 py-3 text-gray-700 font-bold border border-transparent disabled:opacity-50">Back</button>
             <button
               onClick={() => {
-                if (!formData.eventType || !formData.eventName || !formData.eventDate) {
+                const otherMissingDetail = formData.eventType === 'other' && !formData.eventTypeOther;
+                if (!formData.eventType || !formData.eventName || !formData.eventDate || otherMissingDetail) {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);
@@ -1282,8 +1105,20 @@ function InquiryForm() {
                   <option key={type.value} value={type.value}>{type.label}</option>
                 ))}
               </select>
+              {formData.eventType === 'other' && (
+                <input
+                  type="text"
+                  value={formData.eventTypeOther || ''}
+                  onChange={(e) => updateField('eventTypeOther', e.target.value)}
+                  className={`${inputStyles} mt-2 ${showValidation && !formData.eventTypeOther ? 'border-red-500' : ''}`}
+                  placeholder="Please specify event type..."
+                />
+              )}
               {showValidation && !formData.eventType && (
                 <p className="text-xs text-red-600 mt-1 font-medium">This field is required</p>
+              )}
+              {showValidation && formData.eventType === 'other' && !formData.eventTypeOther && (
+                <p className="text-xs text-red-600 mt-1 font-medium">Please specify the event type</p>
               )}
             </div>
 
@@ -1362,7 +1197,8 @@ function InquiryForm() {
             <button onClick={() => goToStep(4)} className="px-5 py-3 text-gray-700 font-bold border border-transparent">Back</button>
             <button
               onClick={() => {
-                if (!formData.eventType || !formData.eventName || !formData.eventDate) {
+                const otherMissingDetail = formData.eventType === 'other' && !formData.eventTypeOther;
+                if (!formData.eventType || !formData.eventName || !formData.eventDate || otherMissingDetail) {
                   setShowValidation(true);
                 } else {
                   setShowValidation(false);

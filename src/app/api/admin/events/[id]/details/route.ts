@@ -53,7 +53,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         calendar_event_id,
         call_time,
         pack_out_time,
-        room_available_from,
+        site_available_from,
         call_out_notes,
         vehicle_type,
         band_names,
@@ -97,7 +97,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       console.error('Error fetching assignments:', assignmentsError);
     }
 
-    // Fetch client approval info (including tokens for admin links)
+    // Fetch client approval info
     const { data: approval, error: approvalError } = await supabase
       .from('client_approvals')
       .select(`
@@ -106,8 +106,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         deposit_amount,
         balance_status,
         created_at,
-        client_approval_token,
-        balance_payment_token
+        client_approval_token
       `)
       .eq('booking_id', id)
       .single();
@@ -186,23 +185,15 @@ export async function GET(request: Request, { params }: RouteParams) {
       balanceStatus: approval?.balance_status || 'not_due',
     };
 
-    // Internal links for admin actions
-    // Note: Different pages expect different tokens:
-    // - review-quote & review-jobsheet: booking.approval_token or booking.id
-    // - select-contractors: contractor_selection_token (set after client approval) OR approval_token as fallback
-    // - collect-balance: balance_payment_token from client_approvals (only exists after deposit paid)
-    // - approve (client page): client_approval_token from client_approvals
+    // Internal links for admin actions - use IDs directly where possible
     const adminLinks = {
       reviewQuote: `/review-quote?token=${booking.approval_token}`,
       reviewJobsheet: `/review-jobsheet?token=${booking.approval_token}`,
-      // Use contractor_selection_token if available (set after client approval), otherwise use approval_token
       selectContractors: booking.contractor_selection_token
         ? `/select-contractors?token=${booking.contractor_selection_token}`
         : `/select-contractors?token=${booking.approval_token}`,
-      // balance_payment_token only exists after deposit is paid - show null if not available
-      collectBalance: approval?.balance_payment_token
-        ? `/collect-balance?token=${approval.balance_payment_token}`
-        : null,
+      // Use booking_id directly for balance collection
+      collectBalance: `/collect-balance?token=${booking.id}`,
       // client_approval_token is used for the client-facing approval page
       clientApprovalPage: approval?.client_approval_token
         ? `/approve?token=${approval.client_approval_token}`

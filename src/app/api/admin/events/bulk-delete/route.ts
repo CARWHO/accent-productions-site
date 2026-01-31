@@ -32,7 +32,6 @@ export async function POST(request: Request) {
         id,
         quote_number,
         quote_drive_file_id,
-        tech_rider_file_id,
         calendar_event_id
       `)
       .in('id', ids);
@@ -58,9 +57,6 @@ export async function POST(request: Request) {
     for (const booking of bookings) {
       if (booking.quote_drive_file_id) {
         deletePromises.push(deleteFile(booking.quote_drive_file_id));
-      }
-      if (booking.tech_rider_file_id) {
-        deletePromises.push(deleteFile(booking.tech_rider_file_id));
       }
       if (booking.calendar_event_id) {
         deletePromises.push(deleteCalendarEvent(booking.calendar_event_id));

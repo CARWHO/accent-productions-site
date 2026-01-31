@@ -65,7 +65,7 @@ interface FullSystemFormData {
   contactEmail: string;
   contactPhone: string;
   // Timing fields for contractors
-  roomAvailableFrom?: string;
+  siteAvailableFrom?: string;
   callTime?: string;
   packOutTime?: string;
 }
@@ -173,7 +173,7 @@ interface JobsheetOptions {
   playbackFromDevice?: boolean;
   additionalInfo?: string;
   // Timing fields for contractors
-  roomAvailableFrom?: string;
+  siteAvailableFrom?: string;
   callTime?: string;
   packOutTime?: string;
 }
@@ -236,7 +236,7 @@ async function generateJobsheetSheet(
         needsGenerator: options?.needsGenerator || false,
         // Timing fields for contractors (from client form)
         loadInTime: options?.callTime || null,           // callTime maps to loadInTime (crew arrival)
-        roomAvailableFrom: options?.roomAvailableFrom || null,  // When venue opens for setup
+        siteAvailableFrom: options?.siteAvailableFrom || null,  // When venue opens for setup
         packDownTime: options?.packOutTime || null,      // packOutTime maps to packDownTime (teardown complete)
         // Content requirements
         contentRequirements,
@@ -366,7 +366,7 @@ serve(async (req) => {
       playbackFromDevice: fsData.playbackFromDevice || false,
       additionalInfo: fsData.additionalInfo || undefined,
       // Timing fields for contractors
-      roomAvailableFrom: fsData.roomAvailableFrom || undefined,
+      siteAvailableFrom: fsData.siteAvailableFrom || undefined,
       callTime: fsData.callTime || undefined,
       packOutTime: fsData.packOutTime || undefined,
     } : undefined;
