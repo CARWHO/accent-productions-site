@@ -276,13 +276,13 @@ async function createJobsheetTemplate(folderType) {
         ['client_name', ''],
         ['client_email', ''],
         ['client_phone', ''],
-        ['room_available_from', ''],  // When venue opens for setup
+        ['site_available_from', ''],  // When venue opens for setup
         ['load_in_time', ''],         // When crew arrives (call time)
         ['sound_check_time', ''],
         ['doors_time', ''],
         ['set_time', ''],
         ['finish_time', ''],
-        ['pack_down_time', ''],       // When teardown finishes (pack-out time)
+        ['site_vacate_time', ''],     // When we need to leave
       ],
     },
   });
@@ -537,33 +537,41 @@ async function main() {
     jobsheet: {},
   };
 
-  for (const folderType of FOLDER_TYPES) {
-    results.quote[folderType] = await createQuoteTemplate(folderType);
-    results.jobsheet[folderType] = await createJobsheetTemplate(folderType);
-    console.log('');
-  }
-
-  console.log('='.repeat(60));
-  console.log('ALL TEMPLATES CREATED!\n');
-  console.log('Add these to your .env:\n');
-  console.log('# Quote Templates');
+  // Only create quote templates (comment out to create all including jobsheets)
+  results.quote.fullsystem = await createQuoteTemplate('fullsystem');
   console.log(`GOOGLE_FULLSYSTEM_QUOTE_TEMPLATE_ID=${results.quote.fullsystem}`);
-  console.log(`GOOGLE_BACKLINE_QUOTE_TEMPLATE_ID=${results.quote.backline}`);
-  console.log(`GOOGLE_SOUNDTECH_QUOTE_TEMPLATE_ID=${results.quote.soundtech}`);
   console.log('');
-  console.log('# Jobsheet Templates');
-  console.log(`GOOGLE_FULLSYSTEM_JOBSHEET_TEMPLATE_ID=${results.jobsheet.fullsystem}`);
-  console.log(`GOOGLE_BACKLINE_JOBSHEET_TEMPLATE_ID=${results.jobsheet.backline}`);
-  console.log(`GOOGLE_SOUNDTECH_JOBSHEET_TEMPLATE_ID=${results.jobsheet.soundtech}`);
-  console.log('='.repeat(60));
 
-  console.log('\nIMPORTANT: After creating templates, you need to:');
-  console.log('1. Open each QUOTE and JOBSHEET template in Google Sheets');
+  results.quote.backline = await createQuoteTemplate('backline');
+  console.log(`GOOGLE_BACKLINE_QUOTE_TEMPLATE_ID=${results.quote.backline}`);
+
+  // COMMENTED OUT - Uncomment to create all templates
+  // for (const folderType of FOLDER_TYPES) {
+  //   results.quote[folderType] = await createQuoteTemplate(folderType);
+  //   results.jobsheet[folderType] = await createJobsheetTemplate(folderType);
+  //   console.log('');
+  // }
+  //
+  // console.log('='.repeat(60));
+  // console.log('ALL TEMPLATES CREATED!\n');
+  // console.log('Add these to your .env:\n');
+  // console.log('# Quote Templates');
+  // console.log(`GOOGLE_FULLSYSTEM_QUOTE_TEMPLATE_ID=${results.quote.fullsystem}`);
+  // console.log(`GOOGLE_BACKLINE_QUOTE_TEMPLATE_ID=${results.quote.backline}`);
+  // console.log(`GOOGLE_SOUNDTECH_QUOTE_TEMPLATE_ID=${results.quote.soundtech}`);
+  // console.log('');
+  // console.log('# Jobsheet Templates');
+  // console.log(`GOOGLE_FULLSYSTEM_JOBSHEET_TEMPLATE_ID=${results.jobsheet.fullsystem}`);
+  // console.log(`GOOGLE_BACKLINE_JOBSHEET_TEMPLATE_ID=${results.jobsheet.backline}`);
+  // console.log(`GOOGLE_SOUNDTECH_JOBSHEET_TEMPLATE_ID=${results.jobsheet.soundtech}`);
+  // console.log('='.repeat(60));
+
+  console.log('\nIMPORTANT: After creating template, you need to:');
+  console.log('1. Open the QUOTE template in Google Sheets');
   console.log('2. Go to the hidden "Lookup" sheet (unhide it temporarily)');
   console.log('3. Click cell A1 and click "Allow access" for IMPORTRANGE');
-  console.log('4. For QUOTE templates: Also authorize the IMPORTRANGE in LineItems column D');
+  console.log('4. Also authorize the IMPORTRANGE in LineItems column D');
   console.log('   (Both will show #REF! until authorized)');
-  console.log('5. For JOBSHEET templates: The Equipment tab dropdown will work after authorizing Lookup');
 }
 
 main().catch(console.error);

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import crypto from 'crypto';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const businessEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co.nz';
@@ -69,22 +68,10 @@ export async function GET(request: Request) {
 
     console.log(`Found ${validPayments.length} pending contractor payments`);
 
-    // Generate payment tokens for each assignment
-    for (const assignment of validPayments) {
-      if (!assignment.payment_token) {
-        const token = crypto.randomBytes(32).toString('hex');
-        await supabase
-          .from('booking_contractor_assignments')
-          .update({ payment_token: token })
-          .eq('id', assignment.id);
-        assignment.payment_token = token;
-      }
-    }
-
     // Group by booking for cleaner email
     interface BookingGroup {
       booking: { id: string; event_name: string | null; event_date: string; quote_number: string | null };
-      contractors: Array<{ name: string; amount: number; token: string }>;
+      contractors: Array<{ name: string; amount: number; assignmentId: string }>;
     }
 
     const byBooking: Record<string, BookingGroup> = {};
@@ -99,7 +86,7 @@ export async function GET(request: Request) {
       byBooking[bookingId].contractors.push({
         name: payment.contractors.name,
         amount: payment.pay_amount,
-        token: payment.payment_token
+        assignmentId: payment.id
       });
     }
 
@@ -120,7 +107,7 @@ export async function GET(request: Request) {
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.name}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">$${c.amount}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
-              <a href="${baseUrl}/pay-contractor?token=${c.token}"
+              <a href="${baseUrl}/pay-contractor?token=${c.assignmentId}"
                  style="background: #16a34a; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 12px;">
                 Pay
               </a>
@@ -199,18 +186,6 @@ export async function GET(request: Request) {
     if (validBalances.length > 0) {
       console.log(`Found ${validBalances.length} pending client balances`);
 
-      // Generate balance payment tokens
-      for (const approval of validBalances) {
-        if (!approval.balance_payment_token) {
-          const token = crypto.randomBytes(32).toString('hex');
-          await supabase
-            .from('client_approvals')
-            .update({ balance_payment_token: token })
-            .eq('id', approval.id);
-          approval.balance_payment_token = token;
-        }
-      }
-
       // Send email to admin about client balances
       if (resend) {
         const formatDate = (dateStr: string) => {
@@ -237,7 +212,7 @@ export async function GET(request: Request) {
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${booking.client_name}</td>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">$${balance.toFixed(0)}</td>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
-                <a href="${baseUrl}/collect-balance?token=${ca.balance_payment_token}"
+                <a href="${baseUrl}/collect-balance?token=${booking.id}"
                    style="background: #1c1917; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 12px;">
                   Collect
                 </a>

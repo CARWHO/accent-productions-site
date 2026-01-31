@@ -55,7 +55,7 @@ export async function GET(request: Request) {
           client_name,
           call_time,
           pack_out_time,
-          room_available_from,
+          site_available_from,
           call_out_notes,
           band_names
         )
@@ -120,7 +120,7 @@ export async function GET(request: Request) {
           client_name: string;
           call_time: string | null;
           pack_out_time: string | null;
-          room_available_from: string | null;
+          site_available_from: string | null;
           call_out_notes: string | null;
           band_names: string | null;
         };
@@ -136,7 +136,7 @@ export async function GET(request: Request) {
           timeInfo += timeInfo ? ` | Show: ${formatTime(booking.event_time)}` : `Show: ${formatTime(booking.event_time)}`;
         }
         if (booking.pack_out_time) {
-          timeInfo += timeInfo ? ` | Pack-out: ${formatTime(booking.pack_out_time)}` : `Pack-out: ${formatTime(booking.pack_out_time)}`;
+          timeInfo += timeInfo ? ` | Site Vacate: ${formatTime(booking.pack_out_time)}` : `Site Vacate: ${formatTime(booking.pack_out_time)}`;
         }
 
         const bandNamesHtml = booking.band_names

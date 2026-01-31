@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       timeInfo += timeInfo ? ` | Show: ${formatTime(booking.event_time)}` : `Show: ${formatTime(booking.event_time)}`;
     }
     if (booking.pack_out_time) {
-      timeInfo += timeInfo ? ` | Pack-out: ${formatTime(booking.pack_out_time)}` : `Pack-out: ${formatTime(booking.pack_out_time)}`;
+      timeInfo += timeInfo ? ` | Site Vacate: ${formatTime(booking.pack_out_time)}` : `Site Vacate: ${formatTime(booking.pack_out_time)}`;
     }
 
     const bandNamesHtml = booking.band_names

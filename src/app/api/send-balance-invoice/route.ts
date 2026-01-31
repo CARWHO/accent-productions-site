@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import crypto from 'crypto';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -9,10 +8,10 @@ const businessEmail = process.env.BUSINESS_EMAIL || 'hello@accent-productions.co
 
 export async function POST(request: Request) {
   try {
-    const { token } = await request.json();
+    const { bookingId } = await request.json();
 
-    if (!token) {
-      return NextResponse.json({ error: 'Missing token' }, { status: 400 });
+    if (!bookingId) {
+      return NextResponse.json({ error: 'Missing bookingId' }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
@@ -20,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
-    // Get approval by balance payment token
+    // Get approval by booking_id
     const { data: approval, error: fetchError } = await supabase
       .from('client_approvals')
       .select(`
@@ -28,14 +27,13 @@ export async function POST(request: Request) {
         adjusted_quote_total,
         deposit_amount,
         balance_status,
-        balance_payment_token,
         bookings (id, event_name, event_date, quote_number, client_name, client_email, client_phone)
       `)
-      .eq('balance_payment_token', token)
+      .eq('booking_id', bookingId)
       .single();
 
     if (fetchError || !approval) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
+      return NextResponse.json({ error: 'Approval not found' }, { status: 404 });
     }
 
     if (approval.balance_status === 'paid') {
@@ -55,16 +53,6 @@ export async function POST(request: Request) {
     const total = Number(approval.adjusted_quote_total) || 0;
     const deposit = Number(approval.deposit_amount) || 0;
     const balance = total - deposit;
-
-    // Generate a client payment token if not exists
-    let clientPaymentToken = approval.balance_payment_token;
-    if (!clientPaymentToken) {
-      clientPaymentToken = crypto.randomBytes(32).toString('hex');
-      await supabase
-        .from('client_approvals')
-        .update({ balance_payment_token: clientPaymentToken })
-        .eq('id', approval.id);
-    }
 
     // Update status to invoiced
     await supabase
@@ -124,7 +112,7 @@ export async function POST(request: Request) {
             </table>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${baseUrl}/pay-balance?token=${clientPaymentToken}"
+              <a href="${baseUrl}/pay-balance?token=${booking.id}"
                  style="display: inline-block; background: #1c1917; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
                 Pay Balance
               </a>

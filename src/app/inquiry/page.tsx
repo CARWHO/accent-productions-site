@@ -16,13 +16,13 @@ const serviceTypes = [
     description: 'Equipment-only rental. Choose the gear you need and pick up or have it delivered.',
     href: '/inquiry/backline',
     image: '/images/soundgear-rental.png',
-  },
-  {
-    title: 'Lighting & Staging',
-    description: 'Stage setup, lighting rigs, and visual production for your event.',
-    href: '/inquiry/lighting',
-    image: '/images/soundtech-hire.png', // TODO: Replace with lighting image
-  },
+  }
+  // {
+  //   title: 'Lighting & Staging',
+  //   description: 'Stage setup, lighting rigs, and visual production for your event.',
+  //   href: '/inquiry/lighting',
+  //   image: '/images/soundtech-hire.png', // TODO: Replace with lighting image
+  // },
 ];
 
 export default function InquiryPage() {

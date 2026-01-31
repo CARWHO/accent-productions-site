@@ -5,7 +5,7 @@ import { buildICSFromBooking } from '@/lib/ics-generator';
 /**
  * GET: Generate and download an ICS calendar file for a booking
  * Query params:
- *   - token: contractor_selection_token or contractor_token
+ *   - token: contractor_selection_token
  *   - booking_id: alternative to token for direct lookup
  */
 export async function GET(request: Request) {
@@ -37,25 +37,16 @@ export async function GET(request: Request) {
       }
       booking = data;
     } else if (token) {
-      // Try contractor_selection_token first, then contractor_token
-      let result = await supabase
+      const { data, error } = await supabase
         .from('bookings')
         .select('*')
         .eq('contractor_selection_token', token)
         .single();
 
-      if (result.error || !result.data) {
-        result = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('contractor_token', token)
-          .single();
-      }
-
-      if (result.error || !result.data) {
+      if (error || !data) {
         return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
       }
-      booking = result.data;
+      booking = data;
     }
 
     if (!booking) {

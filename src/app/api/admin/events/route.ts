@@ -26,7 +26,6 @@ export async function GET(request: Request) {
   const sortOrder = searchParams.get('order') || 'desc';
   const limit = parseInt(searchParams.get('limit') || '100', 10);
   const offset = parseInt(searchParams.get('offset') || '0', 10);
-  const showPast = searchParams.get('past') === 'true';
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
@@ -81,14 +80,7 @@ export async function GET(request: Request) {
       query = query.lte('event_date', dateTo);
     }
 
-    // Filter past/upcoming
-    const today = new Date().toISOString().split('T')[0];
-    if (showPast) {
-      query = query.lt('event_date', today);
-    } else if (!dateFrom && !dateTo) {
-      // Default to upcoming events
-      query = query.gte('event_date', today);
-    }
+    // Only filter by date if explicit date range is provided (no default filtering)
 
     // Sorting
     const validSortFields = ['event_date', 'created_at', 'client_name', 'status'];

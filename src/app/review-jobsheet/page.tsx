@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import PageCard from '@/components/ui/PageCard';
 import { SuccessIcon, ErrorIcon, LoadingSpinner } from '@/components/ui/StatusIcons';
+import { formatDate } from '@/lib/format-utils';
+import { inputStyles } from '@/lib/form-styles';
 
 interface JobSheetData {
   equipment: { item: string; quantity: number }[];
@@ -26,7 +28,7 @@ interface Booking {
   // Group 2 fields
   call_time: string | null;
   pack_out_time: string | null;
-  room_available_from: string | null;
+  site_available_from: string | null;
   call_out_notes: string | null;
   vehicle_type: string | null;
   vehicle_amount: number | null;
@@ -65,7 +67,7 @@ function ReviewJobSheetContent() {
   // Editable fields
   const [callTime, setCallTime] = useState('');
   const [packOutTime, setPackOutTime] = useState('');
-  const [roomAvailableFrom, setRoomAvailableFrom] = useState('');
+  const [siteAvailableFrom, setSiteAvailableFrom] = useState('');
   const [callOutNotes, setCallOutNotes] = useState('');
   const [vehicleType, setVehicleType] = useState('');
   const [vehicleAmount, setVehicleAmount] = useState('');
@@ -97,7 +99,7 @@ function ReviewJobSheetContent() {
         const b = data.booking;
         setCallTime(b.call_time || '');
         setPackOutTime(b.pack_out_time || '');
-        setRoomAvailableFrom(b.room_available_from || '');
+        setSiteAvailableFrom(b.site_available_from || '');
         setCallOutNotes(b.call_out_notes || '');
         setVehicleType(b.vehicle_type || '');
         // Vehicle amount: from booking, or default from quote lineItems
@@ -130,7 +132,7 @@ function ReviewJobSheetContent() {
           updates: {
             call_time: callTime || null,
             pack_out_time: packOutTime || null,
-            room_available_from: roomAvailableFrom || null,
+            site_available_from: siteAvailableFrom || null,
             call_out_notes: callOutNotes || null,
             vehicle_type: vehicleType || null,
             vehicle_amount: vehicleAmount ? parseFloat(vehicleAmount) : null,
@@ -156,17 +158,6 @@ function ReviewJobSheetContent() {
     await handleSave();
     router.push(`/select-contractors?token=${token}`);
   };
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-NZ', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-  };
-
-  const inputStyles = "w-full border border-gray-300 rounded-md px-3 py-2.5 text-base focus:outline-none focus:border-[#000000] transition-colors bg-white font-medium";
 
   if (loading) {
     return (
@@ -199,19 +190,27 @@ function ReviewJobSheetContent() {
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Review Job Sheet</h1>
             <p className="text-gray-600 font-medium">Quote #{booking.quote_number}</p>
           </div>
-          {booking.jobsheet_sheet_id && (
-            <a
-              href={`https://docs.google.com/spreadsheets/d/${booking.jobsheet_sheet_id}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          <div className="flex items-center gap-3">
+            {booking.jobsheet_sheet_id && (
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${booking.jobsheet_sheet_id}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/>
+                </svg>
+                Edit in Sheets
+              </a>
+            )}
+            <button
+              onClick={() => router.push('/admin/events')}
+              className="text-gray-700 font-bold text-sm"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/>
-              </svg>
-              Edit in Sheets
-            </a>
-          )}
+              Back
+            </button>
+          </div>
         </div>
 
         {/* Status Badge */}
@@ -281,6 +280,18 @@ function ReviewJobSheetContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Site Available From
+                </label>
+                <input
+                  type="time"
+                  value={siteAvailableFrom}
+                  onChange={(e) => setSiteAvailableFrom(e.target.value)}
+                  className={inputStyles}
+                />
+                <p className="text-xs text-gray-500 mt-1">When venue opens for setup</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Call Time (Pack-in)
                 </label>
                 <input
@@ -293,19 +304,7 @@ function ReviewJobSheetContent() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Room Available From
-                </label>
-                <input
-                  type="time"
-                  value={roomAvailableFrom}
-                  onChange={(e) => setRoomAvailableFrom(e.target.value)}
-                  className={inputStyles}
-                />
-                <p className="text-xs text-gray-500 mt-1">When venue opens for setup</p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Pack-out Time
+                  Site Vacate Time
                 </label>
                 <input
                   type="time"
@@ -313,7 +312,7 @@ function ReviewJobSheetContent() {
                   onChange={(e) => setPackOutTime(e.target.value)}
                   className={inputStyles}
                 />
-                <p className="text-xs text-gray-500 mt-1">When tear-down finishes</p>
+                <p className="text-xs text-gray-500 mt-1">When we need to leave</p>
               </div>
             </div>
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import PageCard from '@/components/ui/PageCard';
+import { categoryConfig, hiddenCategories, mergedCategories, categoryOrder } from '@/lib/backline-config';
 
 interface CategoryInfo {
   name: string;
@@ -11,36 +12,6 @@ interface CategoryInfo {
   count: number;
   image: string;
 }
-
-const categoryConfig: Record<string, { slug: string; image: string }> = {
-  'Drum Kits': { slug: 'drum-kits', image: '/images/drumkits.png' },
-  'Cymbals': { slug: 'cymbals', image: '/images/cymbals.png' },
-  'Percussion': { slug: 'percussion', image: '/images/percussion.png' },
-  'Guitar Amps': { slug: 'guitar-amps', image: '/images/guitar-amps.png' },
-  'Bass Heads': { slug: 'bass-heads', image: '/images/base-heads.png' },
-  'Bass Cabinets': { slug: 'bass-cabinets', image: '/images/bass-cabinets.png' },
-  'Keyboards': { slug: 'keyboards', image: '/images/keyboard.png' },
-  'Guitars': { slug: 'guitars', image: '/images/guitars.png' },
-};
-
-// Categories to hide from the listing
-const hiddenCategories = new Set(['Accessories']);
-
-// Categories to merge into "Guitars"
-const mergedCategories: Record<string, string[]> = {
-  'Guitars': ['Guitars', 'Bass Guitars'],
-};
-
-const categoryOrder = [
-  'Drum Kits',
-  'Cymbals',
-  'Percussion',
-  'Guitar Amps',
-  'Bass Heads',
-  'Bass Cabinets',
-  'Keyboards',
-  'Guitars',
-];
 
 export default function BacklinePage() {
   const [categories, setCategories] = useState<CategoryInfo[]>([]);

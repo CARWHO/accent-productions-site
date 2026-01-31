@@ -236,6 +236,12 @@ serve(async (req) => {
           Questions? Reply to this email or call us on 027 602 3869.
         </p>
 
+        ${invoiceDriveLink ? `
+        <div style="margin: 20px 0;">
+          <a href="${invoiceDriveLink}" style="color: #2563eb; font-size: 14px;">View Invoice</a>
+        </div>
+        ` : ""}
+
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />
         <p style="color: #999; font-size: 12px;">
           Accent Productions | Professional Sound & Lighting

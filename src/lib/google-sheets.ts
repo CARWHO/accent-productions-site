@@ -98,13 +98,6 @@ export interface LineItem {
   lineTotal?: number;    // Optional: bypass formula with direct total
 }
 
-// Legacy format for backward compatibility
-export interface LegacyLineItem {
-  description: string;
-  cost: number;
-  quantity?: number;
-}
-
 export interface CreateQuoteSheetResult {
   spreadsheetId: string;
   spreadsheetUrl: string;
@@ -197,16 +190,20 @@ export async function createQuoteSheet(
     }
 
     // Write labour items with direct pricing to A-F (after equipment rows)
+    // Line Total uses formula =B*D (Hours × Rate) so editing hours/rate updates total
     if (labourItems.length > 0) {
       const startRow = 2 + equipmentItems.length;
-      const labourValues = labourItems.map(item => [
-        item.gearName,
-        item.quantity,
-        item.days,
-        item.unitRate,
-        '',  // Day2+ rate not applicable
-        item.lineTotal,
-      ]);
+      const labourValues = labourItems.map((item, index) => {
+        const rowNum = startRow + index;
+        return [
+          item.gearName,
+          item.quantity,
+          item.days,
+          item.unitRate,
+          '',  // Day2+ rate not applicable
+          `=B${rowNum}*D${rowNum}`,  // Formula: Hours × Rate
+        ];
+      });
 
       await sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -398,88 +395,6 @@ export async function exportSheetAsPdf(
   }
 }
 
-/**
- * Get the URL to edit a spreadsheet directly
- */
-export function getSheetEditUrl(spreadsheetId: string): string {
-  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
-}
-
-/**
- * Update line items in an existing quote sheet
- *
- * Updates LineItems tab with Gear Name, Qty, Days, and optionally direct pricing
- */
-export async function updateQuoteLineItems(
-  spreadsheetId: string,
-  lineItems: LineItem[]
-): Promise<boolean> {
-  try {
-    const oauth2Client = getOAuth2Client();
-    if (!oauth2Client) {
-      console.warn('Google not configured');
-      return false;
-    }
-
-    const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
-
-    // Clear existing line items (rows 2-51, columns A-C only to preserve formulas in D-F)
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId,
-      range: 'LineItems!A2:C51',
-    });
-
-    // Split into equipment (uses VLOOKUP) and labour (direct pricing)
-    const equipmentItems = lineItems.filter(item => item.unitRate === undefined);
-    const labourItems = lineItems.filter(item => item.unitRate !== undefined);
-
-    // Write equipment items to A-C only
-    if (equipmentItems.length > 0) {
-      const equipmentValues = equipmentItems.map(item => [
-        item.gearName,
-        item.quantity,
-        item.days,
-      ]);
-
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: 'LineItems!A2:C' + (1 + equipmentItems.length),
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: equipmentValues,
-        },
-      });
-    }
-
-    // Write labour items with direct pricing to A-F (after equipment rows)
-    if (labourItems.length > 0) {
-      const startRow = 2 + equipmentItems.length;
-      const labourValues = labourItems.map(item => [
-        item.gearName,
-        item.quantity,
-        item.days,
-        item.unitRate,
-        '',
-        item.lineTotal,
-      ]);
-
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `LineItems!A${startRow}:F${startRow + labourItems.length - 1}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: labourValues,
-        },
-      });
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error updating quote line items:', error);
-    return false;
-  }
-}
-
 export interface JobSheetEventData {
   quoteNumber: string;
   eventName: string;
@@ -489,13 +404,13 @@ export interface JobSheetEventData {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
-  roomAvailableFrom?: string;  // When venue opens for setup
+  siteAvailableFrom?: string;  // When venue opens for setup
   loadInTime?: string;         // When crew arrives (call time)
   soundCheckTime?: string;
   doorsTime?: string;
   setTime?: string;
   finishTime?: string;
-  packDownTime?: string;       // When teardown finishes (pack-out time)
+  packDownTime?: string;       // When we need to leave (site vacate time)
   // AI-generated content (stored as JSON in sheet)
   suggestedGear?: Array<{ item: string; quantity: number; notes?: string }>;
   executionNotes?: string[];
@@ -575,7 +490,7 @@ export async function createJobSheet(
           [eventData.clientName],
           [eventData.clientEmail],
           [eventData.clientPhone],
-          [eventData.roomAvailableFrom || ''],  // NEW: When venue opens for setup
+          [eventData.siteAvailableFrom || ''],  // NEW: When venue opens for setup
           [eventData.loadInTime || ''],         // When crew arrives (call time)
           [eventData.soundCheckTime || ''],
           [eventData.doorsTime || ''],
@@ -586,7 +501,7 @@ export async function createJobSheet(
       },
     });
 
-    // Row 17: Suggested Gear section header (shifted down by 1 due to roomAvailableFrom)
+    // Row 17: Suggested Gear section header (shifted down by 1 due to siteAvailableFrom)
     // Rows 18-32: Gear items (Item | Qty | Notes) - up to 15 items
     const gearRows: string[][] = [
       ['SUGGESTED GEAR', 'Item', 'Qty', 'Notes'], // Header row
@@ -699,13 +614,13 @@ export interface JobSheetData {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
-  roomAvailableFrom: string;  // When venue opens for setup
+  siteAvailableFrom: string;  // When venue opens for setup
   loadInTime: string;         // When crew arrives (call time)
   soundCheckTime: string;
   doorsTime: string;
   setTime: string;
   finishTime: string;
-  packDownTime: string;       // When teardown finishes (pack-out time)
+  packDownTime: string;       // When we need to leave (site vacate time)
   suggestedGear: Array<{ item: string; quantity: number; notes?: string }>;
   executionNotes: string[];
   equipment: Array<{ gearName: string; quantity: number; notes: string }>;
@@ -717,7 +632,7 @@ export interface JobSheetData {
  * Used by notify-contractors to get admin-edited data
  *
  * Layout:
- * - Rows 1-15: Basic event data (B column) - includes roomAvailableFrom at row 9
+ * - Rows 1-15: Basic event data (B column) - includes siteAvailableFrom at row 9
  * - Rows 18-32: Suggested Gear (B=Item, C=Qty, D=Notes)
  * - Rows 35-49: Execution Notes (A column)
  */
@@ -815,7 +730,7 @@ export async function readJobSheetData(
       clientName: getValue(5),
       clientEmail: getValue(6),
       clientPhone: getValue(7),
-      roomAvailableFrom: getValue(8),  // When venue opens for setup
+      siteAvailableFrom: getValue(8),  // When venue opens for setup
       loadInTime: getValue(9),         // When crew arrives (call time)
       soundCheckTime: getValue(10),
       doorsTime: getValue(11),

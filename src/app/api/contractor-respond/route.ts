@@ -24,11 +24,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Find assignment by token
+    // Find assignment by ID
     const { data: assignment, error: fetchError } = await supabase
       .from('booking_contractor_assignments')
       .select('*, contractors(*), bookings(*)')
-      .eq('assignment_token', token)
+      .eq('id', token)
       .single();
 
     if (fetchError || !assignment) {
@@ -193,11 +193,13 @@ export async function GET(request: Request) {
               </div>
 
               <!-- Add to Calendar Button -->
-              <div style="margin: 25px 0;">
+              <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="font-size: 13px; color: #6b7280; margin: 0 0 10px 0;">Add to your calendar:</p>
                 <a href="${icsUrl}"
-                   style="display: inline-block; background: #6b7280; color: #fff; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                   style="display: inline-block; background: #6b7280; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px;">
                   Add to Calendar
                 </a>
+                <p style="font-size: 11px; color: #9ca3af; margin: 8px 0 0 0;">Works with Outlook, Apple Calendar, Google Calendar</p>
               </div>
 
               <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin: 20px 0;">

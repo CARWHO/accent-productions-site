@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { processContractorPayment } from '@/lib/stripe-payments';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://accent-productions.co.nz';
@@ -21,7 +20,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Find assignment by payment token
+    // Find assignment by ID
     const { data: assignment, error: fetchError } = await supabase
       .from('booking_contractor_assignments')
       .select(`
@@ -29,7 +28,7 @@ export async function GET(request: Request) {
         contractors (id, name, email),
         bookings (id, event_name, event_date, quote_number)
       `)
-      .eq('payment_token', token)
+      .eq('id', token)
       .single();
 
     if (fetchError || !assignment) {
@@ -40,21 +39,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${baseUrl}/result?type=already_done&message=${encodeURIComponent('Payment to ' + assignment.contractors.name + ' was already confirmed.')}`);
     }
 
-    // Process payment via Stripe (stub for now)
-    const paymentResult = await processContractorPayment({
-      contractorId: assignment.contractors.id,
-      contractorName: assignment.contractors.name,
-      contractorEmail: assignment.contractors.email,
-      amount: Number(assignment.pay_amount),
-      description: `Payment for ${assignment.bookings.event_name || 'Event'} - Quote #${assignment.bookings.quote_number}`,
-    });
-
-    if (!paymentResult.success) {
-      console.error('Payment failed:', paymentResult.error);
-      return NextResponse.redirect(`${baseUrl}/result?type=error&error=payment_failed`);
-    }
-
-    // Update assignment status
+    // Update assignment status (payment is done manually via bank transfer)
     const { error: updateError } = await supabase
       .from('booking_contractor_assignments')
       .update({

@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { formatDate } from '@/lib/format-utils';
+import { STATUS_COLORS, STATUS_LABELS } from '@/lib/status-config';
 
 interface Booking {
   id: string;
@@ -30,69 +33,10 @@ interface Client {
   client_email: string;
 }
 
-interface Reminder {
-  id: string;
-  contractor: { id: string; name: string; email: string };
-  booking: {
-    id: string;
-    event_name: string | null;
-    event_date: string;
-    event_time: string | null;
-    location: string | null;
-    quote_number: string | null;
-    client_name: string;
-    daysUntil: number;
-  };
-  reminderDate: string;
-  daysUntilReminder: number;
-  reminderDue: boolean;
-  reminderSent: boolean;
-  lastReminderSentAt: string | null;
-}
-
-interface Payment {
-  id: string;
-  type: 'contractor' | 'balance';
-  contractor?: { id: string; name: string; email: string };
-  client?: { name: string; email: string };
-  booking: {
-    id: string;
-    event_name: string | null;
-    event_date: string;
-    quote_number: string | null;
-    client_name?: string;
-  };
-  amount: number | null;
-  paymentStatus: string;
-  payUrl?: string;
-  collectUrl?: string;
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  quote_sent: 'bg-blue-100 text-blue-800',
-  client_approved: 'bg-green-100 text-green-800',
-  contractors_notified: 'bg-purple-100 text-purple-800',
-  assigned: 'bg-indigo-100 text-indigo-800',
-  completed: 'bg-gray-100 text-gray-800',
-  cancelled: 'bg-red-100 text-red-800',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  quote_sent: 'Quote Sent',
-  client_approved: 'Approved',
-  contractors_notified: 'Notified',
-  assigned: 'Assigned',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
-
 const ITEMS_PER_PAGE = 50;
 
 export default function AdminEventsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'events' | 'reminders' | 'payments'>('events');
 
   // Events state
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -104,9 +48,13 @@ export default function AdminEventsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [clientFilter, setClientFilter] = useState('');
-  const [showPast, setShowPast] = useState(false);
   const [sortField, setSortField] = useState('event_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // Debounced search to prevent flickering
+  const debouncedSearch = useDebouncedValue(search, 300);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,42 +74,26 @@ export default function AdminEventsPage() {
   // Duplicate state
   const [duplicating, setDuplicating] = useState<string | null>(null);
 
-  // Reminders state
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [loadingReminders, setLoadingReminders] = useState(false);
-  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
-
-  // Payments state
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loadingPayments, setLoadingPayments] = useState(false);
-
   useEffect(() => {
     fetchEvents();
     // Clear selections when filters/page change
     setSelectedIds(new Set());
-  }, [search, statusFilter, clientFilter, showPast, sortField, sortOrder, currentPage]);
+  }, [debouncedSearch, statusFilter, clientFilter, sortField, sortOrder, currentPage, dateFrom, dateTo]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, clientFilter, showPast]);
-
-  useEffect(() => {
-    if (activeTab === 'reminders') {
-      fetchReminders();
-    } else if (activeTab === 'payments') {
-      fetchPayments();
-    }
-  }, [activeTab]);
+  }, [debouncedSearch, statusFilter, clientFilter, dateFrom, dateTo]);
 
   async function fetchEvents() {
     setLoading(true);
     const params = new URLSearchParams();
 
-    if (search) params.set('search', search);
+    if (debouncedSearch) params.set('search', debouncedSearch);
     if (statusFilter) params.set('status', statusFilter);
     if (clientFilter) params.set('client', clientFilter);
-    if (showPast) params.set('past', 'true');
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
     params.set('sort', sortField);
     params.set('order', sortOrder);
     params.set('limit', String(ITEMS_PER_PAGE));
@@ -182,45 +114,6 @@ export default function AdminEventsPage() {
       setLoading(false);
     }
   }
-
-  async function fetchReminders() {
-    setLoadingReminders(true);
-    try {
-      const res = await fetch('/api/admin/reminders/upcoming');
-      const data = await res.json();
-      if (res.ok) {
-        setReminders(data.reminders || []);
-      }
-    } catch (err) {
-      console.error('Error fetching reminders:', err);
-    } finally {
-      setLoadingReminders(false);
-    }
-  }
-
-  async function fetchPayments() {
-    setLoadingPayments(true);
-    try {
-      const res = await fetch('/api/admin/payments/pending');
-      const data = await res.json();
-      if (res.ok) {
-        setPayments(data.payments || []);
-      }
-    } catch (err) {
-      console.error('Error fetching payments:', err);
-    } finally {
-      setLoadingPayments(false);
-    }
-  }
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-NZ', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
 
   const toggleSort = (field: string) => {
     if (sortField === field) {
@@ -298,29 +191,6 @@ export default function AdminEventsPage() {
     }
   };
 
-  const handleSendReminder = async (assignmentId: string) => {
-    setSendingReminder(assignmentId);
-    try {
-      const res = await fetch('/api/admin/reminders/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignmentId }),
-      });
-
-      if (res.ok) {
-        fetchReminders();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to send reminder');
-      }
-    } catch (err) {
-      console.error('Error sending reminder:', err);
-      alert('Failed to send reminder');
-    } finally {
-      setSendingReminder(null);
-    }
-  };
-
   // Pagination helpers
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
   const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
@@ -378,49 +248,14 @@ export default function AdminEventsPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600 mt-1">Manage events, reminders, and payments</p>
+          <p className="text-gray-600 mt-1">Manage events</p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab('events')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              activeTab === 'events'
-                ? 'bg-black text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-            }`}
-          >
-            Events
-          </button>
-          <button
-            onClick={() => setActiveTab('reminders')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              activeTab === 'reminders'
-                ? 'bg-black text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-            }`}
-          >
-            Contractor Reminders
-          </button>
-          <button
-            onClick={() => setActiveTab('payments')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              activeTab === 'payments'
-                ? 'bg-black text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-            }`}
-          >
-            Pending Payments
-          </button>
-        </div>
-
-        {/* Events Tab */}
-        {activeTab === 'events' && (
-          <>
+        {/* Events */}
+        <>
             {/* Filters */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div className="relative">
                   <svg
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -470,28 +305,51 @@ export default function AdminEventsPage() {
                   ))}
                 </select>
 
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showPast}
-                      onChange={e => setShowPast(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
-                    />
-                    <span className="text-sm">Show Past</span>
-                  </label>
+                <button
+                  onClick={() => {
+                    setSearch('');
+                    setStatusFilter('');
+                    setClientFilter('');
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Date Range Filter */}
+              <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200">
+                <span className="text-sm text-gray-600">Date range:</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={e => setDateFrom(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-black focus:border-transparent"
+                    placeholder="From"
+                  />
+                  <span className="text-gray-400">to</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={e => setDateTo(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-black focus:border-transparent"
+                    placeholder="To"
+                  />
+                </div>
+                {(dateFrom || dateTo) && (
                   <button
                     onClick={() => {
-                      setSearch('');
-                      setStatusFilter('');
-                      setClientFilter('');
-                      setShowPast(false);
+                      setDateFrom('');
+                      setDateTo('');
                     }}
-                    className="text-sm text-gray-500 hover:text-gray-700"
+                    className="text-xs text-gray-500 hover:text-gray-700 underline"
                   >
-                    Clear
+                    Clear dates
                   </button>
-                </div>
+                )}
               </div>
             </div>
 
@@ -580,7 +438,7 @@ export default function AdminEventsPage() {
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
-                              {formatDate(booking.event_date)}
+                              {formatDate(booking.event_date, 'short')}
                             </div>
                             {booking.event_time && (
                               <div className="text-xs text-gray-500">{booking.event_time}</div>
@@ -692,123 +550,6 @@ export default function AdminEventsPage() {
               </div>
             )}
           </>
-        )}
-
-        {/* Reminders Tab */}
-        {activeTab === 'reminders' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Upcoming Contractor Reminders</h2>
-              <p className="text-sm text-gray-500 mt-1">Events in the next 30 days with assigned contractors</p>
-            </div>
-            {loadingReminders ? (
-              <div className="p-8 text-center text-gray-500">Loading...</div>
-            ) : reminders.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No upcoming reminders</div>
-            ) : (
-              <div className="divide-y divide-gray-200">
-                {reminders.map(reminder => (
-                  <div key={reminder.id} className="px-6 py-4 hover:bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-medium text-gray-900">{reminder.contractor.name}</h3>
-                          {reminder.reminderDue && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                              Due Today
-                            </span>
-                          )}
-                          {reminder.reminderSent && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                              Sent
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {reminder.booking.event_name || 'Event'} - {formatDate(reminder.booking.event_date)}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {reminder.booking.daysUntil} days until event | Reminder date: {formatDate(reminder.reminderDate)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleSendReminder(reminder.id)}
-                          disabled={sendingReminder === reminder.id}
-                          className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {sendingReminder === reminder.id ? 'Sending...' : 'Send Now'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Payments Tab */}
-        {activeTab === 'payments' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Pending Payments</h2>
-              <p className="text-sm text-gray-500 mt-1">Contractor payments and client balances</p>
-            </div>
-            {loadingPayments ? (
-              <div className="p-8 text-center text-gray-500">Loading...</div>
-            ) : payments.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No pending payments</div>
-            ) : (
-              <div className="divide-y divide-gray-200">
-                {payments.map(payment => (
-                  <div key={`${payment.type}-${payment.id}`} className="px-6 py-4 hover:bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                              payment.type === 'contractor'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }`}
-                          >
-                            {payment.type === 'contractor' ? 'Contractor' : 'Balance'}
-                          </span>
-                          <h3 className="font-medium text-gray-900">
-                            {payment.type === 'contractor'
-                              ? payment.contractor?.name
-                              : payment.client?.name}
-                          </h3>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {payment.booking.event_name || `Quote #${payment.booking.quote_number}`}
-                          {' - '}
-                          {formatDate(payment.booking.event_date)}
-                        </p>
-                        {payment.amount && (
-                          <p className="text-sm font-medium text-gray-900 mt-1">
-                            ${payment.amount.toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={payment.payUrl || payment.collectUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
-                        >
-                          {payment.type === 'contractor' ? 'Pay' : 'Collect'}
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Delete Confirmation Modal */}

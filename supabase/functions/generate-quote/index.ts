@@ -65,6 +65,7 @@ interface FullSystemFormData {
   type?: "fullsystem";
   package: string;
   eventType: string;
+  eventTypeOther?: string;
   eventName: string;
   organization: string;
   eventDate: string;
@@ -96,7 +97,7 @@ interface FullSystemFormData {
   hasStage: boolean;
   stageDetails: string;
   // Timing fields for contractors
-  roomAvailableFrom?: string;
+  siteAvailableFrom?: string;
   callTime?: string;
   packOutTime?: string;
   contactName: string;
@@ -556,7 +557,7 @@ ${EQUIPMENT_RULES}
 ${formatInventoryForPrompt(inventory)}
 
 ## EVENT DETAILS
-- Type: ${formData.eventType || "Event"}
+- Type: ${formData.eventType === 'other' && formData.eventTypeOther ? formData.eventTypeOther : (formData.eventType || "Event")}
 - Name: ${formData.eventName || "Not specified"}
 - Package Size: ${formData.package} (${packageSizes[formData.package] || "N/A"})
 - Date: ${formData.eventDate || "TBC"}
@@ -761,7 +762,7 @@ serve(async (req) => {
       bookingData.location = formData.location || null;
       bookingData.event_name = formData.eventName || null;
       // Timing fields from client form
-      bookingData.room_available_from = formData.roomAvailableFrom || null;
+      bookingData.site_available_from = formData.siteAvailableFrom || null;
       bookingData.call_time = formData.callTime || null;
       bookingData.pack_out_time = formData.packOutTime || null;
       const contentReqs: string[] = [];
@@ -770,7 +771,7 @@ serve(async (req) => {
       if (formData.hasBand) contentReqs.push("Band");
       if (formData.hasSpeeches) contentReqs.push("Speeches");
       const fullQuote = quote as QuoteOutput;
-      bookingData.details_json = { type: "fullsystem", package: formData.package, eventType: formData.eventType, contentRequirements: contentReqs, lineItems: fullQuote.lineItems, executionNotes: fullQuote.executionNotes, suggestedGear: fullQuote.suggestedGear, unavailableGear: fullQuote.unavailableGear };
+      bookingData.details_json = { type: "fullsystem", package: formData.package, eventType: formData.eventType, eventTypeOther: formData.eventTypeOther, contentRequirements: contentReqs, lineItems: fullQuote.lineItems, executionNotes: fullQuote.executionNotes, suggestedGear: fullQuote.suggestedGear, unavailableGear: fullQuote.unavailableGear };
     }
 
     await supabase.from("bookings").insert(bookingData);

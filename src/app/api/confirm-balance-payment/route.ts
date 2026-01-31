@@ -21,14 +21,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Find approval by balance payment token
+    // Find approval by booking_id
     const { data: approval, error: fetchError } = await supabase
       .from('client_approvals')
       .select(`
         *,
         bookings (id, event_name, event_date, quote_number, client_name, client_email)
       `)
-      .eq('balance_payment_token', token)
+      .eq('booking_id', token)
       .single();
 
     if (fetchError || !approval) {

@@ -9,7 +9,7 @@ interface RouteParams {
 
 /**
  * DELETE: Hard delete an event/booking and all associated data
- * - Deletes Google Drive files (quote, tech rider, contractor jobsheets)
+ * - Deletes Google Drive files (quote, contractor jobsheets)
  * - Deletes Google Calendar event
  * - Cascades to booking_contractor_assignments and client_approvals
  */
@@ -33,7 +33,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         id,
         quote_number,
         quote_drive_file_id,
-        tech_rider_file_id,
         calendar_event_id
       `)
       .eq('id', id)
@@ -54,10 +53,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     if (booking.quote_drive_file_id) {
       deletePromises.push(deleteFile(booking.quote_drive_file_id));
-    }
-
-    if (booking.tech_rider_file_id) {
-      deletePromises.push(deleteFile(booking.tech_rider_file_id));
     }
 
     if (assignments) {

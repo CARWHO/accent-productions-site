@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { EquipmentCard } from '@/components/backline/EquipmentCard';
 import PageCard from '@/components/ui/PageCard';
+import { slugToCategory, mergedCategories } from '@/lib/backline-config';
 
 interface HireItem {
   id: string;
@@ -15,24 +16,6 @@ interface HireItem {
   stock_quantity: number;
   image_url: string | null;
 }
-
-const slugToCategory: Record<string, string> = {
-  'drum-kits': 'Drum Kits',
-  'cymbals': 'Cymbals',
-  'percussion': 'Percussion',
-  'guitar-amps': 'Guitar Amps',
-  'bass-heads': 'Bass Heads',
-  'bass-cabinets': 'Bass Cabinets',
-  'keyboards': 'Keyboards',
-  'guitars': 'Guitars',
-  'bass-guitars': 'Bass Guitars',
-  'accessories': 'Accessories',
-};
-
-// Categories that should fetch multiple database categories
-const mergedCategories: Record<string, string[]> = {
-  'Guitars': ['Guitars', 'Bass Guitars'],
-};
 
 export default function CategoryPage() {
   const params = useParams();

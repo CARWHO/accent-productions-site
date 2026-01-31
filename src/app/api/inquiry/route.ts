@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     const body = {
       package: getField('package'),
       eventType: getField('eventType'),
+      eventTypeOther: getField('eventTypeOther'),
       eventName: getField('eventName'),
       organization: getField('organization'),
       eventDate: getField('eventDate'),
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
       hasStage: getBoolField('hasStage'),
       stageDetails: getField('stageDetails'),
       // Timing fields for contractors
-      roomAvailableFrom: getField('roomAvailableFrom'),
+      siteAvailableFrom: getField('siteAvailableFrom'),
       callTime: getField('callTime'),
       packOutTime: getField('packOutTime'),
       contactName: getField('contactName'),

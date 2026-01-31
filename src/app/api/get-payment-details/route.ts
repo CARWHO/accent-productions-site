@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Query by assignment ID
     const { data: assignment, error } = await supabase
       .from('booking_contractor_assignments')
       .select(`
@@ -24,11 +25,11 @@ export async function GET(request: Request) {
         contractors (id, name, email, bank_account),
         bookings (id, event_name, event_date, quote_number)
       `)
-      .eq('payment_token', token)
+      .eq('id', token)
       .single();
 
     if (error || !assignment) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
+      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 });
     }
 
     const contractor = assignment.contractors as unknown as { id: string; name: string; email: string; bank_account: string | null };

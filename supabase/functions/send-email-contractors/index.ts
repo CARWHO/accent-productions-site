@@ -48,7 +48,7 @@ interface JobSheetInput {
   // Group 2 fields
   callTime?: string | null;
   packOutTime?: string | null;
-  roomAvailableFrom?: string | null;
+  siteAvailableFrom?: string | null;
   callOutNotes?: string | null;
   bandNames?: string | null;
 }
@@ -278,20 +278,18 @@ serve(async (req) => {
       const contractor = assignment.contractors;
       if (!contractor) continue;
 
-      const assignmentToken = crypto.randomUUID();
-
-      // Update assignment
+      // Update assignment status
       await supabase
         .from("booking_contractor_assignments")
         .update({
-          assignment_token: assignmentToken,
           status: "notified",
           notified_at: new Date().toISOString(),
         })
         .eq("id", assignment.id);
 
-      const acceptUrl = `${SITE_URL}/api/contractor-respond?token=${assignmentToken}&action=accept`;
-      const declineUrl = `${SITE_URL}/api/contractor-respond?token=${assignmentToken}&action=decline`;
+      // Use assignment ID directly in URLs
+      const acceptUrl = `${SITE_URL}/api/contractor-respond?token=${assignment.id}&action=accept`;
+      const declineUrl = `${SITE_URL}/api/contractor-respond?token=${assignment.id}&action=decline`;
 
       // Build pay breakdown
       const hourlyRate = Number(assignment.hourly_rate) || 0;
@@ -347,7 +345,7 @@ serve(async (req) => {
         // Group 2 fields
         callTime: booking.call_time || null,
         packOutTime: booking.pack_out_time || null,
-        roomAvailableFrom: booking.room_available_from || null,
+        siteAvailableFrom: booking.site_available_from || null,
         callOutNotes: booking.call_out_notes || null,
         bandNames: booking.band_names || (details?.bandNames as string) || null,
       };
@@ -437,7 +435,7 @@ serve(async (req) => {
           (timeDisplay ? ` | ${timeDisplay}` : "");
       }
       if (jobSheetInput.packOutTime) {
-        timeDisplay += timeDisplay ? ` | Pack-out: ${formatTime(jobSheetInput.packOutTime)}` : `Pack-out: ${formatTime(jobSheetInput.packOutTime)}`;
+        timeDisplay += timeDisplay ? ` | Site Vacate: ${formatTime(jobSheetInput.packOutTime)}` : `Site Vacate: ${formatTime(jobSheetInput.packOutTime)}`;
       }
 
       const emailHtml = `
@@ -491,11 +489,16 @@ serve(async (req) => {
           <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">Please respond ASAP so we can finalize the booking.</p>
 
           <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin: 20px 0;">
-            <p style="font-size: 13px; color: #6b7280; margin: 0 0 8px 0;">Add to your calendar (if you accept):</p>
-            <a href="${SITE_URL}/api/generate-ics?token=${token}" style="display: inline-block; background: #6b7280; color: #fff; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-size: 13px;">
-              Download .ics
+            <p style="font-size: 13px; color: #6b7280; margin: 0 0 10px 0;">Add to your calendar (if you accept):</p>
+            <a href="${SITE_URL}/api/generate-ics?token=${token}" style="display: inline-block; background: #6b7280; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px;">
+              Add to Calendar
             </a>
-            <span style="font-size: 11px; color: #9ca3af; margin-left: 8px;">Works with Outlook, Apple Calendar, etc.</span>
+            <p style="font-size: 11px; color: #9ca3af; margin: 8px 0 0 0;">Works with Outlook, Apple Calendar, Google Calendar</p>
+          </div>
+
+          <div style="margin: 20px 0;">
+            ${jobSheetDriveLink ? `<a href="${jobSheetDriveLink}" style="margin-right: 16px; color: #2563eb; font-size: 14px;">View Job Sheet</a>` : ""}
+            ${booking.tech_rider_file_id ? `<a href="https://drive.google.com/file/d/${booking.tech_rider_file_id}/view" style="color: #2563eb; font-size: 14px;">View Tech Rider</a>` : ""}
           </div>
 
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e5e5;" />

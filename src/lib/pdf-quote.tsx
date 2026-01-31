@@ -1,8 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from '@react-pdf/renderer';
 import { QuoteOutput } from './gemini-quote';
-import path from 'path';
-import fs from 'fs';
+import { getLogoBase64, formatCurrency, formatDateShort } from './pdf-utils';
 
 const styles = StyleSheet.create({
   page: {
@@ -184,119 +183,132 @@ const styles = StyleSheet.create({
   },
 });
 
-function formatCurrency(amount: number): string {
-  return `$${amount.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Line item with optional extended data for labour detection
+interface ExtendedLineItem {
+  description: string;
+  amount: number;
+  quantity?: number;   // Hours for labour
+  unitRate?: number;   // >0 for labour items (hourly rate)
 }
 
-function formatDate(): string {
-  return new Date().toLocaleDateString('en-NZ', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-}
+// Categorize equipment into 6 categories: PA, Backline, Staging, Lighting, Transport, Technician
+function categorizeEquipment(lineItems: ExtendedLineItem[]): { description: string; cost: number }[] {
+  interface CategoryData {
+    items: string[];
+    total: number;
+    hours?: number;
+    rate?: number;
+  }
 
-// Categorize equipment items for grouped display
-function categorizeEquipment(lineItems: { description: string; amount: number }[]): { description: string; cost: number }[] {
-  const categories: Record<string, { items: string[]; total: number }> = {
-    'Speakers': { items: [], total: 0 },
-    'Subwoofers': { items: [], total: 0 },
-    'Monitors': { items: [], total: 0 },
-    'Microphones': { items: [], total: 0 },
-    'Console & Stage Box': { items: [], total: 0 },
-    'Accessories': { items: [], total: 0 },
-    'Labour': { items: [], total: 0 },
+  const categories: Record<string, CategoryData> = {
+    'PA': { items: [], total: 0 },           // Speakers, subs, mics, console, DIs, cables
+    'Backline': { items: [], total: 0 },     // Drums, amps, keyboards, guitars
+    'Staging': { items: [], total: 0 },      // Risers, decks, platforms
+    'Lighting': { items: [], total: 0 },     // LED, par, wash, uplights
+    'Transport': { items: [], total: 0 },    // Vehicle, delivery
+    'Technician': { items: [], total: 0, hours: 0, rate: 0 },
   };
+
+  // Keywords for non-PA categories (everything else goes to PA)
+  const patterns: { category: string; keywords: string[] }[] = [
+    { category: 'Backline', keywords: ['drum', 'kit', 'amp', 'amplifier', 'keyboard', 'piano', 'guitar', 'bass', 'fender', 'marshall', 'ampeg', 'roland', 'nord'] },
+    { category: 'Staging', keywords: ['riser', 'stage deck', 'platform', 'drum riser'] },
+    { category: 'Lighting', keywords: ['light', 'led', 'par', 'wash', 'uplift', 'uplight', 'spot', 'moving head', 'dmx', 'fixture'] },
+    { category: 'Transport', keywords: ['vehicle', 'transport', 'delivery', 'truck', 'van', 'travel', 'freight'] },
+  ];
+
+  // Keywords to identify labour/technician items
+  const labourKeywords = ['technician', 'labour', 'labor', 'tech time', 'sound tech'];
 
   for (const item of lineItems) {
     const desc = item.description.toLowerCase();
 
-    if (desc.includes('sub') || desc.includes('18')) {
-      categories['Subwoofers'].items.push(item.description);
-      categories['Subwoofers'].total += item.amount;
-    } else if (desc.includes('monitor') || desc.includes('wedge')) {
-      categories['Monitors'].items.push(item.description);
-      categories['Monitors'].total += item.amount;
-    } else if (desc.includes('elx') || desc.includes('ekx') || desc.includes('zlx') || desc.includes('etx') || desc.includes('speaker') || desc.includes('-p') || desc.includes('12p') || desc.includes('15p')) {
-      categories['Speakers'].items.push(item.description);
-      categories['Speakers'].total += item.amount;
-    } else if (desc.includes('sm58') || desc.includes('sm57') || desc.includes('mic') || desc.includes('beta') || desc.includes('sennheiser') || desc.includes('akg') || desc.includes('d112') || desc.includes('e902') || desc.includes('ksm') || desc.includes('wireless')) {
-      categories['Microphones'].items.push(item.description);
-      categories['Microphones'].total += item.amount;
-    } else if (desc.includes('console') || desc.includes('x32') || desc.includes('mixer') || desc.includes('s16') || desc.includes('stage box') || desc.includes('rio') || desc.includes('dl16') || desc.includes('dl32')) {
-      categories['Console & Stage Box'].items.push(item.description);
-      categories['Console & Stage Box'].total += item.amount;
-    } else if (desc.includes('di') || desc.includes('cable') || desc.includes('stand') || desc.includes('snake') || desc.includes('power')) {
-      categories['Accessories'].items.push(item.description);
-      categories['Accessories'].total += item.amount;
-    } else if (desc.includes('technician') || desc.includes('labour') || desc.includes('labor') || desc.includes('tech time')) {
-      categories['Labour'].items.push(item.description);
-      categories['Labour'].total += item.amount;
-    } else {
-      // Default to accessories for unmatched items
-      categories['Accessories'].items.push(item.description);
-      categories['Accessories'].total += item.amount;
+    // Labour items detected by keyword (technician, labour, etc.)
+    // unitRate provides hours breakdown if available
+    if (labourKeywords.some(kw => desc.includes(kw))) {
+      categories['Technician'].items.push(item.description);
+      categories['Technician'].total += item.amount;
+      if (item.unitRate && item.unitRate > 0) {
+        categories['Technician'].hours = item.quantity || 0;
+        categories['Technician'].rate = item.unitRate;
+      }
+      continue;
+    }
+
+    // Check specific categories
+    let matched = false;
+    for (const pattern of patterns) {
+      if (pattern.keywords.some(kw => desc.includes(kw))) {
+        categories[pattern.category].items.push(item.description);
+        categories[pattern.category].total += item.amount;
+        matched = true;
+        break;
+      }
+    }
+
+    // Default to PA (speakers, mics, console, monitors, DIs, cables, etc.)
+    if (!matched) {
+      categories['PA'].items.push(item.description);
+      categories['PA'].total += item.amount;
     }
   }
 
-  // Build result array with only non-zero categories
+  // Build result with bracket summaries
   const result: { description: string; cost: number }[] = [];
 
-  // Combine Speakers and Subs into "FOH System" if both exist
-  const speakerTotal = categories['Speakers'].total + categories['Subwoofers'].total;
-  if (speakerTotal > 0) {
-    result.push({ description: 'FOH System', cost: speakerTotal });
-  }
+  const getBracketSummary = (category: string, items: string[]): string => {
+    const types = new Set<string>();
+    for (const item of items) {
+      const lower = item.toLowerCase();
+      if (category === 'PA') {
+        if (lower.includes('speaker') || lower.includes('elx') || lower.includes('ekx') || lower.includes('zlx') || lower.includes('etx') || lower.includes('12p') || lower.includes('15p')) types.add('Speakers');
+        if (lower.includes('sub') || lower.includes('18')) types.add('Subwoofers');
+        if (lower.includes('monitor') || lower.includes('wedge')) types.add('Monitors');
+        if (lower.includes('mic') || lower.includes('sm58') || lower.includes('sm57') || lower.includes('wireless')) types.add('Microphones');
+        if (lower.includes('console') || lower.includes('mixer') || lower.includes('x32') || lower.includes('m32')) types.add('Mixer');
+        if (lower.includes('di') || lower.includes('cable') || lower.includes('stand')) types.add('Accessories');
+      } else if (category === 'Backline') {
+        if (lower.includes('drum') || lower.includes('kit')) types.add('Drum Kit');
+        if (lower.includes('guitar') && lower.includes('amp') || lower.includes('fender') || lower.includes('marshall')) types.add('Guitar Amp');
+        if (lower.includes('bass') || lower.includes('ampeg')) types.add('Bass Amp');
+        if (lower.includes('keyboard') || lower.includes('piano') || lower.includes('nord') || lower.includes('roland')) types.add('Keys');
+      } else if (category === 'Staging') {
+        if (lower.includes('drum riser')) types.add('Drum Riser');
+        else types.add('Risers');
+      } else if (category === 'Lighting') {
+        if (lower.includes('led')) types.add('LED');
+        if (lower.includes('par')) types.add('Par Cans');
+        if (lower.includes('uplift') || lower.includes('uplight')) types.add('Uplights');
+        if (lower.includes('wash')) types.add('Wash');
+      }
+    }
+    return types.size > 0 ? Array.from(types).slice(0, 3).join(', ') : '';
+  };
 
-  if (categories['Monitors'].total > 0) {
-    const count = categories['Monitors'].items.length;
-    result.push({
-      description: count > 1 ? `Monitors (${count}x)` : 'Monitor',
-      cost: categories['Monitors'].total
-    });
-  }
+  // Display order
+  const displayOrder = ['PA', 'Backline', 'Staging', 'Lighting', 'Transport', 'Technician'];
 
-  if (categories['Microphones'].total > 0) {
-    const count = categories['Microphones'].items.length;
-    result.push({
-      description: count > 1 ? `Microphones (${count}x)` : 'Microphone',
-      cost: categories['Microphones'].total
-    });
-  }
+  for (const categoryName of displayOrder) {
+    const cat = categories[categoryName];
+    if (cat.total <= 0) continue;
 
-  if (categories['Console & Stage Box'].total > 0) {
-    result.push({ description: 'Console & Stage Box', cost: categories['Console & Stage Box'].total });
-  }
-
-  if (categories['Accessories'].total > 0) {
-    result.push({ description: 'Accessories', cost: categories['Accessories'].total });
-  }
-
-  if (categories['Labour'].total > 0) {
-    result.push({ description: 'Sound Technician', cost: categories['Labour'].total });
+    if (categoryName === 'Technician') {
+      const hours = cat.hours || 0;
+      const rate = cat.rate || 0;
+      const desc = hours > 0 && rate > 0
+        ? `Technician (${hours}hrs @ $${rate}/hr)`
+        : 'Technician';
+      result.push({ description: desc, cost: cat.total });
+    } else {
+      const summary = getBracketSummary(categoryName, cat.items);
+      result.push({
+        description: summary ? `${categoryName} (${summary})` : categoryName,
+        cost: cat.total
+      });
+    }
   }
 
   return result;
-}
-
-// Get logo as base64 for embedding in PDF
-function getLogoBase64(): string | null {
-  try {
-    const logoPath = path.join(process.cwd(), 'public', 'images', 'logo-quote.png');
-    if (fs.existsSync(logoPath)) {
-      const logoBuffer = fs.readFileSync(logoPath);
-      return `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
-    // Fallback to logoblack.png
-    const fallbackPath = path.join(process.cwd(), 'public', 'images', 'logoblack.png');
-    if (fs.existsSync(fallbackPath)) {
-      const logoBuffer = fs.readFileSync(fallbackPath);
-      return `data:image/png;base64,${logoBuffer.toString('base64')}`;
-    }
-  } catch (e) {
-    console.error('Error loading logo:', e);
-  }
-  return null;
 }
 
 export async function generateQuotePDF(
@@ -315,7 +327,7 @@ export async function generateQuotePDF(
   }
 ): Promise<Buffer> {
   // Use provided issuedDate or fall back to today's date
-  const issuedDate = options?.issuedDate || formatDate();
+  const issuedDate = options?.issuedDate || formatDateShort();
   const logoBase64 = getLogoBase64();
   const isInvoice = options?.isInvoice ?? false;
   const documentNumber = isInvoice ? (options?.invoiceNumber || quote.quoteNumber) : quote.quoteNumber;
@@ -446,7 +458,7 @@ export async function generateQuotePDF(
         {/* Totals */}
         <View style={styles.totalsContainer}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>GST</Text>
+            <Text style={styles.totalLabel}>GST (15%)</Text>
             <Text style={styles.totalValue}>{formatCurrency(quote.gst)}</Text>
           </View>
           <View style={styles.totalRow}>

@@ -64,7 +64,7 @@ function CollectBalanceContent() {
       const res = await fetch('/api/send-balance-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ bookingId: token }),
       });
 
       const data = await res.json();
